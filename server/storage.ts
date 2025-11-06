@@ -1,11 +1,14 @@
 import { db } from "./db";
-import { users } from "@shared/schema";
-import { type User, type InsertUser } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { users, vehiclePolicies } from "@shared/schema";
+import { type User, type InsertUser, type VehiclePolicy, type InsertVehiclePolicy } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 
 export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  getVehiclePoliciesByEmail(email: string): Promise<VehiclePolicy[]>;
+  getVehiclePolicy(vehicleId: string, email: string): Promise<VehiclePolicy | undefined>;
+  createVehiclePolicy(policy: InsertVehiclePolicy): Promise<VehiclePolicy>;
 }
 
 export class DbStorage implements IStorage {
@@ -16,6 +19,25 @@ export class DbStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
+  }
+
+  async getVehiclePoliciesByEmail(email: string): Promise<VehiclePolicy[]> {
+    return await db.select().from(vehiclePolicies).where(eq(vehiclePolicies.email_id, email));
+  }
+
+  async getVehiclePolicy(vehicleId: string, email: string): Promise<VehiclePolicy | undefined> {
+    const result = await db.select().from(vehiclePolicies).where(
+      and(
+        eq(vehiclePolicies.vehicle_id, vehicleId),
+        eq(vehiclePolicies.email_id, email)
+      )
+    );
+    return result[0];
+  }
+
+  async createVehiclePolicy(policy: InsertVehiclePolicy): Promise<VehiclePolicy> {
+    const result = await db.insert(vehiclePolicies).values(policy).returning();
     return result[0];
   }
 }
