@@ -1,17 +1,13 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email_id: text("email_id").primaryKey(),
   user_name: text("user_name").notNull(),
-  email_id: text("email_id").notNull().unique(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-}).extend({
+export const insertUserSchema = createInsertSchema(users).extend({
   email_id: z.string().email("Invalid email address").toLowerCase().trim(),
   user_name: z.string().min(1, "Name is required").trim(),
 });
