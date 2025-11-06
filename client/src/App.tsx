@@ -31,9 +31,13 @@ function AppContent() {
       setAppState("confirmation");
     },
     onError: (error: any) => {
+      const errorMessage = error.message?.includes("Email already registered") || error.message?.includes("400")
+        ? "This email is already registered. Please use the 'Existing User' option to login."
+        : "Unable to create account. Please try again.";
+      
       toast({
-        title: "Error",
-        description: error.message || "Failed to create user",
+        title: "Registration Failed",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -50,9 +54,13 @@ function AppContent() {
       setAppState("welcome");
     },
     onError: (error: any) => {
+      const errorMessage = error.message?.includes("User not found") || error.message?.includes("404")
+        ? "User not found. Please check your email or create a new account."
+        : "Unable to login. Please try again.";
+      
       toast({
-        title: "Error",
-        description: error.message || "User not found",
+        title: "Login Failed",
+        description: errorMessage,
         variant: "destructive",
       });
     },

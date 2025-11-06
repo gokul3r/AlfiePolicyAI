@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema } from "@shared/schema";
+import { insertUserSchema, loginSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -30,19 +30,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Login existing user
   app.post("/api/users/login", async (req, res) => {
     try {
-      const { email_id } = req.body;
+      const validatedData = loginSchema.parse(req.body);
       
-      if (!email_id) {
-        return res.status(400).json({ error: "Email is required" });
-      }
-
-      const user = await storage.getUserByEmail(email_id);
+      const user = await storage.getUserByEmail(validatedData.email_id);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
 
       res.json(user);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid email address", details: error.errors });
+      }
       console.error("Error logging in:", error);
       res.status(500).json({ error: "Failed to login" });
     }
