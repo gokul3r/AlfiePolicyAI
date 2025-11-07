@@ -39,22 +39,32 @@ Preferred communication style: Simple, everyday language.
 - `NewUserDialog`: Modal for user registration with name and email inputs using React Hook Form + Zod validation
 - `ExistingUserDialog`: Modal for existing user login via email using React Hook Form + Zod validation
 - `ConfirmationMessage`: Success confirmation screen with animated check icon
+- `WelcomeScreen`: Main dashboard after login showing user's policies
+  - Displays "Welcome, {userName}" with user email
+  - "Add Policy" button always visible to add new policies
+  - "Policy Details" button appears only when user has existing policies
+  - Toggleable vehicle list showing all user's policies with key details
+  - Each vehicle card is clickable to open edit form
+  - Uses TanStack Query for real-time policy data fetching
+  - Local state management for show/hide vehicle list toggle
 - `OnboardingDialog`: Post-login modal offering "Upload policy documents" or "Enter details manually" options
 - `UploadDialog`: PDF upload interface with extraction integration
   - Accepts PDF files only with 6MB maximum size
   - Validates file type and size before upload
   - Displays animated progress indicator during 8-10 second extraction
-  - Integrates with Google Cloud Run extraction API
+  - Integrates with Google Cloud Run extraction API via backend proxy
   - Shows extraction status with toast notifications
   - Automatically transitions to ManualEntryForm with pre-filled data
 - `ManualEntryForm`: Comprehensive vehicle policy form with React Hook Form + Zod validation
-  - Pre-fills user email (disabled field)
-  - Accepts optional initialValues for pre-filling extracted data from PDFs
+  - Supports both create and edit modes (isEditMode prop)
+  - Title changes: "Enter Vehicle Policy Details" (create) vs "Edit Vehicle Policy" (edit)
+  - Pre-fills user email (disabled field in both modes)
+  - Accepts optional initialValues for pre-filling extracted data from PDFs or existing policy data
   - Highlights missing fields with red borders (2px destructive color)
   - Validates all inputs (driver age, registration, manufacturer, model, year, fuel type, coverage type, bonus years, voluntary excess)
-  - Auto-generates vehicle_id from manufacturer name + random number
+  - Auto-generates vehicle_id from manufacturer name + random number (create mode only)
   - Coverage type dropdown: Comprehensive, Third party only, Third-party fire and theft
-  - Returns to welcome screen on cancel or successful submit
+  - Returns to welcome screen on cancel or successful submit/update
 
 ### Backend Architecture
 
@@ -77,7 +87,10 @@ Preferred communication style: Simple, everyday language.
 - `POST /api/users`: Create new user with email uniqueness validation
 - `POST /api/users/login`: Authenticate existing user by email
 - `POST /api/vehicle-policies`: Create new vehicle policy with validation
-- `GET /api/vehicle-policies/:email_id`: Retrieve all vehicle policies for a user
+- `GET /api/vehicle-policies/:email`: Retrieve all vehicle policies for a user
+- `GET /api/vehicle-policies/:email/:vehicleId`: Retrieve a specific vehicle policy
+- `PUT /api/vehicle-policies/:email/:vehicleId`: Update an existing vehicle policy
+- `POST /api/extract-pdf`: Backend proxy endpoint for PDF extraction (forwards to Google Cloud Run API)
 
 ### Data Storage
 
@@ -110,6 +123,8 @@ vehicle_policies table:
 - `DbStorage` class implementing `IStorage` interface for testability
 - Repository pattern separating database logic from business logic
 - Type-safe queries using Drizzle's query builder
+- CRUD operations: getUserByEmail, createUser, getVehiclePoliciesByEmail, getVehiclePolicy, createVehiclePolicy, updateVehiclePolicy
+- Query cache invalidation after mutations to keep UI in sync
 
 **Migration Strategy**
 - Schema defined in `shared/schema.ts` for sharing between client and server
