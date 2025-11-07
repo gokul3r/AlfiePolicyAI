@@ -40,8 +40,17 @@ Preferred communication style: Simple, everyday language.
 - `ExistingUserDialog`: Modal for existing user login via email using React Hook Form + Zod validation
 - `ConfirmationMessage`: Success confirmation screen with animated check icon
 - `OnboardingDialog`: Post-login modal offering "Upload policy documents" or "Enter details manually" options
+- `UploadDialog`: PDF upload interface with extraction integration
+  - Accepts PDF files only with 6MB maximum size
+  - Validates file type and size before upload
+  - Displays animated progress indicator during 8-10 second extraction
+  - Integrates with Google Cloud Run extraction API
+  - Shows extraction status with toast notifications
+  - Automatically transitions to ManualEntryForm with pre-filled data
 - `ManualEntryForm`: Comprehensive vehicle policy form with React Hook Form + Zod validation
   - Pre-fills user email (disabled field)
+  - Accepts optional initialValues for pre-filling extracted data from PDFs
+  - Highlights missing fields with red borders (2px destructive color)
   - Validates all inputs (driver age, registration, manufacturer, model, year, fuel type, coverage type, bonus years, voluntary excess)
   - Auto-generates vehicle_id from manufacturer name + random number
   - Coverage type dropdown: Comprehensive, Third party only, Third-party fire and theft
@@ -113,6 +122,14 @@ vehicle_policies table:
 - **Neon Serverless PostgreSQL**: Serverless PostgreSQL with WebSocket connections for edge deployment
 - Connection managed via environment variable `DATABASE_URL`
 - Connection pooling via `@neondatabase/serverless` Pool
+
+**Document Extraction Service**
+- **Google Cloud Run Insurance PDF Extractor**: Serverless API for extracting vehicle policy data from PDF documents
+- Endpoint: `https://insurance-pdf-extractor-657860957693.europe-west2.run.app/extract`
+- Request: Multipart form data with PDF file (max 6MB)
+- Response: JSON with extracted_fields, not_extracted_fields, status, and message
+- Processing time: 8-10 seconds average
+- No authentication required (public endpoint)
 
 **UI Component Libraries**
 - **Radix UI**: Headless, accessible component primitives (accordion, dialog, dropdown, toast, etc.)
