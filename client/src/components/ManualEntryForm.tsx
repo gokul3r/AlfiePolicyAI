@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 // Form schema - excludes vehicle_id and email_id as they're handled separately
 const manualEntryFormSchema = z.object({
@@ -46,6 +48,8 @@ interface ManualEntryFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userEmail: string;
+  initialValues?: Partial<VehiclePolicyFormData>;
+  missingFields?: string[];
   onSubmit: (formData: VehiclePolicyFormData) => void;
   onCancel: () => void;
 }
@@ -54,23 +58,47 @@ export default function ManualEntryForm({
   open,
   onOpenChange,
   userEmail,
+  initialValues,
+  missingFields = [],
   onSubmit,
   onCancel,
 }: ManualEntryFormProps) {
   const form = useForm<VehiclePolicyFormData>({
     resolver: zodResolver(manualEntryFormSchema),
     defaultValues: {
-      driver_age: undefined,
-      vehicle_registration_number: "",
-      vehicle_manufacturer_name: "",
-      vehicle_model: "",
-      vehicle_year: undefined,
-      type_of_fuel: "",
-      type_of_cover_needed: "",
-      no_claim_bonus_years: undefined,
-      voluntary_excess: undefined,
+      driver_age: initialValues?.driver_age ?? undefined,
+      vehicle_registration_number: initialValues?.vehicle_registration_number ?? "",
+      vehicle_manufacturer_name: initialValues?.vehicle_manufacturer_name ?? "",
+      vehicle_model: initialValues?.vehicle_model ?? "",
+      vehicle_year: initialValues?.vehicle_year ?? undefined,
+      type_of_fuel: initialValues?.type_of_fuel ?? "",
+      type_of_cover_needed: initialValues?.type_of_cover_needed ?? "",
+      no_claim_bonus_years: initialValues?.no_claim_bonus_years ?? undefined,
+      voluntary_excess: initialValues?.voluntary_excess ?? undefined,
     },
   });
+
+  // Reset form when initialValues change
+  useEffect(() => {
+    if (initialValues) {
+      form.reset({
+        driver_age: initialValues?.driver_age ?? undefined,
+        vehicle_registration_number: initialValues?.vehicle_registration_number ?? "",
+        vehicle_manufacturer_name: initialValues?.vehicle_manufacturer_name ?? "",
+        vehicle_model: initialValues?.vehicle_model ?? "",
+        vehicle_year: initialValues?.vehicle_year ?? undefined,
+        type_of_fuel: initialValues?.type_of_fuel ?? "",
+        type_of_cover_needed: initialValues?.type_of_cover_needed ?? "",
+        no_claim_bonus_years: initialValues?.no_claim_bonus_years ?? undefined,
+        voluntary_excess: initialValues?.voluntary_excess ?? undefined,
+      });
+    }
+  }, [initialValues, form]);
+
+  // Helper to check if a field is missing
+  const isFieldMissing = (fieldName: string) => {
+    return missingFields.includes(fieldName);
+  };
 
   const handleSubmit = (data: VehiclePolicyFormData) => {
     onSubmit(data);
@@ -120,7 +148,10 @@ export default function ManualEntryForm({
                         type="number"
                         placeholder="Enter your age"
                         {...field}
-                        className="h-11 rounded-lg"
+                        className={cn(
+                          "h-11 rounded-lg",
+                          isFieldMissing("driver_age") && "border-destructive border-2"
+                        )}
                         data-testid="input-driver-age"
                       />
                     </FormControl>
@@ -286,7 +317,10 @@ export default function ManualEntryForm({
                         step="0.01"
                         placeholder="e.g., 500.00"
                         {...field}
-                        className="h-11 rounded-lg"
+                        className={cn(
+                          "h-11 rounded-lg",
+                          (isFieldMissing("Voluntary_Excess") || isFieldMissing("voluntary_excess")) && "border-destructive border-2"
+                        )}
                         data-testid="input-voluntary-excess"
                       />
                     </FormControl>

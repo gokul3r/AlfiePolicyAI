@@ -9,6 +9,7 @@ import NewUserDialog from "@/components/NewUserDialog";
 import ExistingUserDialog from "@/components/ExistingUserDialog";
 import ConfirmationMessage from "@/components/ConfirmationMessage";
 import OnboardingDialog from "@/components/OnboardingDialog";
+import UploadDialog from "@/components/UploadDialog";
 import ManualEntryForm, { type VehiclePolicyFormData } from "@/components/ManualEntryForm";
 import type { User, InsertVehiclePolicy, VehiclePolicy } from "@shared/schema";
 import { apiRequest } from "./lib/queryClient";
@@ -19,9 +20,12 @@ function AppContent() {
   const [appState, setAppState] = useState<AppState>("home");
   const [newUserDialogOpen, setNewUserDialogOpen] = useState(false);
   const [existingUserDialogOpen, setExistingUserDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [manualEntryFormOpen, setManualEntryFormOpen] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState("");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [extractedData, setExtractedData] = useState<Partial<VehiclePolicyFormData> | null>(null);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
   const { toast } = useToast();
 
   const createUserMutation = useMutation({
@@ -118,7 +122,37 @@ function AppContent() {
     }
   };
 
+  const handleUploadDocument = () => {
+    setUploadDialogOpen(true);
+  };
+
+  const handleUploadCancel = () => {
+    setUploadDialogOpen(false);
+    setAppState("welcome");
+  };
+
+  const handleExtracted = (extractedFields: any, notExtractedFields: string[]) => {
+    // Map API field names to form field names (handle casing differences)
+    const mappedData: Partial<VehiclePolicyFormData> = {
+      vehicle_registration_number: extractedFields.vehicle_registration_number,
+      vehicle_manufacturer_name: extractedFields.vehicle_manufacturer_name,
+      vehicle_model: extractedFields.vehicle_model,
+      vehicle_year: extractedFields.vehicle_year,
+      type_of_fuel: extractedFields.type_of_fuel,
+      type_of_cover_needed: extractedFields.type_of_Cover_needed, // Note: different casing in API
+      no_claim_bonus_years: extractedFields.No_Claim_bonus_years, // Note: different casing in API
+    };
+
+    setExtractedData(mappedData);
+    setMissingFields(notExtractedFields);
+    setUploadDialogOpen(false);
+    setManualEntryFormOpen(true);
+  };
+
   const handleEnterManually = () => {
+    // Reset extracted data for manual entry
+    setExtractedData(null);
+    setMissingFields([]);
     setManualEntryFormOpen(true);
   };
 
@@ -136,10 +170,16 @@ function AppContent() {
     };
 
     createVehiclePolicyMutation.mutate(policyData);
+    
+    // Reset extracted data after submission
+    setExtractedData(null);
+    setMissingFields([]);
   };
 
   const handleManualEntryCancel = () => {
     setManualEntryFormOpen(false);
+    setExtractedData(null);
+    setMissingFields([]);
     setAppState("welcome");
   };
 
@@ -173,19 +213,29 @@ function AppContent() {
 
       {appState === "onboarding" && (
         <OnboardingDialog
-          onUploadDocuments={() => {}}
+          onUploadDocuments={handleUploadDocument}
           onEnterManually={handleEnterManually}
         />
       )}
 
       {currentUser && (
-        <ManualEntryForm
-          open={manualEntryFormOpen}
-          onOpenChange={setManualEntryFormOpen}
-          userEmail={currentUser.email_id}
-          onSubmit={handleManualEntrySubmit}
-          onCancel={handleManualEntryCancel}
-        />
+        <>
+          <UploadDialog
+            open={uploadDialogOpen}
+            onOpenChange={setUploadDialogOpen}
+            onExtracted={handleExtracted}
+            onCancel={handleUploadCancel}
+          />
+          <ManualEntryForm
+            open={manualEntryFormOpen}
+            onOpenChange={setManualEntryFormOpen}
+            userEmail={currentUser.email_id}
+            initialValues={extractedData || undefined}
+            missingFields={missingFields}
+            onSubmit={handleManualEntrySubmit}
+            onCancel={handleManualEntryCancel}
+          />
+        </>
       )}
 
       <Toaster />
