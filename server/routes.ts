@@ -158,27 +158,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a new vehicle policy
   app.post("/api/vehicle-policies", async (req, res) => {
     try {
+      console.log("[vehicle-policies] Received request body:", JSON.stringify(req.body));
       const validatedData = insertVehiclePolicySchema.parse(req.body);
+      console.log("[vehicle-policies] Validated data:", JSON.stringify(validatedData));
       
       // Check if user exists
       const user = await storage.getUserByEmail(validatedData.email_id);
+      console.log("[vehicle-policies] User lookup result:", user ? `Found: ${user.email_id}` : "Not found");
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
 
       // Check if vehicle policy already exists
       const existingPolicy = await storage.getVehiclePolicy(validatedData.vehicle_id, validatedData.email_id);
+      console.log("[vehicle-policies] Existing policy check:", existingPolicy ? "Found existing" : "No existing policy");
       if (existingPolicy) {
         return res.status(400).json({ error: "Vehicle policy already exists for this vehicle ID and email" });
       }
 
+      console.log("[vehicle-policies] Attempting to create policy...");
       const policy = await storage.createVehiclePolicy(validatedData);
+      console.log("[vehicle-policies] Policy created successfully:", JSON.stringify(policy));
+      
+      // Verify the policy was actually saved
+      const verifyPolicy = await storage.getVehiclePolicy(policy.vehicle_id, policy.email_id);
+      console.log("[vehicle-policies] Verification query result:", verifyPolicy ? "Policy found in DB" : "Policy NOT found in DB");
+      
       res.status(201).json(policy);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.log("[vehicle-policies] Validation error:", JSON.stringify(error.errors));
         return res.status(400).json({ error: "Invalid vehicle policy data", details: error.errors });
       }
-      console.error("Error creating vehicle policy:", error);
+      console.error("[vehicle-policies] Unexpected error:", error);
       res.status(500).json({ error: "Failed to create vehicle policy" });
     }
   });

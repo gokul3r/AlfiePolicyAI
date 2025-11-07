@@ -33,7 +33,8 @@ function AppContent() {
       const res = await apiRequest("POST", "/api/users", { user_name, email_id });
       return await res.json() as User;
     },
-    onSuccess: () => {
+    onSuccess: (user) => {
+      setCurrentUser(user);
       setNewUserDialogOpen(false);
       setConfirmationMessage("User ID Created");
       setAppState("confirmation");
@@ -77,10 +78,15 @@ function AppContent() {
 
   const createVehiclePolicyMutation = useMutation({
     mutationFn: async (policyData: InsertVehiclePolicy) => {
+      console.log("[createVehiclePolicy] Starting mutation with data:", policyData);
       const res = await apiRequest("POST", "/api/vehicle-policies", policyData);
-      return await res.json() as VehiclePolicy;
+      console.log("[createVehiclePolicy] API request successful, response status:", res.status);
+      const data = await res.json() as VehiclePolicy;
+      console.log("[createVehiclePolicy] Response parsed:", data);
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("[createVehiclePolicy] onSuccess called with:", data);
       setManualEntryFormOpen(false);
       setAppState("welcome");
       toast({
@@ -89,6 +95,7 @@ function AppContent() {
       });
     },
     onError: (error: any) => {
+      console.error("[createVehiclePolicy] onError called with:", error);
       toast({
         title: "Submission Failed",
         description: "Unable to save vehicle policy. Please try again.",
@@ -114,7 +121,9 @@ function AppContent() {
   };
 
   const handleContinue = () => {
-    if (appState === "welcome") {
+    if (appState === "confirmation") {
+      setAppState("welcome");
+    } else if (appState === "welcome") {
       setAppState("onboarding");
     } else {
       setAppState("home");
