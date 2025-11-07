@@ -52,6 +52,7 @@ interface ManualEntryFormProps {
   missingFields?: string[];
   onSubmit: (formData: VehiclePolicyFormData) => void;
   onCancel: () => void;
+  isEditMode?: boolean;
 }
 
 export default function ManualEntryForm({
@@ -62,6 +63,7 @@ export default function ManualEntryForm({
   missingFields = [],
   onSubmit,
   onCancel,
+  isEditMode = false,
 }: ManualEntryFormProps) {
   const form = useForm<VehiclePolicyFormData>({
     resolver: zodResolver(manualEntryFormSchema),
@@ -115,7 +117,7 @@ export default function ManualEntryForm({
       <DialogContent className="max-w-md rounded-2xl p-6" data-testid="dialog-manual-entry">
         <DialogHeader className="space-y-3">
           <DialogTitle className="text-xl font-bold text-center" data-testid="text-manual-entry-title">
-            Enter Vehicle Policy Details
+            {isEditMode ? "Edit Vehicle Policy" : "Enter Vehicle Policy Details"}
           </DialogTitle>
         </DialogHeader>
 

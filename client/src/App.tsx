@@ -8,6 +8,7 @@ import HomePage from "@/components/HomePage";
 import NewUserDialog from "@/components/NewUserDialog";
 import ExistingUserDialog from "@/components/ExistingUserDialog";
 import ConfirmationMessage from "@/components/ConfirmationMessage";
+import WelcomeScreen from "@/components/WelcomeScreen";
 import OnboardingDialog from "@/components/OnboardingDialog";
 import UploadDialog from "@/components/UploadDialog";
 import ManualEntryForm, { type VehiclePolicyFormData } from "@/components/ManualEntryForm";
@@ -26,6 +27,7 @@ function AppContent() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [extractedData, setExtractedData] = useState<Partial<VehiclePolicyFormData> | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [editingPolicy, setEditingPolicy] = useState<VehiclePolicy | null>(null);
   const { toast } = useToast();
 
   const createUserMutation = useMutation({
@@ -89,6 +91,7 @@ function AppContent() {
       console.log("[createVehiclePolicy] onSuccess called with:", data);
       setManualEntryFormOpen(false);
       setAppState("welcome");
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", currentUser?.email_id] });
       toast({
         title: "Success",
         description: "Vehicle policy details saved successfully!",
@@ -99,6 +102,30 @@ function AppContent() {
       toast({
         title: "Submission Failed",
         description: "Unable to save vehicle policy. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateVehiclePolicyMutation = useMutation({
+    mutationFn: async ({ vehicleId, email, updates }: { vehicleId: string; email: string; updates: Partial<InsertVehiclePolicy> }) => {
+      const res = await apiRequest("PUT", `/api/vehicle-policies/${email}/${vehicleId}`, updates);
+      return await res.json() as VehiclePolicy;
+    },
+    onSuccess: () => {
+      setManualEntryFormOpen(false);
+      setEditingPolicy(null);
+      setAppState("welcome");
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", currentUser?.email_id] });
+      toast({
+        title: "Success",
+        description: "Vehicle policy updated successfully!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: "Unable to update vehicle policy. Please try again.",
         variant: "destructive",
       });
     },
@@ -168,17 +195,26 @@ function AppContent() {
   const handleManualEntrySubmit = (formData: VehiclePolicyFormData) => {
     if (!currentUser) return;
 
-    // Generate vehicle_id from manufacturer name + random numbers
-    const randomSuffix = Math.floor(Math.random() * 1000);
-    const vehicle_id = `${formData.vehicle_manufacturer_name}${randomSuffix}`;
+    if (editingPolicy) {
+      // Update existing policy
+      updateVehiclePolicyMutation.mutate({
+        vehicleId: editingPolicy.vehicle_id,
+        email: currentUser.email_id,
+        updates: formData,
+      });
+    } else {
+      // Create new policy - Generate vehicle_id from manufacturer name + random numbers
+      const randomSuffix = Math.floor(Math.random() * 1000);
+      const vehicle_id = `${formData.vehicle_manufacturer_name}${randomSuffix}`;
 
-    const policyData = {
-      vehicle_id,
-      email_id: currentUser.email_id,
-      ...formData,
-    };
+      const policyData = {
+        vehicle_id,
+        email_id: currentUser.email_id,
+        ...formData,
+      };
 
-    createVehiclePolicyMutation.mutate(policyData);
+      createVehiclePolicyMutation.mutate(policyData);
+    }
     
     // Reset extracted data after submission
     setExtractedData(null);
@@ -189,7 +225,22 @@ function AppContent() {
     setManualEntryFormOpen(false);
     setExtractedData(null);
     setMissingFields([]);
+    setEditingPolicy(null);
     setAppState("welcome");
+  };
+
+  const handleAddPolicy = () => {
+    setEditingPolicy(null);
+    setExtractedData(null);
+    setMissingFields([]);
+    setAppState("onboarding");
+  };
+
+  const handleEditPolicy = (policy: VehiclePolicy) => {
+    setEditingPolicy(policy);
+    setExtractedData(null);
+    setMissingFields([]);
+    setManualEntryFormOpen(true);
   };
 
   return (
@@ -213,10 +264,19 @@ function AppContent() {
         </>
       )}
 
-      {(appState === "confirmation" || appState === "welcome") && (
+      {appState === "confirmation" && (
         <ConfirmationMessage
           message={confirmationMessage}
           onContinue={handleContinue}
+        />
+      )}
+
+      {appState === "welcome" && currentUser && (
+        <WelcomeScreen
+          userName={currentUser.user_name}
+          userEmail={currentUser.email_id}
+          onAddPolicy={handleAddPolicy}
+          onEditPolicy={handleEditPolicy}
         />
       )}
 
@@ -239,10 +299,11 @@ function AppContent() {
             open={manualEntryFormOpen}
             onOpenChange={setManualEntryFormOpen}
             userEmail={currentUser.email_id}
-            initialValues={extractedData || undefined}
+            initialValues={editingPolicy || extractedData || undefined}
             missingFields={missingFields}
             onSubmit={handleManualEntrySubmit}
             onCancel={handleManualEntryCancel}
+            isEditMode={!!editingPolicy}
           />
         </>
       )}

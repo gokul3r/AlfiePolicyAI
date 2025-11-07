@@ -9,6 +9,7 @@ export interface IStorage {
   getVehiclePoliciesByEmail(email: string): Promise<VehiclePolicy[]>;
   getVehiclePolicy(vehicleId: string, email: string): Promise<VehiclePolicy | undefined>;
   createVehiclePolicy(policy: InsertVehiclePolicy): Promise<VehiclePolicy>;
+  updateVehiclePolicy(vehicleId: string, email: string, updates: Partial<InsertVehiclePolicy>): Promise<VehiclePolicy>;
 }
 
 export class DbStorage implements IStorage {
@@ -38,6 +39,19 @@ export class DbStorage implements IStorage {
 
   async createVehiclePolicy(policy: InsertVehiclePolicy): Promise<VehiclePolicy> {
     const result = await db.insert(vehiclePolicies).values(policy).returning();
+    return result[0];
+  }
+
+  async updateVehiclePolicy(vehicleId: string, email: string, updates: Partial<InsertVehiclePolicy>): Promise<VehiclePolicy> {
+    const result = await db.update(vehiclePolicies)
+      .set(updates)
+      .where(
+        and(
+          eq(vehiclePolicies.vehicle_id, vehicleId),
+          eq(vehiclePolicies.email_id, email)
+        )
+      )
+      .returning();
     return result[0];
   }
 }

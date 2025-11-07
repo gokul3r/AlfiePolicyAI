@@ -195,6 +195,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update an existing vehicle policy
+  app.put("/api/vehicle-policies/:email/:vehicleId", async (req, res) => {
+    try {
+      const email = req.params.email.toLowerCase().trim();
+      const vehicleId = req.params.vehicleId;
+      
+      // Check if the policy exists
+      const existingPolicy = await storage.getVehiclePolicy(vehicleId, email);
+      if (!existingPolicy) {
+        return res.status(404).json({ error: "Vehicle policy not found" });
+      }
+
+      // Validate the update data (partial schema)
+      const updateSchema = insertVehiclePolicySchema.partial().omit({ vehicle_id: true, email_id: true });
+      const validatedUpdates = updateSchema.parse(req.body);
+      
+      const updatedPolicy = await storage.updateVehiclePolicy(vehicleId, email, validatedUpdates);
+      res.json(updatedPolicy);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid update data", details: error.errors });
+      }
+      console.error("Error updating vehicle policy:", error);
+      res.status(500).json({ error: "Failed to update vehicle policy" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
