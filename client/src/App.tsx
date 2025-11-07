@@ -8,10 +8,11 @@ import HomePage from "@/components/HomePage";
 import NewUserDialog from "@/components/NewUserDialog";
 import ExistingUserDialog from "@/components/ExistingUserDialog";
 import ConfirmationMessage from "@/components/ConfirmationMessage";
+import OnboardingDialog from "@/components/OnboardingDialog";
 import type { User } from "@shared/schema";
 import { apiRequest } from "./lib/queryClient";
 
-type AppState = "home" | "confirmation" | "welcome";
+type AppState = "home" | "confirmation" | "welcome" | "onboarding";
 
 function AppContent() {
   const [appState, setAppState] = useState<AppState>("home");
@@ -83,8 +84,12 @@ function AppContent() {
   };
 
   const handleContinue = () => {
-    setAppState("home");
-    setConfirmationMessage("");
+    if (appState === "welcome") {
+      setAppState("onboarding");
+    } else {
+      setAppState("home");
+      setConfirmationMessage("");
+    }
   };
 
   return (
@@ -112,6 +117,13 @@ function AppContent() {
         <ConfirmationMessage
           message={confirmationMessage}
           onContinue={handleContinue}
+        />
+      )}
+
+      {appState === "onboarding" && (
+        <OnboardingDialog
+          onUploadDocuments={() => {}}
+          onEnterManually={() => {}}
         />
       )}
 
