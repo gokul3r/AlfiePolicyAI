@@ -30,14 +30,22 @@ Preferred communication style: Simple, everyday language.
 - Custom query client configured with optimized defaults (no refetch on window focus, infinite stale time)
 
 **Routing & Navigation**
-- Application uses state-based navigation with three main states: "home", "confirmation", and "welcome"
+- Application uses state-based navigation with four main states: "home", "confirmation", "welcome", and "onboarding"
 - Component-based routing rather than traditional URL-based routing
+- State transitions: home → confirmation → welcome → onboarding → (manual entry) → welcome
 
 **Key UI Components**
 - `HomePage`: Landing page with "New User" and "Existing User" options
-- `NewUserDialog`: Modal for user registration with name and email inputs
-- `ExistingUserDialog`: Modal for existing user login via email
+- `NewUserDialog`: Modal for user registration with name and email inputs using React Hook Form + Zod validation
+- `ExistingUserDialog`: Modal for existing user login via email using React Hook Form + Zod validation
 - `ConfirmationMessage`: Success confirmation screen with animated check icon
+- `OnboardingDialog`: Post-login modal offering "Upload policy documents" or "Enter details manually" options
+- `ManualEntryForm`: Comprehensive vehicle policy form with React Hook Form + Zod validation
+  - Pre-fills user email (disabled field)
+  - Validates all inputs (driver age, registration, manufacturer, model, year, fuel type, coverage type, bonus years, voluntary excess)
+  - Auto-generates vehicle_id from manufacturer name + random number
+  - Coverage type dropdown: Comprehensive, Third party only, Third-party fire and theft
+  - Returns to welcome screen on cancel or successful submit
 
 ### Backend Architecture
 
@@ -59,6 +67,8 @@ Preferred communication style: Simple, everyday language.
 **API Endpoints**
 - `POST /api/users`: Create new user with email uniqueness validation
 - `POST /api/users/login`: Authenticate existing user by email
+- `POST /api/vehicle-policies`: Create new vehicle policy with validation
+- `GET /api/vehicle-policies/:email_id`: Retrieve all vehicle policies for a user
 
 ### Data Storage
 
@@ -70,9 +80,21 @@ Preferred communication style: Simple, everyday language.
 **Database Schema**
 ```typescript
 users table:
-  - id: UUID (auto-generated primary key)
+  - email_id: text (primary key)
   - user_name: text (required)
-  - email_id: text (required, unique)
+
+vehicle_policies table:
+  - vehicle_id: text (composite primary key with email_id)
+  - email_id: text (composite primary key, foreign key to users.email_id)
+  - driver_age: integer (required)
+  - vehicle_registration_number: text (required)
+  - vehicle_manufacturer_name: text (required)
+  - vehicle_model: text (required)
+  - vehicle_year: integer (required)
+  - type_of_fuel: text (required)
+  - type_of_cover_needed: text (required)
+  - no_claim_bonus_years: integer (required)
+  - voluntary_excess: real (required)
 ```
 
 **Data Access Layer**
