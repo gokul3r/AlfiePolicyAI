@@ -9,7 +9,8 @@ import NewUserDialog from "@/components/NewUserDialog";
 import ExistingUserDialog from "@/components/ExistingUserDialog";
 import ConfirmationMessage from "@/components/ConfirmationMessage";
 import OnboardingDialog from "@/components/OnboardingDialog";
-import type { User } from "@shared/schema";
+import ManualEntryForm, { type VehiclePolicyFormData } from "@/components/ManualEntryForm";
+import type { User, InsertVehiclePolicy, VehiclePolicy } from "@shared/schema";
 import { apiRequest } from "./lib/queryClient";
 
 type AppState = "home" | "confirmation" | "welcome" | "onboarding";
@@ -18,7 +19,9 @@ function AppContent() {
   const [appState, setAppState] = useState<AppState>("home");
   const [newUserDialogOpen, setNewUserDialogOpen] = useState(false);
   const [existingUserDialogOpen, setExistingUserDialogOpen] = useState(false);
+  const [manualEntryFormOpen, setManualEntryFormOpen] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState("");
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const { toast } = useToast();
 
   const createUserMutation = useMutation({
@@ -50,6 +53,7 @@ function AppContent() {
       return await res.json() as User;
     },
     onSuccess: (user) => {
+      setCurrentUser(user);
       setExistingUserDialogOpen(false);
       setConfirmationMessage(`Welcome - ${user.user_name}`);
       setAppState("welcome");
@@ -62,6 +66,28 @@ function AppContent() {
       toast({
         title: "Login Failed",
         description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createVehiclePolicyMutation = useMutation({
+    mutationFn: async (policyData: InsertVehiclePolicy) => {
+      const res = await apiRequest("POST", "/api/vehicle-policies", policyData);
+      return await res.json() as VehiclePolicy;
+    },
+    onSuccess: () => {
+      setManualEntryFormOpen(false);
+      setAppState("welcome");
+      toast({
+        title: "Success",
+        description: "Vehicle policy details saved successfully!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Submission Failed",
+        description: "Unable to save vehicle policy. Please try again.",
         variant: "destructive",
       });
     },
@@ -90,6 +116,31 @@ function AppContent() {
       setAppState("home");
       setConfirmationMessage("");
     }
+  };
+
+  const handleEnterManually = () => {
+    setManualEntryFormOpen(true);
+  };
+
+  const handleManualEntrySubmit = (formData: VehiclePolicyFormData) => {
+    if (!currentUser) return;
+
+    // Generate vehicle_id from manufacturer name + random numbers
+    const randomSuffix = Math.floor(Math.random() * 1000);
+    const vehicle_id = `${formData.vehicle_manufacturer_name}${randomSuffix}`;
+
+    const policyData = {
+      vehicle_id,
+      email_id: currentUser.email_id,
+      ...formData,
+    };
+
+    createVehiclePolicyMutation.mutate(policyData);
+  };
+
+  const handleManualEntryCancel = () => {
+    setManualEntryFormOpen(false);
+    setAppState("welcome");
   };
 
   return (
@@ -123,7 +174,17 @@ function AppContent() {
       {appState === "onboarding" && (
         <OnboardingDialog
           onUploadDocuments={() => {}}
-          onEnterManually={() => {}}
+          onEnterManually={handleEnterManually}
+        />
+      )}
+
+      {currentUser && (
+        <ManualEntryForm
+          open={manualEntryFormOpen}
+          onOpenChange={setManualEntryFormOpen}
+          userEmail={currentUser.email_id}
+          onSubmit={handleManualEntrySubmit}
+          onCancel={handleManualEntryCancel}
         />
       )}
 
