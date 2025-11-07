@@ -76,19 +76,17 @@ export default function UploadDialog({
       const formData = new FormData();
       formData.append("file", selectedFile);
 
-      const response = await fetch(
-        "https://insurance-pdf-extractor-657860957693.europe-west2.run.app/extract",
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
+      const response = await fetch("/api/extract-pdf", {
+        method: "POST",
+        body: formData,
+      });
 
       clearInterval(progressInterval);
       setUploadProgress(100);
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        const errorData = await response.json().catch(() => ({ message: "Unknown error" }));
+        throw new Error(errorData.message || `API error: ${response.status}`);
       }
 
       const data = await response.json();
