@@ -80,10 +80,11 @@ export default function WhisperDialog({
             <p className="text-sm font-medium text-foreground">Choose the vehicle</p>
             <div className="space-y-2">
               {vehicles.map((vehicle) => (
-                <button
+                <Button
                   key={vehicle.vehicle_id}
+                  variant="outline"
                   onClick={() => handleVehicleSelect(vehicle)}
-                  className="w-full text-left p-4 rounded-lg border border-border hover-elevate active-elevate-2 transition-all"
+                  className="w-full h-auto text-left p-4 justify-start"
                   data-testid={`button-select-vehicle-${vehicle.vehicle_id}`}
                 >
                   <div className="flex items-center gap-3">
@@ -97,7 +98,7 @@ export default function WhisperDialog({
                       </p>
                     </div>
                   </div>
-                </button>
+                </Button>
               ))}
             </div>
           </div>

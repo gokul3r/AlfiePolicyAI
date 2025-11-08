@@ -139,6 +139,29 @@ function AppContent() {
     },
   });
 
+  const whisperUpdateMutation = useMutation({
+    mutationFn: async ({ vehicleId, email, preferences }: { vehicleId: string; email: string; preferences: string }) => {
+      const res = await apiRequest("PUT", `/api/vehicle-policies/${email}/${vehicleId}`, { 
+        whisper_preferences: preferences 
+      });
+      return await res.json() as VehiclePolicy;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", currentUser?.email_id] });
+      toast({
+        title: "Success",
+        description: "Whisper preferences saved successfully!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed",
+        description: "Unable to save whisper preferences. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleNewUser = () => {
     setNewUserDialogOpen(true);
   };
@@ -258,25 +281,11 @@ function AppContent() {
   const handleWhisperSubmit = async (vehicleId: string, preferences: string) => {
     if (!currentUser) return;
 
-    try {
-      await updateVehiclePolicyMutation.mutateAsync({
-        vehicleId,
-        email: currentUser.email_id,
-        updates: { whisper_preferences: preferences },
-      });
-      
-      toast({
-        title: "Success",
-        description: "Whisper preferences saved successfully!",
-      });
-    } catch (error) {
-      toast({
-        title: "Failed",
-        description: "Unable to save whisper preferences. Please try again.",
-        variant: "destructive",
-      });
-      throw error;
-    }
+    await whisperUpdateMutation.mutateAsync({
+      vehicleId,
+      email: currentUser.email_id,
+      preferences,
+    });
   };
 
   return (
