@@ -45,6 +45,8 @@ Preferred communication style: Simple, everyday language.
   - "Policy Details" button appears only when user has existing policies
   - Toggleable vehicle list showing all user's policies with key details
   - Each vehicle card is clickable to open edit form
+  - "Whisper" button appears only when user has existing policies
+  - Whisper button features MessageCircle icon with bold text and subtitle "Record user preferences"
   - Uses TanStack Query for real-time policy data fetching
   - Local state management for show/hide vehicle list toggle
 - `OnboardingDialog`: Post-login modal offering "Upload policy documents" or "Enter details manually" options
@@ -65,6 +67,16 @@ Preferred communication style: Simple, everyday language.
   - Auto-generates vehicle_id from manufacturer name + random number (create mode only)
   - Coverage type dropdown: Comprehensive, Third party only, Third-party fire and theft
   - Returns to welcome screen on cancel or successful submit/update
+- `WhisperDialog`: Insurance preference recording interface
+  - Displays all user's vehicles as clickable shadcn Button components
+  - Shows vehicle manufacturer, model, and registration number
+  - When vehicle selected, shows textarea for recording preferences
+  - Pre-fills existing whisper_preferences if available
+  - Supports editing and updating preferences
+  - Back button returns to vehicle selection
+  - Uses dedicated whisperUpdateMutation for state isolation
+  - Shows "Whisper preferences saved successfully!" toast on save
+  - Does not interfere with ManualEntryForm or policy editing workflows
 
 ### Backend Architecture
 
@@ -117,6 +129,7 @@ vehicle_policies table:
   - type_of_cover_needed: text (required)
   - no_claim_bonus_years: integer (required)
   - voluntary_excess: real (required)
+  - whisper_preferences: text (nullable)
 ```
 
 **Data Access Layer**
