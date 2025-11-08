@@ -32,6 +32,7 @@ export const vehiclePolicies = pgTable("vehicle_policies", {
   type_of_cover_needed: text("type_of_cover_needed").notNull(),
   no_claim_bonus_years: integer("no_claim_bonus_years").notNull(),
   voluntary_excess: real("voluntary_excess").notNull(),
+  whisper_preferences: text("whisper_preferences"),
 }, (table) => ({
   pk: primaryKey({ columns: [table.vehicle_id, table.email_id] })
 }));
@@ -48,6 +49,7 @@ export const insertVehiclePolicySchema = createInsertSchema(vehiclePolicies).ext
   type_of_cover_needed: z.string().min(1, "Cover type is required").trim(),
   no_claim_bonus_years: z.number().int().min(0).max(20),
   voluntary_excess: z.number().min(0),
+  whisper_preferences: z.string().optional(),
 });
 
 export type InsertVehiclePolicy = z.infer<typeof insertVehiclePolicySchema>;
