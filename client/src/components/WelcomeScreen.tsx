@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Car } from "lucide-react";
+import { Shield, Plus, Car, MessageCircle } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
 
 interface WelcomeScreenProps {
@@ -11,13 +11,15 @@ interface WelcomeScreenProps {
   userEmail: string;
   onAddPolicy: () => void;
   onEditPolicy: (policy: VehiclePolicy) => void;
+  onWhisper: () => void;
 }
 
 export default function WelcomeScreen({ 
   userName, 
   userEmail, 
   onAddPolicy,
-  onEditPolicy 
+  onEditPolicy,
+  onWhisper
 }: WelcomeScreenProps) {
   const [showVehicleList, setShowVehicleList] = useState(false);
   
@@ -76,6 +78,25 @@ export default function WelcomeScreen({
                 <Car className="w-5 h-5 mr-2" />
                 {showVehicleList ? "Hide Policy Details" : "Policy Details"}
               </Button>
+            )}
+
+            {hasPolicies && (
+              <div className="space-y-1">
+                <Button
+                  variant="outline"
+                  onClick={onWhisper}
+                  className="w-full py-6 text-base font-medium rounded-xl"
+                  size="lg"
+                  data-testid="button-whisper"
+                  disabled={isLoading}
+                >
+                  <MessageCircle className="w-5 h-5 mr-2" />
+                  <span className="font-bold">Whisper</span>
+                </Button>
+                <p className="text-xs text-center text-muted-foreground">
+                  Record user preferences
+                </p>
+              </div>
             )}
           </div>
         </div>
