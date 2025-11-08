@@ -1,0 +1,109 @@
+🎯 Objective
+
+Implement the “Search Quotes” functionality that:
+
+Sends data from the app to the Quote Generation API, and
+
+Displays a structured, insight-rich list of insurance quotes returned from the API.
+
+⚙️ API Details
+Endpoint
+
+<INSERT Google Cloud Run API link here>
+
+API Input
+
+The API accepts:
+
+10 fields from the vehicle_policies table
+
+Plus the Whisper-based user preferences (whisper_preferences column)
+
+These are sent together as JSON input to the API.
+
+API Output
+
+The API returns a JSON file containing 10 insurance quotes, each with the following structured insights:
+
+Field	Description
+available_features	List of all features offered by this insurance provider (e.g., legal cover, breakdown cover)
+features_matching_requirements	Features that match the customer’s requested preferences
+missing_required	Features requested by the customer but not included in this quote
+trust_pilot_context	Object containing:
+• rating — Trustpilot rating (out of 5)
+• reviews_count — total number of Trustpilot reviews
+• pros — list of positive highlights
+• cons — list of drawbacks
+alfie_touch_score	AI-computed score (out of 5) measuring match quality and insurer reliability
+alfie_message	AI’s short, human-readable summary or judgement about the quote
+💡 Display Logic (UI Layout for Each Quote)
+
+Each insurance quote should be displayed as a card or tile following the app’s branding guidelines.
+For each quote:
+
+Header Section
+
+Insurance Provider Name (with a random small icon beside it)
+
+Trustpilot Rating:
+Display as ⭐⭐⭐⭐ (numeric rating) followed by the text “stars”, and then show the number of reviews.
+Example: 4.3 stars (174,567 reviews)
+
+“View Pros and Cons” (a clickable link or button)
+
+When clicked, open a tooltip or modal listing the pros and cons from the JSON.
+
+Include a Close button.
+
+Features Section
+Column	Data Source
+Matching Features	features_matching_requirements
+Missing Features	missing_required
+
+Display these side by side in two columns.
+
+Insights Section
+Label	Data Source
+Auto-Sage Score	alfie_touch_score
+Auto-Sage Insights	alfie_message
+🗂️ Example Display Structure (Simplified)
+───────────────────────────────────────────────
+🚗 Ventura Insurance
+⭐ 4.6 stars (152,430 reviews)
+[View Pros & Cons]
+
+Matching Features:
+ - Legal cover
+ - Breakdown cover
+ - Windshield cover
+
+Missing Features:
+ - European cover
+ - NCD protection
+
+Auto-Sage Score: 4.8 / 5
+Auto-Sage Insights: Excellent value; all major features covered except NCD protection.
+───────────────────────────────────────────────
+
+
+Repeat this layout for all quotes received in the JSON response.
+
+🧩 Integration Summary
+
+Send Request:
+
+Gather the 10 fields from vehicle_policies
+
+Append whisper_preferences
+
+Send as JSON to the quote-generation API
+
+Receive Response:
+
+Parse the returned JSON (10 quotes with insights)
+
+Render Quotes:
+
+Display each quote using the above layout
+
+Ensure the UI follows the app’s design system and colors
