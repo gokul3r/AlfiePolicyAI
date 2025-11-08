@@ -12,8 +12,10 @@ import WelcomeScreen from "@/components/WelcomeScreen";
 import OnboardingDialog from "@/components/OnboardingDialog";
 import UploadDialog from "@/components/UploadDialog";
 import ManualEntryForm, { type VehiclePolicyFormData } from "@/components/ManualEntryForm";
+import WhisperDialog from "@/components/WhisperDialog";
 import type { User, InsertVehiclePolicy, VehiclePolicy } from "@shared/schema";
 import { apiRequest } from "./lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 
 type AppState = "home" | "confirmation" | "welcome" | "onboarding";
 
@@ -23,12 +25,18 @@ function AppContent() {
   const [existingUserDialogOpen, setExistingUserDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [manualEntryFormOpen, setManualEntryFormOpen] = useState(false);
+  const [whisperDialogOpen, setWhisperDialogOpen] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState("");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [extractedData, setExtractedData] = useState<Partial<VehiclePolicyFormData> | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [editingPolicy, setEditingPolicy] = useState<VehiclePolicy | null>(null);
   const { toast } = useToast();
+
+  const { data: userPolicies = [] } = useQuery<VehiclePolicy[]>({
+    queryKey: ["/api/vehicle-policies", currentUser?.email_id],
+    enabled: !!currentUser?.email_id,
+  });
 
   const createUserMutation = useMutation({
     mutationFn: async ({ user_name, email_id }: { user_name: string; email_id: string }) => {
@@ -243,6 +251,34 @@ function AppContent() {
     setManualEntryFormOpen(true);
   };
 
+  const handleWhisper = () => {
+    setWhisperDialogOpen(true);
+  };
+
+  const handleWhisperSubmit = async (vehicleId: string, preferences: string) => {
+    if (!currentUser) return;
+
+    try {
+      await updateVehiclePolicyMutation.mutateAsync({
+        vehicleId,
+        email: currentUser.email_id,
+        updates: { whisper_preferences: preferences },
+      });
+      
+      toast({
+        title: "Success",
+        description: "Whisper preferences saved successfully!",
+      });
+    } catch (error) {
+      toast({
+        title: "Failed",
+        description: "Unable to save whisper preferences. Please try again.",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
   return (
     <>
       {appState === "home" && (
@@ -277,6 +313,7 @@ function AppContent() {
           userEmail={currentUser.email_id}
           onAddPolicy={handleAddPolicy}
           onEditPolicy={handleEditPolicy}
+          onWhisper={handleWhisper}
         />
       )}
 
@@ -304,6 +341,12 @@ function AppContent() {
             onSubmit={handleManualEntrySubmit}
             onCancel={handleManualEntryCancel}
             isEditMode={!!editingPolicy}
+          />
+          <WhisperDialog
+            open={whisperDialogOpen}
+            onOpenChange={setWhisperDialogOpen}
+            vehicles={userPolicies}
+            onSubmit={handleWhisperSubmit}
           />
         </>
       )}
