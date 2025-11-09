@@ -25,7 +25,7 @@ Preferred communication style: Simple, everyday language.
 **Key UI Components**
 - **`HomePage`**: Landing with "New User" and "Existing User" options.
 - **`NewUserDialog` / `ExistingUserDialog`**: Modals for user registration/login.
-- **`WelcomeScreen`**: Dashboard displaying policies, "Add Policy", "Policy Details", "Whisper", "Search Quotes" buttons, and a toggleable vehicle list.
+- **`WelcomeScreen`**: Dashboard displaying policies, "Add Policy", "Policy Details", "Whisper", "Search Quotes", "Chat with AutoSage" buttons, and a toggleable vehicle list.
 - **`OnboardingDialog`**: Post-login modal for document upload or manual entry.
 - **`UploadDialog`**: PDF upload interface with extraction integration (6MB max, 8-10 sec processing).
 - **`ManualEntryForm`**: Comprehensive vehicle policy form supporting create/edit, pre-filling, and validation.
@@ -33,7 +33,9 @@ Preferred communication style: Simple, everyday language.
 - **`QuoteSearchDialog`**: Initiates insurance quote search for a selected vehicle, with retry logic and loading indicators.
 - **`QuotesScreen`**: Displays up to 10 insurance quotes for a selected vehicle, with a sticky header.
 - **`QuoteCard`**: Displays individual quotes with insurer info, Trustpilot rating, features matching, AutoSage Score, and AI analysis.
-- **`ChatDialog`**: Full-screen AI assistant chat interface with message history persistence and real-time updates.
+- **`ChatModeSelector`**: Modal for selecting between text chat and voice chat modes.
+- **`ChatDialog`**: Text-based AI assistant chat interface with message history persistence and real-time updates using OpenAI Responses API.
+- **`VoiceChatDialog`**: Voice-based AI assistant with WebSocket audio streaming, real-time transcription display, and mic toggle.
 
 ### Backend Architecture
 
@@ -45,7 +47,8 @@ Preferred communication style: Simple, everyday language.
 - User and authentication management (`/api/users`, `/api/users/login`).
 - Vehicle policy CRUD operations (`/api/vehicle-policies`).
 - Backend proxy endpoints for PDF extraction (`/api/extract-pdf`) and quote search (`/api/search-quotes`).
-- Chat message history and saving (`/api/chat/messages`).
+- Text chat endpoint using OpenAI Responses API (`/api/chat/send-message`).
+- Voice chat WebSocket endpoint using OpenAI Realtime API (`/api/voice-chat`).
 
 ### Data Storage
 
