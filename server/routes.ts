@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertUserSchema, loginSchema, insertVehiclePolicySchema, insertChatMessageSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
+import { sendRealtimeMessage } from "./openai-realtime";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configure multer for file uploads (store in memory)
@@ -277,6 +278,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error saving chat message:", error);
       res.status(500).json({ error: "Failed to save chat message" });
+    }
+  });
+
+  // Send message to AI and get response
+  app.post("/api/chat/send-message", async (req, res) => {
+    try {
+      const { email_id, message } = req.body;
+      
+      // Validate inputs
+      if (!email_id || typeof email_id !== "string") {
+        return res.status(400).json({ error: "email_id is required" });
+      }
+      if (!message || typeof message !== "string") {
+        return res.status(400).json({ error: "message is required" });
+      }
+
+      const email = email_id.toLowerCase().trim();
+      const userMessage = message.trim();
+
+      // Verify user exists
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      console.log(`[Chat] Processing message from ${email}: "${userMessage}"`);
+
+      // Save user message to database
+      const savedUserMessage = await storage.saveChatMessage({
+        email_id: email,
+        role: "user",
+        content: userMessage,
+      });
+
+      // Get AI response using Realtime API with vector store
+      const VECTOR_STORE_ID = "vs_6901fa16a5c081918d2ad17626cc303f";
+      
+      let aiResponse: string;
+      try {
+        aiResponse = await sendRealtimeMessage(userMessage, {
+          vectorStoreId: VECTOR_STORE_ID,
+          userEmail: email,
+        });
+        console.log(`[Chat] AI response: "${aiResponse}"`);
+      } catch (aiError: any) {
+        console.error("[Chat] AI error:", aiError);
+        // Fallback to friendly error message
+        aiResponse = "I'm having trouble connecting right now. Please try again in a moment.";
+      }
+
+      // Save assistant response to database
+      const savedAssistantMessage = await storage.saveChatMessage({
+        email_id: email,
+        role: "assistant",
+        content: aiResponse,
+      });
+
+      // Return both messages
+      res.json({
+        userMessage: savedUserMessage,
+        assistantMessage: savedAssistantMessage,
+      });
+    } catch (error) {
+      console.error("Error in send-message endpoint:", error);
+      res.status(500).json({ 
+        error: "Failed to process message",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
