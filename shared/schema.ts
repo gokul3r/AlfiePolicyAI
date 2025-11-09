@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, primaryKey, serial, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, primaryKey, serial, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -153,3 +153,47 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
 
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+
+export const personalizations = pgTable("personalizations", {
+  email_id: text("email_id").primaryKey().references(() => users.email_id),
+  gmail_id: text("gmail_id"),
+  gmail_access_token: text("gmail_access_token"),
+  gmail_refresh_token: text("gmail_refresh_token"),
+  gmail_token_expiry: timestamp("gmail_token_expiry"),
+  email_enabled: boolean("email_enabled").notNull().default(false),
+  calendar_enabled: boolean("calendar_enabled").notNull().default(false),
+  last_email_scan: timestamp("last_email_scan"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertPersonalizationSchema = createInsertSchema(personalizations).omit({
+  created_at: true,
+  updated_at: true,
+}).extend({
+  email_id: z.string().email("Invalid email address").toLowerCase().trim(),
+});
+
+export type InsertPersonalization = z.infer<typeof insertPersonalizationSchema>;
+export type Personalization = typeof personalizations.$inferSelect;
+
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  email_id: text("email_id").notNull().references(() => users.email_id),
+  message: text("message").notNull(),
+  destination: text("destination"),
+  departure_date: text("departure_date"),
+  is_read: boolean("is_read").notNull().default(false),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  created_at: true,
+}).extend({
+  email_id: z.string().email("Invalid email address").toLowerCase().trim(),
+  message: z.string().min(1, "Notification message is required").trim(),
+});
+
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;

@@ -2,12 +2,21 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Car, MessageCircle, Search, MessageSquare } from "lucide-react";
+import { Shield, Plus, Car, MessageCircle, Search, MessageSquare, Bell, Menu } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
 import { ChatModeSelector } from "./ChatModeSelector";
 import ChatDialog from "./ChatDialog";
 import { VoiceChatDialog } from "./VoiceChatDialog";
+import { PersonalizeDialog } from "./PersonalizeDialog";
+import { NotificationPanel } from "./NotificationPanel";
 
 interface WelcomeScreenProps {
   userName: string;
@@ -30,9 +39,16 @@ export default function WelcomeScreen({
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showTextChat, setShowTextChat] = useState(false);
   const [showVoiceChat, setShowVoiceChat] = useState(false);
+  const [showPersonalize, setShowPersonalize] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   
   const { data: policies = [], isLoading } = useQuery<VehiclePolicy[]>({
     queryKey: ["/api/vehicle-policies", userEmail],
+  });
+
+  // Fetch notification count
+  const { data: notificationCount = 0 } = useQuery<number>({
+    queryKey: ["/api/notifications/count", userEmail],
   });
 
   const hasPolicies = policies.length > 0;
@@ -46,9 +62,65 @@ export default function WelcomeScreen({
     setShowVehicleList(false);
   };
 
+  const handleLogout = () => {
+    window.location.href = "/";
+  };
+
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
-      <div className="w-full max-w-md mx-auto space-y-6">
+    <div className="min-h-screen bg-background flex flex-col p-6">
+      {/* Top Navigation Bar */}
+      <div className="w-full max-w-md mx-auto mb-4">
+        <div className="flex items-center justify-end gap-2">
+          {/* Bell Icon with Notification Badge */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowNotifications(true)}
+            className="relative"
+            data-testid="button-notifications"
+          >
+            <Bell className="h-5 w-5" />
+            {notificationCount > 0 && (
+              <Badge 
+                className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                data-testid="badge-notification-count"
+              >
+                {notificationCount}
+              </Badge>
+            )}
+          </Button>
+
+          {/* Hamburger Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                data-testid="button-menu"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                onClick={() => setShowPersonalize(true)}
+                data-testid="menu-item-personalize"
+              >
+                Personalize
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={handleLogout}
+                data-testid="menu-item-logout"
+              >
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="w-full max-w-md mx-auto space-y-6 flex-1 flex flex-col items-center justify-center">
         <div className="bg-card rounded-2xl p-8 space-y-6 text-center shadow-lg">
           <div className="flex justify-center">
             <div className="bg-primary/10 p-4 rounded-full">
@@ -211,6 +283,20 @@ export default function WelcomeScreen({
       <VoiceChatDialog
         open={showVoiceChat}
         onOpenChange={setShowVoiceChat}
+        userEmail={userEmail}
+      />
+
+      {/* Personalize Dialog */}
+      <PersonalizeDialog
+        open={showPersonalize}
+        onOpenChange={setShowPersonalize}
+        userEmail={userEmail}
+      />
+
+      {/* Notification Panel */}
+      <NotificationPanel
+        open={showNotifications}
+        onOpenChange={setShowNotifications}
         userEmail={userEmail}
       />
     </div>
