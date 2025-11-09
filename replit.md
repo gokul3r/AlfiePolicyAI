@@ -36,6 +36,7 @@ Preferred communication style: Simple, everyday language.
 - **`ChatModeSelector`**: Modal for selecting between text chat and voice chat modes.
 - **`ChatDialog`**: Text-based AI assistant chat interface with message history persistence and real-time updates using OpenAI Responses API.
 - **`VoiceChatDialog`**: Voice-based AI assistant with WebSocket audio streaming, real-time transcription display, and mic toggle.
+- **`PersonalizeDialog`**: Settings dialog for Gmail OAuth integration, connection status, privacy consent, and disconnect option.
 
 ### Backend Architecture
 
@@ -49,6 +50,7 @@ Preferred communication style: Simple, everyday language.
 - Backend proxy endpoints for PDF extraction (`/api/extract-pdf`) and quote search (`/api/search-quotes`).
 - Text chat endpoint using OpenAI Responses API (`/api/chat/send-message`).
 - Voice chat WebSocket endpoint using OpenAI Realtime API (`/api/voice-chat`).
+- Gmail OAuth integration endpoints (`/api/personalization/gmail/authorize`, `/api/personalization/gmail/callback`, `/api/personalization/gmail/disconnect`, `/api/personalization/gmail/status`).
 
 ### Data Storage
 
@@ -61,11 +63,17 @@ Preferred communication style: Simple, everyday language.
 - `users` table: `email_id` (PK), `user_name`.
 - `vehicle_policies` table: `vehicle_id` (composite PK), `email_id` (composite PK, FK), `driver_age`, `vehicle_registration_number`, `vehicle_manufacturer_name`, `vehicle_model`, `vehicle_year`, `type_of_fuel`, `type_of_cover_needed`, `no_claim_bonus_years`, `voluntary_excess`, `whisper_preferences` (nullable).
 - `chat_messages` table: `id` (serial PK), `email_id` (FK to users), `role` ('user' or 'assistant'), `content`, `created_at` (timestamp, default now()).
+- `personalizations` table: `email_id` (PK, FK to users), `gmail_id` (connected Gmail email), `gmail_access_token`, `gmail_refresh_token`, `gmail_token_expiry`, `email_enabled` (boolean), `created_at`, `updated_at`.
 
 ## External Dependencies
 
 **Database Service**
 - **Neon Serverless PostgreSQL**: Serverless database for persistent data storage.
+
+**Gmail Integration (Phase 1)**
+- **Google OAuth 2.0**: OAuth authentication for Gmail access.
+- **Gmail API**: Read-only email access for scanning insurance policy notifications.
+- **Google Cloud Console**: OAuth credentials and API management.
 
 **Document Extraction Service**
 - **Google Cloud Run Insurance PDF Extractor**: Serverless API for extracting policy data from PDFs.
