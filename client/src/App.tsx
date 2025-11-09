@@ -22,6 +22,29 @@ import { useQuery } from "@tanstack/react-query";
 
 type AppState = "home" | "confirmation" | "welcome" | "onboarding" | "quotes";
 
+const ALLOWED_FUEL_TYPES = ["Electric", "Hybrid", "Petrol", "Diesel"] as const;
+
+function sanitizePolicyForForm(policy: VehiclePolicy | Partial<VehiclePolicyFormData> | null): Partial<VehiclePolicyFormData> | undefined {
+  if (!policy) return undefined;
+  
+  const sanitized: Partial<VehiclePolicyFormData> = {
+    driver_age: policy.driver_age,
+    vehicle_registration_number: policy.vehicle_registration_number,
+    vehicle_manufacturer_name: policy.vehicle_manufacturer_name,
+    vehicle_model: policy.vehicle_model,
+    vehicle_year: policy.vehicle_year,
+    type_of_cover_needed: policy.type_of_cover_needed,
+    no_claim_bonus_years: policy.no_claim_bonus_years,
+    voluntary_excess: policy.voluntary_excess,
+  };
+  
+  if (policy.type_of_fuel && ALLOWED_FUEL_TYPES.includes(policy.type_of_fuel as any)) {
+    sanitized.type_of_fuel = policy.type_of_fuel as "Electric" | "Hybrid" | "Petrol" | "Diesel";
+  }
+  
+  return sanitized;
+}
+
 function AppContent() {
   const [appState, setAppState] = useState<AppState>("home");
   const [newUserDialogOpen, setNewUserDialogOpen] = useState(false);
@@ -383,7 +406,7 @@ function AppContent() {
             open={manualEntryFormOpen}
             onOpenChange={setManualEntryFormOpen}
             userEmail={currentUser.email_id}
-            initialValues={editingPolicy || extractedData || undefined}
+            initialValues={sanitizePolicyForForm(editingPolicy || extractedData || null)}
             missingFields={missingFields}
             onSubmit={handleManualEntrySubmit}
             onCancel={handleManualEntryCancel}

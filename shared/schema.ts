@@ -45,7 +45,9 @@ export const insertVehiclePolicySchema = createInsertSchema(vehiclePolicies).ext
   vehicle_manufacturer_name: z.string().min(1, "Manufacturer name is required").trim(),
   vehicle_model: z.string().min(1, "Vehicle model is required").trim(),
   vehicle_year: z.number().int().min(1900).max(new Date().getFullYear() + 1),
-  type_of_fuel: z.string().min(1, "Fuel type is required").trim(),
+  type_of_fuel: z.enum(["Electric", "Hybrid", "Petrol", "Diesel"], {
+    errorMap: () => ({ message: "Please select a valid fuel type" })
+  }),
   type_of_cover_needed: z.string().min(1, "Cover type is required").trim(),
   no_claim_bonus_years: z.number().int().min(0).max(20),
   voluntary_excess: z.number().min(0),
