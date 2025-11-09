@@ -35,6 +35,10 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  
+  // Use refs to track transcripts to avoid stale closure in WebSocket handler
+  const userTranscriptRef = useRef<string>("");
+  const assistantTranscriptRef = useRef<string>("");
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -70,19 +74,28 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
       }
 
       if (data.type === "user_transcript") {
+        userTranscriptRef.current = data.transcript;
         setCurrentUserTranscript(data.transcript);
       }
 
       if (data.type === "assistant_transcript") {
+        assistantTranscriptRef.current = data.transcript;
         setCurrentAssistantTranscript(data.transcript);
         
-        // Add completed messages to history
-        if (currentUserTranscript) {
+        // Add completed messages to history using refs (not stale state)
+        const userText = userTranscriptRef.current;
+        const assistantText = assistantTranscriptRef.current;
+        
+        if (userText && assistantText) {
           setMessages(prev => [
             ...prev,
-            { role: "user", content: currentUserTranscript, timestamp: new Date() },
-            { role: "assistant", content: data.transcript, timestamp: new Date() },
+            { role: "user", content: userText, timestamp: new Date() },
+            { role: "assistant", content: assistantText, timestamp: new Date() },
           ]);
+          
+          // Reset both state and refs
+          userTranscriptRef.current = "";
+          assistantTranscriptRef.current = "";
           setCurrentUserTranscript("");
           setCurrentAssistantTranscript("");
         }
