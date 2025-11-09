@@ -36,7 +36,9 @@ const manualEntryFormSchema = z.object({
   vehicle_manufacturer_name: z.string().min(1, "Manufacturer name is required").trim(),
   vehicle_model: z.string().min(1, "Vehicle model is required").trim(),
   vehicle_year: z.coerce.number().int().min(1900, "Year must be 1900 or later").max(new Date().getFullYear() + 1, "Year cannot be in the future"),
-  type_of_fuel: z.string().min(1, "Fuel type is required").trim(),
+  type_of_fuel: z.enum(["Electric", "Hybrid", "Petrol", "Diesel"], {
+    errorMap: () => ({ message: "Please select a fuel type" })
+  }),
   type_of_cover_needed: z.string().min(1, "Please select a cover type"),
   no_claim_bonus_years: z.coerce.number().int().min(0, "Must be 0 or more").max(20, "Maximum 20 years"),
   voluntary_excess: z.coerce.number().min(0, "Must be 0 or more"),
@@ -73,7 +75,7 @@ export default function ManualEntryForm({
       vehicle_manufacturer_name: initialValues?.vehicle_manufacturer_name ?? "",
       vehicle_model: initialValues?.vehicle_model ?? "",
       vehicle_year: initialValues?.vehicle_year ?? undefined,
-      type_of_fuel: initialValues?.type_of_fuel ?? "",
+      type_of_fuel: initialValues?.type_of_fuel ?? undefined,
       type_of_cover_needed: initialValues?.type_of_cover_needed ?? "",
       no_claim_bonus_years: initialValues?.no_claim_bonus_years ?? undefined,
       voluntary_excess: initialValues?.voluntary_excess ?? undefined,
@@ -89,7 +91,7 @@ export default function ManualEntryForm({
         vehicle_manufacturer_name: initialValues?.vehicle_manufacturer_name ?? "",
         vehicle_model: initialValues?.vehicle_model ?? "",
         vehicle_year: initialValues?.vehicle_year ?? undefined,
-        type_of_fuel: initialValues?.type_of_fuel ?? "",
+        type_of_fuel: initialValues?.type_of_fuel ?? undefined,
         type_of_cover_needed: initialValues?.type_of_cover_needed ?? "",
         no_claim_bonus_years: initialValues?.no_claim_bonus_years ?? undefined,
         voluntary_excess: initialValues?.voluntary_excess ?? undefined,
@@ -245,14 +247,27 @@ export default function ManualEntryForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Type of Fuel</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g., Petrol, Diesel, Electric"
-                        {...field}
-                        className="h-11 rounded-lg"
-                        data-testid="input-fuel-type"
-                      />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-11 rounded-lg" data-testid="select-fuel-type">
+                          <SelectValue placeholder="Select fuel type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Electric" data-testid="option-electric">
+                          Electric
+                        </SelectItem>
+                        <SelectItem value="Hybrid" data-testid="option-hybrid">
+                          Hybrid
+                        </SelectItem>
+                        <SelectItem value="Petrol" data-testid="option-petrol">
+                          Petrol
+                        </SelectItem>
+                        <SelectItem value="Diesel" data-testid="option-diesel">
+                          Diesel
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
