@@ -13,11 +13,13 @@ import OnboardingDialog from "@/components/OnboardingDialog";
 import UploadDialog from "@/components/UploadDialog";
 import ManualEntryForm, { type VehiclePolicyFormData } from "@/components/ManualEntryForm";
 import WhisperDialog from "@/components/WhisperDialog";
-import type { User, InsertVehiclePolicy, VehiclePolicy } from "@shared/schema";
+import QuoteSearchDialog from "@/components/QuoteSearchDialog";
+import QuotesScreen from "@/components/QuotesScreen";
+import type { User, InsertVehiclePolicy, VehiclePolicy, QuotesApiResponse } from "@shared/schema";
 import { apiRequest } from "./lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 
-type AppState = "home" | "confirmation" | "welcome" | "onboarding";
+type AppState = "home" | "confirmation" | "welcome" | "onboarding" | "quotes";
 
 function AppContent() {
   const [appState, setAppState] = useState<AppState>("home");
@@ -26,11 +28,14 @@ function AppContent() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [manualEntryFormOpen, setManualEntryFormOpen] = useState(false);
   const [whisperDialogOpen, setWhisperDialogOpen] = useState(false);
+  const [quoteSearchDialogOpen, setQuoteSearchDialogOpen] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState("");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [extractedData, setExtractedData] = useState<Partial<VehiclePolicyFormData> | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [editingPolicy, setEditingPolicy] = useState<VehiclePolicy | null>(null);
+  const [quotesData, setQuotesData] = useState<QuotesApiResponse | null>(null);
+  const [selectedVehicleForQuotes, setSelectedVehicleForQuotes] = useState<VehiclePolicy | null>(null);
   const { toast } = useToast();
 
   const { data: userPolicies = [] } = useQuery<VehiclePolicy[]>({
@@ -288,6 +293,23 @@ function AppContent() {
     });
   };
 
+  const handleSearchQuotes = () => {
+    setQuoteSearchDialogOpen(true);
+  };
+
+  const handleQuoteSearchSubmit = (vehicle: VehiclePolicy, quotes: QuotesApiResponse) => {
+    setSelectedVehicleForQuotes(vehicle);
+    setQuotesData(quotes);
+    setQuoteSearchDialogOpen(false);
+    setAppState("quotes");
+  };
+
+  const handleBackFromQuotes = () => {
+    setAppState("welcome");
+    setQuotesData(null);
+    setSelectedVehicleForQuotes(null);
+  };
+
   return (
     <>
       {appState === "home" && (
@@ -323,6 +345,7 @@ function AppContent() {
           onAddPolicy={handleAddPolicy}
           onEditPolicy={handleEditPolicy}
           onWhisper={handleWhisper}
+          onSearchQuotes={handleSearchQuotes}
         />
       )}
 
@@ -330,6 +353,14 @@ function AppContent() {
         <OnboardingDialog
           onUploadDocuments={handleUploadDocument}
           onEnterManually={handleEnterManually}
+        />
+      )}
+
+      {appState === "quotes" && selectedVehicleForQuotes && quotesData && (
+        <QuotesScreen
+          vehicle={selectedVehicleForQuotes}
+          quotesData={quotesData}
+          onBack={handleBackFromQuotes}
         />
       )}
 
@@ -356,6 +387,12 @@ function AppContent() {
             onOpenChange={setWhisperDialogOpen}
             vehicles={userPolicies}
             onSubmit={handleWhisperSubmit}
+          />
+          <QuoteSearchDialog
+            open={quoteSearchDialogOpen}
+            onOpenChange={setQuoteSearchDialogOpen}
+            vehicles={userPolicies}
+            onQuotesFound={handleQuoteSearchSubmit}
           />
         </>
       )}

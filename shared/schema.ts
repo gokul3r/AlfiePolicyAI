@@ -54,3 +54,78 @@ export const insertVehiclePolicySchema = createInsertSchema(vehiclePolicies).ext
 
 export type InsertVehiclePolicy = z.infer<typeof insertVehiclePolicySchema>;
 export type VehiclePolicy = typeof vehiclePolicies.$inferSelect;
+
+// Quote Search Types
+export const trustPilotContextSchema = z.object({
+  rating: z.number(),
+  reviews_count: z.number(),
+  pros: z.array(z.string()),
+  cons: z.array(z.string()),
+});
+
+export const featuresMatchingSchema = z.object({
+  matched_required: z.array(z.string()),
+  missing_required: z.array(z.string()),
+  justification: z.string(),
+});
+
+export const priceAnalysisSchema = z.object({
+  quote_price: z.number(),
+  budget: z.number(),
+  difference: z.number(),
+  within_budget: z.boolean(),
+  competitiveness: z.string(),
+  justification: z.string(),
+});
+
+export const scoreBreakdownSchema = z.object({
+  trust_pilot_contribution: z.number(),
+  defacto_rating_contribution: z.number(),
+  features_match_percentage: z.number(),
+  price_competitiveness: z.number(),
+  calculation_note: z.string(),
+});
+
+export const originalQuoteSchema = z.object({
+  input: z.any(),
+  output: z.object({
+    quote_reference_number: z.string(),
+    insurer_name: z.string(),
+    policy_cost: z.number(),
+    type_of_policy: z.string(),
+    total_excess_amount: z.number(),
+    legal_cover_included: z.string(),
+    windshield_cover_included: z.string(),
+    courtesy_car_included: z.string(),
+    breakdown_cover_included: z.string(),
+    personal_Accident_cover_included: z.string(),
+    european_cover_included: z.string(),
+    no_claim_bonus_protection_included: z.string(),
+  }),
+});
+
+export const quoteWithInsightsSchema = z.object({
+  insurer_name: z.string(),
+  original_quote: originalQuoteSchema,
+  available_features: z.array(z.string()),
+  features_matching_requirements: featuresMatchingSchema,
+  price_analysis: priceAnalysisSchema,
+  trust_pilot_context: trustPilotContextSchema,
+  alfie_touch_score: z.number(),
+  score_breakdown: scoreBreakdownSchema,
+  alfie_message: z.string(),
+  trade_offs: z.array(z.string()),
+});
+
+export const quotesApiResponseSchema = z.object({
+  parsed_preferences: z.any(),
+  quotes_with_insights: z.array(quoteWithInsightsSchema),
+});
+
+export type TrustPilotContext = z.infer<typeof trustPilotContextSchema>;
+export type FeaturesMatching = z.infer<typeof featuresMatchingSchema>;
+export type PriceAnalysis = z.infer<typeof priceAnalysisSchema>;
+export type ScoreBreakdown = z.infer<typeof scoreBreakdownSchema>;
+export type OriginalQuote = z.infer<typeof originalQuoteSchema>;
+export type QuoteWithInsights = z.infer<typeof quoteWithInsightsSchema>;
+export type QuotesApiResponse = z.infer<typeof quotesApiResponseSchema>;
