@@ -1,8 +1,8 @@
-# Alfie - Insurance Policy Management App
+# AutoSage - Insurance Policy Management App
 
 ## Overview
 
-Alfie is a mobile-first insurance policy management application designed to serve as a personal AI companion for managing insurance policies. The application emphasizes trust, clarity, and calm efficiency through a minimalist Material Design-inspired interface. Built with a modern full-stack TypeScript architecture, it features a React frontend with shadcn/ui components and an Express.js backend with PostgreSQL database integration via Drizzle ORM.
+AutoSage is a mobile-first insurance policy management application designed to serve as a personal AI companion for managing insurance policies. The application emphasizes trust, clarity, and calm efficiency through a minimalist Material Design-inspired interface. Built with a modern full-stack TypeScript architecture, it features a React frontend with shadcn/ui components and an Express.js backend with PostgreSQL database integration via Drizzle ORM.
 
 ## User Preferences
 
@@ -102,9 +102,9 @@ Preferred communication style: Simple, everyday language.
   - **Trustpilot Rating**: Star/StarHalf icons for rating, review count, pros/cons tooltip
   - Pros & Cons tooltip: Max 5 items each, break-words, max-h-96 overflow-y-auto, green CheckCircle2/red XCircle icons
   - **Features Matching**: Green checkmarks for matched features, red X for missing features
-  - **Alfie Touch Score**: Numeric display in rounded badge (e.g., "4.5 / 5"), NOT stars
+  - **AutoSage Score**: Numeric display in rounded badge (e.g., "4.5 / 5"), NOT stars
   - Score displayed in bg-primary/10 pill with bold primary color number
-  - **Alfie Message**: Highlighted section with bg-primary/5 background
+  - **AutoSage AI Analysis**: Highlighted section with bg-primary/5 background
   - **Policy Price**: Quote cost from original_quote.output.policy_cost
   - Uses QuoteWithInsights type from shared/schema.ts for full type safety
 
@@ -191,7 +191,7 @@ vehicle_policies table:
 - No authentication required (public endpoint)
 
 **Insurance Quote Search Service**
-- **Google Cloud Run Alfie Quote Search API**: Serverless API for searching insurance quotes based on vehicle details and user preferences
+- **Google Cloud Run AutoSage Quote Search API**: Serverless API for searching insurance quotes based on vehicle details and user preferences
 - Endpoint: `https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis`
 - Request: JSON with `insurance_details` (vehicle policy fields with exact casing) and `user_preferences` (whisper preferences)
 - Request payload structure:
@@ -214,7 +214,7 @@ vehicle_policies table:
   ```
 - Note: API requires exact field casing (type_of_Cover_needed, No_Claim_bonus_years, Voluntary_Excess)
 - Response: QuotesApiResponse with quotes_with_insights array (up to 10 quotes)
-- Each quote includes: insurer_name, trust_pilot_context, features_matching_requirements, price_analysis, alfie_touch_score, score_breakdown, alfie_message, trade_offs
+- Each quote includes: insurer_name, trust_pilot_context, features_matching_requirements, price_analysis, alfie_touch_score (AutoSage Score), score_breakdown, alfie_message (AutoSage AI Analysis), trade_offs
 - Processing time: 8-10 seconds average
 - No authentication required (public endpoint)
 - Accessed via backend proxy `/api/search-quotes` to avoid browser CORS issues

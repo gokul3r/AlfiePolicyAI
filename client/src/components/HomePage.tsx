@@ -17,7 +17,7 @@ export default function HomePage({ onNewUser, onExistingUser }: HomePageProps) {
             </div>
           </div>
           <h1 className="text-4xl font-bold text-foreground tracking-tight">
-            Alfie
+            AutoSage
           </h1>
           <p className="text-sm text-muted-foreground">
             Your Insurance Companion

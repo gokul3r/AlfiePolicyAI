@@ -38,7 +38,7 @@ export default function NewUserDialog({ open, onOpenChange, onSubmit }: NewUserD
             Create Your Account
           </DialogTitle>
           <DialogDescription className="text-sm text-center">
-            Enter your details to get started with Alfie
+            Enter your details to get started with AutoSage
           </DialogDescription>
         </DialogHeader>
 
