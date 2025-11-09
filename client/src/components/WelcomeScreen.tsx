@@ -5,6 +5,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery } from "@tanstack/react-query";
 import { Shield, Plus, Car, MessageCircle, Search, MessageSquare } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
+import { ChatModeSelector } from "./ChatModeSelector";
+import ChatDialog from "./ChatDialog";
+import { VoiceChatDialog } from "./VoiceChatDialog";
 
 interface WelcomeScreenProps {
   userName: string;
@@ -13,7 +16,6 @@ interface WelcomeScreenProps {
   onEditPolicy: (policy: VehiclePolicy) => void;
   onWhisper: () => void;
   onSearchQuotes: () => void;
-  onChat: () => void;
 }
 
 export default function WelcomeScreen({ 
@@ -23,9 +25,11 @@ export default function WelcomeScreen({
   onEditPolicy,
   onWhisper,
   onSearchQuotes,
-  onChat
 }: WelcomeScreenProps) {
   const [showVehicleList, setShowVehicleList] = useState(false);
+  const [showModeSelector, setShowModeSelector] = useState(false);
+  const [showTextChat, setShowTextChat] = useState(false);
+  const [showVoiceChat, setShowVoiceChat] = useState(false);
   
   const { data: policies = [], isLoading } = useQuery<VehiclePolicy[]>({
     queryKey: ["/api/vehicle-policies", userEmail],
@@ -123,7 +127,7 @@ export default function WelcomeScreen({
                 <div className="space-y-1">
                   <Button
                     variant="outline"
-                    onClick={onChat}
+                    onClick={() => setShowModeSelector(true)}
                     className="w-full py-6 text-base font-medium rounded-xl"
                     size="lg"
                     data-testid="button-chat-autosage"
@@ -182,6 +186,33 @@ export default function WelcomeScreen({
           </Card>
         )}
       </div>
+
+      {/* Chat Mode Selector */}
+      <ChatModeSelector
+        open={showModeSelector}
+        onOpenChange={setShowModeSelector}
+        onSelectMode={(mode) => {
+          if (mode === "text") {
+            setShowTextChat(true);
+          } else {
+            setShowVoiceChat(true);
+          }
+        }}
+      />
+
+      {/* Text Chat Dialog */}
+      <ChatDialog
+        open={showTextChat}
+        onOpenChange={setShowTextChat}
+        userEmail={userEmail}
+      />
+
+      {/* Voice Chat Dialog */}
+      <VoiceChatDialog
+        open={showVoiceChat}
+        onOpenChange={setShowVoiceChat}
+        userEmail={userEmail}
+      />
     </div>
   );
 }

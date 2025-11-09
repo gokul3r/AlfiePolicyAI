@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import WebSocket from "ws";
+import { WebSocketServer } from "ws";
 import { storage } from "./storage";
 import { insertUserSchema, loginSchema, insertVehiclePolicySchema, insertChatMessageSchema } from "@shared/schema";
 import { z } from "zod";
@@ -354,7 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
   // WebSocket server for voice chat
-  const wss = new WebSocket.Server({ server: httpServer, path: "/api/voice-chat" });
+  const wss = new WebSocketServer({ server: httpServer, path: "/api/voice-chat" });
 
   wss.on("connection", (ws, req) => {
     // Extract email from query params
