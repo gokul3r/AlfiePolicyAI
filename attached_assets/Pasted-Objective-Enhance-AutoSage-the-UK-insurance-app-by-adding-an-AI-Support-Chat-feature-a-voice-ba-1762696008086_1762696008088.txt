@@ -1,0 +1,77 @@
+Objective:
+Enhance AutoSage, the UK insurance app, by adding an AI Support Chat feature — a voice-based assistant that helps customers understand insurance concepts and their own policy details.
+
+Feature to build now:
+🗨️ “Chat with AutoSage” Window
+
+Context:
+
+Many UK insurance customers struggle with complex jargons and don’t fully understand their policy documents.
+
+AutoSage should act as a personal AI insurance agent in the user’s pocket — simplifying insurance and making policies easy to understand.
+
+Task Breakdown:
+
+UI Addition:
+
+Under the ‘Search Quotes’ button, add a new AI support icon/button labeled “Chat with AutoSage.”
+
+On Click Behavior:
+
+When the user clicks this button, open a chat dialog box (voice-enabled in future stages).
+
+For now, create a basic chat widget that supports text input/output.
+
+Chat Logic (Phase 1 – Basic):
+The chat assistant should:
+
+Greet the user politely.
+
+Answer generic UK insurance jargon or concept questions, e.g.:
+
+“What is voluntary excess?”
+
+“How do I protect my no-claim bonus?”
+
+If the user’s policy document is uploaded:
+
+Answer questions using the content of the document (e.g., “What is my windscreen cover?”).
+
+If no document is uploaded:
+
+Respond:
+
+“I can’t find that information in your documents yet.”
+
+If the question is about:
+
+Quote Search → reply:
+
+“You can find quote search in the Home page.”
+
+Adding Preferences → reply:
+
+“You can add your preferences in the Home → Whisper → Add your preferences for quote search.”
+
+If any other type of question is asked (outside these topics), politely reply:
+
+“Sorry, I can only answer questions related to UK insurance and your policy.”
+
+Development Phases:
+
+Phase 1: Build a simple chat widget (text only).
+
+Phase 2: Implement the UK insurance jargon answering logic (connect with OpenAI).
+
+Phase 3: Integrate policy-document question answering.
+
+Phase 4: Add voice chat capability.
+
+Before you start:
+
+Do you have any questions or clarifications?
+
+Confirm the plan to first build the basic chat UI before connecting AI logic.
+
+✅ Goal for this prompt:
+Implement the chat widget (Phase 1), then integrate AI-powered insurance Q&A (Phase 2) as the next step.
