@@ -127,10 +127,8 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
     };
 
     return () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.close();
-      }
-      stopRecording();
+      // Full cleanup when dialog closes
+      cleanupSession();
     };
   }, [open, userEmail]);
 
@@ -203,6 +201,48 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
     }
 
     setIsRecording(false);
+  };
+
+  const cleanupSession = () => {
+    // Stop recording if active
+    stopRecording();
+
+    // Stop all queued audio playback
+    audioQueueRef.current.forEach(source => {
+      try {
+        source.stop();
+      } catch (e) {
+        // Source may have already stopped
+      }
+    });
+    audioQueueRef.current = [];
+
+    // Close playback audio context to free resources
+    if (playbackAudioContextRef.current) {
+      playbackAudioContextRef.current.close();
+      playbackAudioContextRef.current = null;
+    }
+
+    // Reset play timer for next session
+    nextPlayTimeRef.current = 0;
+
+    // Clear all messages and transcripts for fresh start
+    setMessages([]);
+    setCurrentUserTranscript("");
+    setCurrentAssistantTranscript("");
+    userTranscriptRef.current = "";
+    assistantTranscriptRef.current = "";
+
+    // Close WebSocket connection (any state except already CLOSED)
+    if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
+      wsRef.current.close();
+    }
+    wsRef.current = null;
+
+    // Reset connection state
+    setIsConnecting(false);
+
+    console.log("[VoiceChat] Session cleaned up");
   };
 
   const toggleRecording = () => {
