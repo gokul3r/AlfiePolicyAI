@@ -7,6 +7,7 @@ import { z } from "zod";
 import multer from "multer";
 import { sendChatMessage } from "./openai-realtime";
 import { handleVoiceChat } from "./voice-chat-handler";
+import { handleGmailAuthorize, handleGmailCallback, handleGmailDisconnect, handleGmailStatus } from "./gmail-oauth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configure multer for file uploads (store in memory)
@@ -350,6 +351,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  // Gmail OAuth routes for personalization
+  app.get("/api/personalization/gmail/authorize", handleGmailAuthorize);
+  app.get("/api/personalization/gmail/callback", handleGmailCallback);
+  app.post("/api/personalization/gmail/disconnect", handleGmailDisconnect);
+  app.get("/api/personalization/gmail/status", handleGmailStatus);
 
   const httpServer = createServer(app);
 

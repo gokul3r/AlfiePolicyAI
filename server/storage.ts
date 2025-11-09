@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { users, vehiclePolicies, chatMessages } from "@shared/schema";
-import { type User, type InsertUser, type VehiclePolicy, type InsertVehiclePolicy, type ChatMessage, type InsertChatMessage } from "@shared/schema";
+import { users, vehiclePolicies, chatMessages, personalizations } from "@shared/schema";
+import { type User, type InsertUser, type VehiclePolicy, type InsertVehiclePolicy, type ChatMessage, type InsertChatMessage, type Personalization } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 export interface IStorage {
@@ -12,6 +12,9 @@ export interface IStorage {
   updateVehiclePolicy(vehicleId: string, email: string, updates: Partial<InsertVehiclePolicy>): Promise<VehiclePolicy>;
   getChatHistory(email: string): Promise<ChatMessage[]>;
   saveChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
+  getPersonalization(email: string): Promise<Personalization | undefined>;
+  saveGmailTokens(email: string, tokens: Partial<Personalization>): Promise<Personalization>;
+  clearGmailTokens(email: string): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -67,6 +70,42 @@ export class DbStorage implements IStorage {
   async saveChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
     const result = await db.insert(chatMessages).values(message).returning();
     return result[0];
+  }
+
+  async getPersonalization(email: string): Promise<Personalization | undefined> {
+    const result = await db.select().from(personalizations).where(eq(personalizations.email_id, email));
+    return result[0];
+  }
+
+  async saveGmailTokens(email: string, tokens: Partial<Personalization>): Promise<Personalization> {
+    // Try to insert first, if exists then update
+    const existing = await this.getPersonalization(email);
+    
+    if (existing) {
+      const result = await db.update(personalizations)
+        .set({ ...tokens, updated_at: new Date() })
+        .where(eq(personalizations.email_id, email))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(personalizations)
+        .values({ email_id: email, ...tokens })
+        .returning();
+      return result[0];
+    }
+  }
+
+  async clearGmailTokens(email: string): Promise<void> {
+    await db.update(personalizations)
+      .set({
+        gmail_id: null,
+        gmail_access_token: null,
+        gmail_refresh_token: null,
+        gmail_token_expiry: null,
+        email_enabled: false,
+        updated_at: new Date(),
+      })
+      .where(eq(personalizations.email_id, email));
   }
 }
 
