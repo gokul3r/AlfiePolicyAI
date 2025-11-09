@@ -32,9 +32,13 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const recordingAudioContextRef = useRef<AudioContext | null>(null);
+  const playbackAudioContextRef = useRef<AudioContext | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const audioQueueRef = useRef<AudioBufferSourceNode[]>([]);
+  const nextPlayTimeRef = useRef<number>(0);
+  const hasAudioDataRef = useRef<boolean>(false);
   
   // Use refs to track transcripts to avoid stale closure in WebSocket handler
   const userTranscriptRef = useRef<string>("");
@@ -135,9 +139,15 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
 
-      // Create audio context for processing
+      // Create audio context for recording
       const audioContext = new AudioContext({ sampleRate: 24000 });
-      audioContextRef.current = audioContext;
+      recordingAudioContextRef.current = audioContext;
+
+      // Initialize playback context if not already done (resume on user interaction)
+      if (!playbackAudioContextRef.current) {
+        playbackAudioContextRef.current = new AudioContext({ sampleRate: 24000 });
+        await playbackAudioContextRef.current.resume();
+      }
 
       const source = audioContext.createMediaStreamSource(stream);
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
@@ -145,12 +155,18 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
       source.connect(processor);
       processor.connect(audioContext.destination);
 
+      // Reset audio buffer tracking
+      hasAudioDataRef.current = false;
+
       processor.onaudioprocess = (e) => {
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
 
         const inputData = e.inputBuffer.getChannelData(0);
         const pcm16 = convertFloat32ToPCM16(inputData);
         const base64Audio = arrayBufferToBase64(pcm16);
+
+        // Mark that we have audio data
+        hasAudioDataRef.current = true;
 
         wsRef.current.send(JSON.stringify({
           type: "audio",
@@ -170,15 +186,24 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
       audioStreamRef.current = null;
     }
 
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
+    if (recordingAudioContextRef.current) {
+      recordingAudioContextRef.current.close();
+      recordingAudioContextRef.current = null;
     }
 
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+    // Only commit and trigger response if we actually have audio data
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && hasAudioDataRef.current) {
       wsRef.current.send(JSON.stringify({
         type: "input_audio_buffer.commit",
       }));
+
+      // Explicitly trigger AI response
+      wsRef.current.send(JSON.stringify({
+        type: "response.create",
+      }));
+
+      // Reset flag
+      hasAudioDataRef.current = false;
     }
 
     setIsRecording(false);
@@ -192,17 +217,52 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
     }
   };
 
-  // Audio playback
+  // Audio playback - convert PCM16 to Float32 and queue for playback
   const playAudioChunk = async (base64Audio: string) => {
     try {
-      const audioData = base64ToArrayBuffer(base64Audio);
-      const audioContext = new AudioContext({ sampleRate: 24000 });
-      const audioBuffer = await audioContext.decodeAudioData(audioData);
+      if (!playbackAudioContextRef.current) {
+        playbackAudioContextRef.current = new AudioContext({ sampleRate: 24000 });
+        await playbackAudioContextRef.current.resume();
+      }
+
+      const audioContext = playbackAudioContextRef.current;
       
+      // Decode base64 to PCM16 ArrayBuffer
+      const pcm16Buffer = base64ToArrayBuffer(base64Audio);
+      const pcm16Array = new Int16Array(pcm16Buffer);
+      
+      // Convert PCM16 to Float32
+      const float32Array = new Float32Array(pcm16Array.length);
+      for (let i = 0; i < pcm16Array.length; i++) {
+        float32Array[i] = pcm16Array[i] / (pcm16Array[i] < 0 ? 0x8000 : 0x7fff);
+      }
+      
+      // Create AudioBuffer
+      const audioBuffer = audioContext.createBuffer(1, float32Array.length, 24000);
+      audioBuffer.getChannelData(0).set(float32Array);
+      
+      // Create source and queue for playback
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(audioContext.destination);
-      source.start();
+      
+      // Schedule playback to avoid gaps/overlaps
+      const currentTime = audioContext.currentTime;
+      const startTime = Math.max(currentTime, nextPlayTimeRef.current);
+      source.start(startTime);
+      
+      // Update next play time
+      nextPlayTimeRef.current = startTime + audioBuffer.duration;
+      
+      audioQueueRef.current.push(source);
+      
+      // Clean up finished sources
+      source.onended = () => {
+        const index = audioQueueRef.current.indexOf(source);
+        if (index > -1) {
+          audioQueueRef.current.splice(index, 1);
+        }
+      };
     } catch (error) {
       console.error("[VoiceChat] Error playing audio:", error);
     }
