@@ -31,10 +31,13 @@ export default function ChatDialog({ open, onOpenChange, userEmail }: ChatDialog
     enabled: open && !!userEmail,
   });
 
-  // Save message mutation
-  const saveMutation = useMutation({
-    mutationFn: async (message: { email_id: string; role: "user" | "assistant"; content: string }) => {
-      return await apiRequest("POST", "/api/chat/messages", message);
+  // Send message to AI mutation
+  const sendMessageMutation = useMutation({
+    mutationFn: async (message: string) => {
+      return await apiRequest("POST", "/api/chat/send-message", {
+        email_id: userEmail,
+        message,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/messages", userEmail] });
@@ -62,23 +65,10 @@ export default function ChatDialog({ open, onOpenChange, userEmail }: ChatDialog
     const trimmedMessage = messageInput.trim();
     if (!trimmedMessage) return;
 
-    // Save user message
-    await saveMutation.mutateAsync({
-      email_id: userEmail,
-      role: "user",
-      content: trimmedMessage,
-    });
-
     setMessageInput("");
 
-    // For Phase 1: Simple placeholder response
-    setTimeout(async () => {
-      await saveMutation.mutateAsync({
-        email_id: userEmail,
-        role: "assistant",
-        content: "Hello! I'm AutoSage, your insurance assistant. AI capabilities will be available soon. For now, I'm here to help you navigate the app.",
-      });
-    }, 500);
+    // Send message to AI (saves both user and assistant messages)
+    await sendMessageMutation.mutateAsync(trimmedMessage);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -167,12 +157,12 @@ export default function ChatDialog({ open, onOpenChange, userEmail }: ChatDialog
               onKeyPress={handleKeyPress}
               placeholder="Type your message..."
               className="flex-1"
-              disabled={saveMutation.isPending}
+              disabled={sendMessageMutation.isPending}
               data-testid="input-chat-message"
             />
             <Button
               onClick={handleSendMessage}
-              disabled={!messageInput.trim() || saveMutation.isPending}
+              disabled={!messageInput.trim() || sendMessageMutation.isPending}
               size="icon"
               data-testid="button-send-message"
             >
