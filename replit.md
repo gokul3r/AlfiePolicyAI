@@ -30,9 +30,9 @@ Preferred communication style: Simple, everyday language.
 - Custom query client configured with optimized defaults (no refetch on window focus, infinite stale time)
 
 **Routing & Navigation**
-- Application uses state-based navigation with four main states: "home", "confirmation", "welcome", and "onboarding"
+- Application uses state-based navigation with five main states: "home", "confirmation", "welcome", "onboarding", and "quotes"
 - Component-based routing rather than traditional URL-based routing
-- State transitions: home → confirmation → welcome → onboarding → (manual entry) → welcome
+- State transitions: home → confirmation → welcome → onboarding → (manual entry) → welcome, welcome → quotes → welcome
 
 **Key UI Components**
 - `HomePage`: Landing page with "New User" and "Existing User" options
@@ -47,6 +47,8 @@ Preferred communication style: Simple, everyday language.
   - Each vehicle card is clickable to open edit form
   - "Whisper" button appears only when user has existing policies
   - Whisper button features MessageCircle icon with bold text and subtitle "Record user preferences"
+  - "Search Quotes" button appears only when user has existing policies
+  - Search Quotes button features Search icon with bold text and subtitle "Find best insurance deals"
   - Uses TanStack Query for real-time policy data fetching
   - Local state management for show/hide vehicle list toggle
 - `OnboardingDialog`: Post-login modal offering "Upload policy documents" or "Enter details manually" options
@@ -77,6 +79,34 @@ Preferred communication style: Simple, everyday language.
   - Uses dedicated whisperUpdateMutation for state isolation
   - Shows "Whisper preferences saved successfully!" toast on save
   - Does not interfere with ManualEntryForm or policy editing workflows
+- `QuoteSearchDialog`: Insurance quote search interface
+  - Displays all user's vehicles as clickable cards with Car icon
+  - Shows vehicle manufacturer, model, and registration number
+  - When vehicle selected, initiates quote search via backend proxy
+  - Shows loading spinner during API call (8-10 seconds average)
+  - Implements retry logic: max 3 attempts with 1-second delays
+  - Shows retry counter if retries occur: "Attempt 2 of 3", "Attempt 3 of 3"
+  - Dialog remains open and non-dismissible during search
+  - On success: closes dialog, navigates to QuotesScreen
+  - On max retries exceeded: shows "Application under maintenance" toast
+  - Uses backend proxy `/api/search-quotes` to avoid CORS issues
+- `QuotesScreen`: Full-screen insurance quotes display
+  - Sticky header with z-50 (high z-index) containing back button and vehicle info
+  - Displays selected vehicle: "{manufacturer} {model} ({registration})"
+  - Back button returns to welcome screen
+  - ScrollArea for vertically scrollable quote list
+  - Displays up to 10 insurance quotes from API
+  - Shows "No quotes found" message if empty
+- `QuoteCard`: Individual insurance quote display card
+  - **Insurer Information**: Name with Shield icon
+  - **Trustpilot Rating**: Star/StarHalf icons for rating, review count, pros/cons tooltip
+  - Pros & Cons tooltip: Max 5 items each, break-words, max-h-96 overflow-y-auto, green CheckCircle2/red XCircle icons
+  - **Features Matching**: Green checkmarks for matched features, red X for missing features
+  - **Alfie Touch Score**: Numeric display in rounded badge (e.g., "4.5 / 5"), NOT stars
+  - Score displayed in bg-primary/10 pill with bold primary color number
+  - **Alfie Message**: Highlighted section with bg-primary/5 background
+  - **Policy Price**: Quote cost from original_quote.output.policy_cost
+  - Uses QuoteWithInsights type from shared/schema.ts for full type safety
 
 ### Backend Architecture
 
@@ -103,6 +133,7 @@ Preferred communication style: Simple, everyday language.
 - `GET /api/vehicle-policies/:email/:vehicleId`: Retrieve a specific vehicle policy
 - `PUT /api/vehicle-policies/:email/:vehicleId`: Update an existing vehicle policy
 - `POST /api/extract-pdf`: Backend proxy endpoint for PDF extraction (forwards to Google Cloud Run API)
+- `POST /api/search-quotes`: Backend proxy endpoint for insurance quote search (forwards to Google Cloud Run Quote Search API)
 
 ### Data Storage
 
@@ -158,6 +189,35 @@ vehicle_policies table:
 - Response: JSON with extracted_fields, not_extracted_fields, status, and message
 - Processing time: 8-10 seconds average
 - No authentication required (public endpoint)
+
+**Insurance Quote Search Service**
+- **Google Cloud Run Alfie Quote Search API**: Serverless API for searching insurance quotes based on vehicle details and user preferences
+- Endpoint: `https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis`
+- Request: JSON with `insurance_details` (vehicle policy fields with exact casing) and `user_preferences` (whisper preferences)
+- Request payload structure:
+  ```json
+  {
+    "insurance_details": {
+      "email_id": "user@example.com",
+      "driver_age": 35,
+      "vehicle_registration_number": "AB12CDE",
+      "vehicle_manufacturer_name": "Toyota",
+      "vehicle_model": "Corolla",
+      "vehicle_year": 2020,
+      "type_of_fuel": "Petrol",
+      "type_of_Cover_needed": "Comprehensive",
+      "No_Claim_bonus_years": 3,
+      "Voluntary_Excess": 250
+    },
+    "user_preferences": "whisper preferences text"
+  }
+  ```
+- Note: API requires exact field casing (type_of_Cover_needed, No_Claim_bonus_years, Voluntary_Excess)
+- Response: QuotesApiResponse with quotes_with_insights array (up to 10 quotes)
+- Each quote includes: insurer_name, trust_pilot_context, features_matching_requirements, price_analysis, alfie_touch_score, score_breakdown, alfie_message, trade_offs
+- Processing time: 8-10 seconds average
+- No authentication required (public endpoint)
+- Accessed via backend proxy `/api/search-quotes` to avoid browser CORS issues
 
 **UI Component Libraries**
 - **Radix UI**: Headless, accessible component primitives (accordion, dialog, dropdown, toast, etc.)
