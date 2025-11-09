@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { insertUserSchema, loginSchema, insertVehiclePolicySchema, insertChatMessageSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
-import { sendRealtimeMessage } from "./openai-realtime";
+import { sendChatMessage } from "./openai-realtime";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configure multer for file uploads (store in memory)
@@ -312,12 +312,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: userMessage,
       });
 
-      // Get AI response using Realtime API with vector store
+      // Get AI response using Chat Completions API with vector store
       const VECTOR_STORE_ID = "vs_6901fa16a5c081918d2ad17626cc303f";
       
       let aiResponse: string;
       try {
-        aiResponse = await sendRealtimeMessage(userMessage, {
+        aiResponse = await sendChatMessage(userMessage, {
           vectorStoreId: VECTOR_STORE_ID,
           userEmail: email,
         });
