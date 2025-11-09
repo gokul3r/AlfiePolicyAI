@@ -83,6 +83,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Quote search proxy endpoint
+  app.post("/api/search-quotes", async (req, res) => {
+    try {
+      // Forward request to Google Cloud Run Quote Search API
+      const response = await fetch(
+        "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(req.body),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "Unknown error");
+        throw new Error(`External API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Error searching quotes:", error);
+      res.status(500).json({ 
+        error: "Failed to search quotes", 
+        message: error.message 
+      });
+    }
+  });
+
   // Create new user
   app.post("/api/users", async (req, res) => {
     try {

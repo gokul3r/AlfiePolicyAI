@@ -41,31 +41,31 @@ export default function QuoteSearchDialog({
     setRetryCount(attempt);
 
     try {
-      // Prepare the request payload
+      // Prepare the request payload - Cloud Run API expects specific field names with exact casing
       const requestPayload = {
-        email_id: vehicle.email_id,
-        driver_age: vehicle.driver_age,
-        vehicle_registration_number: vehicle.vehicle_registration_number,
-        vehicle_manufacturer_name: vehicle.vehicle_manufacturer_name,
-        vehicle_model: vehicle.vehicle_model,
-        vehicle_year: vehicle.vehicle_year,
-        type_of_fuel: vehicle.type_of_fuel,
-        type_of_Cover_needed: vehicle.type_of_cover_needed,
-        No_Claim_bonus_years: vehicle.no_claim_bonus_years,
-        Voluntary_Excess: vehicle.voluntary_excess,
-        whisper_preferences: vehicle.whisper_preferences || "",
+        insurance_details: {
+          email_id: vehicle.email_id,
+          driver_age: vehicle.driver_age,
+          vehicle_registration_number: vehicle.vehicle_registration_number,
+          vehicle_manufacturer_name: vehicle.vehicle_manufacturer_name,
+          vehicle_model: vehicle.vehicle_model,
+          vehicle_year: vehicle.vehicle_year,
+          type_of_fuel: vehicle.type_of_fuel,
+          type_of_Cover_needed: vehicle.type_of_cover_needed,
+          No_Claim_bonus_years: vehicle.no_claim_bonus_years,
+          Voluntary_Excess: vehicle.voluntary_excess,
+        },
+        user_preferences: vehicle.whisper_preferences || "",
       };
 
-      const response = await fetch(
-        "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestPayload),
-        }
-      );
+      // Use backend proxy endpoint to avoid CORS issues
+      const response = await fetch("/api/search-quotes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestPayload),
+      });
 
       if (!response.ok) {
         throw new Error(`API request failed with status ${response.status}`);
