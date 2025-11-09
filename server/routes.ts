@@ -1,10 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import WebSocket from "ws";
 import { storage } from "./storage";
 import { insertUserSchema, loginSchema, insertVehiclePolicySchema, insertChatMessageSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import { sendChatMessage } from "./openai-realtime";
+import { handleVoiceChat } from "./voice-chat-handler";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configure multer for file uploads (store in memory)
@@ -350,6 +352,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+
+  // WebSocket server for voice chat
+  const wss = new WebSocket.Server({ server: httpServer, path: "/api/voice-chat" });
+
+  wss.on("connection", (ws, req) => {
+    // Extract email from query params
+    const url = new URL(req.url || "", `http://${req.headers.host}`);
+    const emailId = url.searchParams.get("email");
+
+    if (!emailId) {
+      console.error("[WebSocket] No email provided");
+      ws.close(1008, "Email required");
+      return;
+    }
+
+    console.log(`[WebSocket] New voice chat connection: ${emailId}`);
+    handleVoiceChat(ws, emailId);
+  });
 
   return httpServer;
 }
