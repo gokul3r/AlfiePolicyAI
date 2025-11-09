@@ -191,15 +191,11 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
       recordingAudioContextRef.current = null;
     }
 
-    // Only commit and trigger response if we actually have audio data
+    // Only commit if we actually have audio data
+    // Server VAD will automatically trigger response when speech ends
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && hasAudioDataRef.current) {
       wsRef.current.send(JSON.stringify({
         type: "input_audio_buffer.commit",
-      }));
-
-      // Explicitly trigger AI response
-      wsRef.current.send(JSON.stringify({
-        type: "response.create",
       }));
 
       // Reset flag
