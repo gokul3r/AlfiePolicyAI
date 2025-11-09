@@ -15,6 +15,7 @@ import ManualEntryForm, { type VehiclePolicyFormData } from "@/components/Manual
 import WhisperDialog from "@/components/WhisperDialog";
 import QuoteSearchDialog from "@/components/QuoteSearchDialog";
 import QuotesScreen from "@/components/QuotesScreen";
+import ChatDialog from "@/components/ChatDialog";
 import type { User, InsertVehiclePolicy, VehiclePolicy, QuotesApiResponse } from "@shared/schema";
 import { apiRequest } from "./lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +30,7 @@ function AppContent() {
   const [manualEntryFormOpen, setManualEntryFormOpen] = useState(false);
   const [whisperDialogOpen, setWhisperDialogOpen] = useState(false);
   const [quoteSearchDialogOpen, setQuoteSearchDialogOpen] = useState(false);
+  const [chatDialogOpen, setChatDialogOpen] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState("");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [extractedData, setExtractedData] = useState<Partial<VehiclePolicyFormData> | null>(null);
@@ -310,6 +312,10 @@ function AppContent() {
     setSelectedVehicleForQuotes(null);
   };
 
+  const handleChat = () => {
+    setChatDialogOpen(true);
+  };
+
   return (
     <>
       {appState === "home" && (
@@ -346,6 +352,7 @@ function AppContent() {
           onEditPolicy={handleEditPolicy}
           onWhisper={handleWhisper}
           onSearchQuotes={handleSearchQuotes}
+          onChat={handleChat}
         />
       )}
 
@@ -393,6 +400,11 @@ function AppContent() {
             onOpenChange={setQuoteSearchDialogOpen}
             vehicles={userPolicies}
             onQuotesFound={handleQuoteSearchSubmit}
+          />
+          <ChatDialog
+            open={chatDialogOpen}
+            onOpenChange={setChatDialogOpen}
+            userEmail={currentUser.email_id}
           />
         </>
       )}

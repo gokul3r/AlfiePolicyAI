@@ -1,7 +1,7 @@
 import { db } from "./db";
-import { users, vehiclePolicies } from "@shared/schema";
-import { type User, type InsertUser, type VehiclePolicy, type InsertVehiclePolicy } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { users, vehiclePolicies, chatMessages } from "@shared/schema";
+import { type User, type InsertUser, type VehiclePolicy, type InsertVehiclePolicy, type ChatMessage, type InsertChatMessage } from "@shared/schema";
+import { eq, and, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -10,6 +10,8 @@ export interface IStorage {
   getVehiclePolicy(vehicleId: string, email: string): Promise<VehiclePolicy | undefined>;
   createVehiclePolicy(policy: InsertVehiclePolicy): Promise<VehiclePolicy>;
   updateVehiclePolicy(vehicleId: string, email: string, updates: Partial<InsertVehiclePolicy>): Promise<VehiclePolicy>;
+  getChatHistory(email: string): Promise<ChatMessage[]>;
+  saveChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
 }
 
 export class DbStorage implements IStorage {
@@ -52,6 +54,18 @@ export class DbStorage implements IStorage {
         )
       )
       .returning();
+    return result[0];
+  }
+
+  async getChatHistory(email: string): Promise<ChatMessage[]> {
+    return await db.select()
+      .from(chatMessages)
+      .where(eq(chatMessages.email_id, email))
+      .orderBy(chatMessages.created_at);
+  }
+
+  async saveChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const result = await db.insert(chatMessages).values(message).returning();
     return result[0];
   }
 }

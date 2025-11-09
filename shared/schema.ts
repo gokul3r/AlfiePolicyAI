@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, primaryKey, serial, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -129,3 +129,25 @@ export type ScoreBreakdown = z.infer<typeof scoreBreakdownSchema>;
 export type OriginalQuote = z.infer<typeof originalQuoteSchema>;
 export type QuoteWithInsights = z.infer<typeof quoteWithInsightsSchema>;
 export type QuotesApiResponse = z.infer<typeof quotesApiResponseSchema>;
+
+export const chatMessages = pgTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  email_id: text("email_id").notNull().references(() => users.email_id),
+  role: text("role").notNull(),
+  content: text("content").notNull(),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true,
+  created_at: true,
+}).extend({
+  email_id: z.string().email("Invalid email address").toLowerCase().trim(),
+  role: z.enum(["user", "assistant"], {
+    errorMap: () => ({ message: "Role must be either 'user' or 'assistant'" })
+  }),
+  content: z.string().min(1, "Message content is required").trim(),
+});
+
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;

@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertUserSchema, loginSchema, insertVehiclePolicySchema } from "@shared/schema";
+import { insertUserSchema, loginSchema, insertVehiclePolicySchema, insertChatMessageSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 
@@ -250,6 +250,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error updating vehicle policy:", error);
       res.status(500).json({ error: "Failed to update vehicle policy" });
+    }
+  });
+
+  // Get chat history for a user
+  app.get("/api/chat/messages/:email", async (req, res) => {
+    try {
+      const email = req.params.email.toLowerCase().trim();
+      const messages = await storage.getChatHistory(email);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching chat history:", error);
+      res.status(500).json({ error: "Failed to fetch chat history" });
+    }
+  });
+
+  // Save a new chat message
+  app.post("/api/chat/messages", async (req, res) => {
+    try {
+      const validatedData = insertChatMessageSchema.parse(req.body);
+      const message = await storage.saveChatMessage(validatedData);
+      res.status(201).json(message);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid message data", details: error.errors });
+      }
+      console.error("Error saving chat message:", error);
+      res.status(500).json({ error: "Failed to save chat message" });
     }
   });
 

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Car, MessageCircle, Search } from "lucide-react";
+import { Shield, Plus, Car, MessageCircle, Search, MessageSquare } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
 
 interface WelcomeScreenProps {
@@ -13,6 +13,7 @@ interface WelcomeScreenProps {
   onEditPolicy: (policy: VehiclePolicy) => void;
   onWhisper: () => void;
   onSearchQuotes: () => void;
+  onChat: () => void;
 }
 
 export default function WelcomeScreen({ 
@@ -21,7 +22,8 @@ export default function WelcomeScreen({
   onAddPolicy,
   onEditPolicy,
   onWhisper,
-  onSearchQuotes
+  onSearchQuotes,
+  onChat
 }: WelcomeScreenProps) {
   const [showVehicleList, setShowVehicleList] = useState(false);
   
@@ -115,6 +117,23 @@ export default function WelcomeScreen({
                   </Button>
                   <p className="text-xs text-center text-muted-foreground">
                     Find best insurance deals
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <Button
+                    variant="outline"
+                    onClick={onChat}
+                    className="w-full py-6 text-base font-medium rounded-xl"
+                    size="lg"
+                    data-testid="button-chat-autosage"
+                    disabled={isLoading}
+                  >
+                    <MessageSquare className="w-5 h-5 mr-2" />
+                    <span className="font-bold">Chat with AutoSage</span>
+                  </Button>
+                  <p className="text-xs text-center text-muted-foreground">
+                    AI insurance assistant
                   </p>
                 </div>
               </>
