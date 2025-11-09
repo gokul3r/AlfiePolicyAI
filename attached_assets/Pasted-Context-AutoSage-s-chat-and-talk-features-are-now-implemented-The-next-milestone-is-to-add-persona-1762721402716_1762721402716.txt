@@ -1,0 +1,112 @@
+Context:
+AutoSage’s chat and talk features are now implemented.
+The next milestone is to add personalization and proactive suggestions to enhance the user experience.
+
+🧩 Feature Name:
+
+Personalization Panel with Notification and Gmail Integration
+
+Objective:
+
+Add a bell (notification icon) and a hamburger menu in the top-right corner of the app UI, introducing basic personalization options and Gmail integration to detect travel plans and suggest travel insurance.
+
+UI Requirements:
+
+Top Bar Additions:
+
+Place a 🔔 Bell icon (notifications) and a ☰ Hamburger menu in the top-right corner of the app header.
+
+Hamburger Menu Behavior:
+
+When clicked, it should display two menu options:
+
+Personalize
+
+Logout
+
+Personalize Option:
+
+Clicking Personalize opens a modal dialog box with the following layout:
+
+Two rows:
+
+Email (label on left) — Toggle switch on the right.
+
+Calendar (label on left) — Toggle switch on the right.
+
+Functional Behavior:
+1. Email Toggle:
+
+When the user toggles Email → ON:
+
+Prompt the user to enter their Gmail ID.
+
+Use Google OAuth to connect securely to their Gmail account.
+
+Once connected, automatically:
+
+Read the last 7 days of emails.
+
+Use the AI agent to detect travel-related emails (based on subject or body keywords like ticket, itinerary, booking, flight, journey, travel).
+
+If a travel email is found, extract:
+
+Destination country or city (e.g., “Switzerland”).
+
+Departure date (if available).
+
+Then display a proactive AI message:
+
+“Hey <user_name>, do you want to buy a travel insurance policy for your upcoming trip to <destination>?”
+
+2. Calendar Toggle:
+
+(For future implementation) — Keep inactive for now; just the toggle UI.
+
+3. Logout Option:
+
+Clears all personalization tokens and resets the session.
+
+Development Phases:
+
+Phase 1 – UI Setup:
+
+Add bell and hamburger icons.
+
+Implement menu with Personalize and Logout.
+
+Create the Personalize modal with email & calendar toggles.
+
+Phase 2 – Gmail Connection (Proof of Concept):
+
+Implement Google OAuth flow for Gmail access.
+
+Fetch last 7 days of emails (read-only).
+
+Filter and summarize travel-related emails using AI.
+
+Phase 3 – AI Triggered Personalization:
+
+Generate dynamic suggestions like travel insurance prompts based on extracted info.
+
+Phase 4 – Calendar Integration (Future).
+
+Expected Output Behavior:
+
+When the feature is working:
+
+User clicks hamburger → chooses Personalize.
+
+Toggles Email → ON → enters Gmail → OAuth connects.
+
+AI reads last week’s emails → finds travel info.
+
+App shows a friendly proactive suggestion:
+
+“Hey Gokul, do you want to buy a travel insurance policy for your upcoming trip to Switzerland?”
+
+Before you start:
+
+Do you have any questions about the Gmail integration flow or UI placement?
+
+Confirm that you’ll start with Phase 1 (UI & toggles) before coding Gmail and AI logic.
