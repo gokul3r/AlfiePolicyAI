@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { users, vehiclePolicies, chatMessages, personalizations, notifications } from "@shared/schema";
-import { type User, type InsertUser, type VehiclePolicy, type InsertVehiclePolicy, type ChatMessage, type InsertChatMessage, type Personalization, type Notification, type InsertNotification } from "@shared/schema";
+import { users, vehiclePolicies, chatMessages, personalizations, notifications, customRatings } from "@shared/schema";
+import { type User, type InsertUser, type VehiclePolicy, type InsertVehiclePolicy, type ChatMessage, type InsertChatMessage, type Personalization, type Notification, type InsertNotification, type CustomRatings, type InsertCustomRatings } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 export interface IStorage {
@@ -20,6 +20,8 @@ export interface IStorage {
   getActiveNotificationsByDestination(email: string, destination: string): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
   dismissNotification(id: number): Promise<void>;
+  getCustomRatings(email: string): Promise<CustomRatings | undefined>;
+  saveCustomRatings(email: string, ratings: Omit<InsertCustomRatings, 'email_id'>): Promise<CustomRatings>;
 }
 
 export class DbStorage implements IStorage {
@@ -150,6 +152,28 @@ export class DbStorage implements IStorage {
     await db.update(notifications)
       .set({ dismissed: true })
       .where(eq(notifications.id, id));
+  }
+
+  async getCustomRatings(email: string): Promise<CustomRatings | undefined> {
+    const result = await db.select().from(customRatings).where(eq(customRatings.email_id, email));
+    return result[0];
+  }
+
+  async saveCustomRatings(email: string, ratings: Omit<InsertCustomRatings, 'email_id'>): Promise<CustomRatings> {
+    const existing = await this.getCustomRatings(email);
+    
+    if (existing) {
+      const result = await db.update(customRatings)
+        .set({ ...ratings, updated_at: new Date() })
+        .where(eq(customRatings.email_id, email))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(customRatings)
+        .values({ email_id: email, ...ratings })
+        .returning();
+      return result[0];
+    }
   }
 }
 

@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, primaryKey, serial, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, primaryKey, serial, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -204,3 +204,64 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+
+// Custom Ratings Schema - using JSONB for flexible storage
+export const customRatings = pgTable("custom_ratings", {
+  email_id: text("email_id").primaryKey().references(() => users.email_id),
+  trustpilot_data: jsonb("trustpilot_data").notNull(),
+  defacto_ratings: jsonb("defacto_ratings").notNull(),
+  use_custom_ratings: boolean("use_custom_ratings").notNull().default(false),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Trustpilot data structure for each provider
+const trustPilotProviderSchema = z.object({
+  rating: z.number().min(0).max(5.0),
+  reviews_count: z.number().int().min(0),
+  pros: z.array(z.string()),
+  cons: z.array(z.string()),
+});
+
+// Full trustpilot data structure (all providers)
+export const trustPilotDataSchema = z.object({
+  Admiral: trustPilotProviderSchema,
+  PAXA: trustPilotProviderSchema,
+  Baviva: trustPilotProviderSchema,
+  IndirectLane: trustPilotProviderSchema,
+  Churchwell: trustPilotProviderSchema,
+  Ventura: trustPilotProviderSchema,
+  Zorich: trustPilotProviderSchema,
+  HestingsDrive: trustPilotProviderSchema,
+  Assureon: trustPilotProviderSchema,
+  Soga: trustPilotProviderSchema,
+});
+
+// Defacto ratings structure (provider name -> rating)
+export const defactoRatingsSchema = z.object({
+  Admiral: z.number().min(0).max(5.0),
+  PAXA: z.number().min(0).max(5.0),
+  Baviva: z.number().min(0).max(5.0),
+  IndirectLane: z.number().min(0).max(5.0),
+  Churchwell: z.number().min(0).max(5.0),
+  Ventura: z.number().min(0).max(5.0),
+  Zorich: z.number().min(0).max(5.0),
+  HestingsDrive: z.number().min(0).max(5.0),
+  Assureon: z.number().min(0).max(5.0),
+  Soga: z.number().min(0).max(5.0),
+});
+
+export const insertCustomRatingsSchema = createInsertSchema(customRatings).omit({
+  created_at: true,
+  updated_at: true,
+}).extend({
+  email_id: z.string().email("Invalid email address").toLowerCase().trim(),
+  trustpilot_data: trustPilotDataSchema,
+  defacto_ratings: defactoRatingsSchema,
+  use_custom_ratings: z.boolean(),
+});
+
+export type TrustPilotData = z.infer<typeof trustPilotDataSchema>;
+export type DefactoRatings = z.infer<typeof defactoRatingsSchema>;
+export type InsertCustomRatings = z.infer<typeof insertCustomRatingsSchema>;
+export type CustomRatings = typeof customRatings.$inferSelect;

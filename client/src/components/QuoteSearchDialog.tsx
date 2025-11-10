@@ -41,8 +41,8 @@ export default function QuoteSearchDialog({
     setRetryCount(attempt);
 
     try {
-      // Prepare the request payload - Cloud Run API expects specific field names with exact casing
-      const requestPayload = {
+      // Prepare the base request payload
+      const requestPayload: any = {
         insurance_details: {
           email_id: vehicle.email_id,
           driver_age: vehicle.driver_age,
@@ -57,6 +57,23 @@ export default function QuoteSearchDialog({
         },
         user_preferences: vehicle.whisper_preferences || "",
       };
+
+      // Fetch custom ratings if available
+      try {
+        const ratingsResponse = await fetch(`/api/custom-ratings/${encodeURIComponent(vehicle.email_id)}`);
+        if (ratingsResponse.ok) {
+          const customRatings = await ratingsResponse.json();
+          
+          // Only include custom ratings if the toggle is enabled
+          if (customRatings.use_custom_ratings) {
+            requestPayload.trust_pilot_data = customRatings.trustpilot_data;
+            requestPayload.defacto_ratings = customRatings.defacto_ratings;
+          }
+        }
+      } catch (ratingsError) {
+        // If fetching custom ratings fails, continue with default ratings
+        console.log("Custom ratings not available, using defaults");
+      }
 
       // Use backend proxy endpoint to avoid CORS issues
       const response = await fetch("/api/search-quotes", {

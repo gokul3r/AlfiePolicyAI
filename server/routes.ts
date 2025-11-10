@@ -423,6 +423,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get custom ratings for a user
+  app.get("/api/custom-ratings/:email", async (req, res) => {
+    try {
+      const email = req.params.email.toLowerCase().trim();
+      const ratings = await storage.getCustomRatings(email);
+      
+      if (!ratings) {
+        return res.status(404).json({ error: "Custom ratings not found for this user" });
+      }
+      
+      res.json(ratings);
+    } catch (error) {
+      console.error("Error fetching custom ratings:", error);
+      res.status(500).json({ error: "Failed to fetch custom ratings" });
+    }
+  });
+
+  // Save custom ratings for a user
+  app.post("/api/custom-ratings", async (req, res) => {
+    try {
+      const { insertCustomRatingsSchema } = await import("@shared/schema");
+      
+      // Validate request body
+      const validated = insertCustomRatingsSchema.parse(req.body);
+      
+      const { email_id, ...ratingsData } = validated;
+      const result = await storage.saveCustomRatings(email_id, ratingsData);
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error saving custom ratings:", error);
+      
+      if (error.name === "ZodError") {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: error.errors 
+        });
+      }
+      
+      res.status(500).json({ error: "Failed to save custom ratings" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for voice chat
