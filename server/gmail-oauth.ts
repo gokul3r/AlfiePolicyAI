@@ -7,7 +7,10 @@ import crypto from "crypto";
 function getOAuth2Client() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const redirectUri = `${process.env.REPL_ID ? 'https://' + process.env.REPL_SLUG + '.' + process.env.REPL_OWNER + '.repl.co' : 'http://localhost:5000'}/api/personalization/gmail/callback`;
+  
+  // Extract first domain from REPLIT_DOMAINS (can be comma-separated)
+  const replitDomain = process.env.REPLIT_DOMAINS?.split(',')[0].trim();
+  const redirectUri = `${replitDomain ? 'https://' + replitDomain : 'http://localhost:5000'}/api/personalization/gmail/callback`;
 
   if (!clientId || !clientSecret) {
     throw new Error("Missing Google OAuth credentials. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Replit Secrets.");
