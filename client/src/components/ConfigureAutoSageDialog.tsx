@@ -15,7 +15,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Scan, Star } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { DEFAULT_TRUSTPILOT_DATA, DEFAULT_DEFACTO_RATINGS, PROVIDER_NAMES } from "@/lib/defaultRatings";
 import type { TrustPilotData, DefactoRatings } from "@shared/schema";
 
@@ -172,15 +171,15 @@ export function ConfigureAutoSageDialog({ open, onOpenChange, userEmail }: Confi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="px-6 py-4 border-b">
+      <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col p-0">
+        <DialogHeader className="px-6 py-4 border-b shrink-0">
           <DialogTitle>Configure AutoSage</DialogTitle>
           <DialogDescription>
             Manage your AutoSage settings, scan for travel notifications, and customize insurance ratings
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 px-6">
+        <div className="flex-1 overflow-auto px-6">
           <div className="space-y-4 py-4">
             {/* Email Scan Card */}
             <Card>
@@ -298,7 +297,7 @@ export function ConfigureAutoSageDialog({ open, onOpenChange, userEmail }: Confi
               </CardContent>
             </Card>
           </div>
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
