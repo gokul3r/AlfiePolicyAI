@@ -30,13 +30,14 @@ Preferred communication style: Simple, everyday language.
 - **`UploadDialog`**: PDF upload interface with extraction integration (6MB max, 8-10 sec processing).
 - **`ManualEntryForm`**: Comprehensive vehicle policy form supporting create/edit, pre-filling, and validation.
 - **`WhisperDialog`**: Interface for recording and editing user insurance preferences per vehicle.
-- **`QuoteSearchDialog`**: Initiates insurance quote search for a selected vehicle, with retry logic and loading indicators.
+- **`QuoteSearchDialog`**: Initiates insurance quote search for a selected vehicle, with retry logic and loading indicators. Fetches custom ratings if enabled and includes them in quote search request.
 - **`QuotesScreen`**: Displays up to 10 insurance quotes for a selected vehicle, with a sticky header.
 - **`QuoteCard`**: Displays individual quotes with insurer info, Trustpilot rating, features matching, AutoSage Score, and AI analysis.
 - **`ChatModeSelector`**: Modal for selecting between text chat and voice chat modes.
 - **`ChatDialog`**: Text-based AI assistant chat interface with message history persistence and real-time updates using OpenAI Responses API.
 - **`VoiceChatDialog`**: Voice-based AI assistant with WebSocket audio streaming, real-time transcription display, and mic toggle.
 - **`PersonalizeDialog`**: Settings dialog for Gmail OAuth integration, connection status, privacy consent, and disconnect option.
+- **`ConfigureAutoSageDialog`**: Settings dialog with Email Scan and Custom Ratings sections. Email Scan allows manual Gmail scanning for travel notifications. Custom Ratings section allows users to customize Trustpilot and Defacto ratings for 10 insurance providers (Admiral, PAXA, Baviva, IndirectLane, Churchwell, Ventura, Zorich, HestingsDrive, Assureon, Soga). Ratings must be numeric values between 0-5.0 (validated on both client and server). Toggle switch enables/disables custom ratings usage in quote searches.
 
 ### Backend Architecture
 
@@ -51,6 +52,7 @@ Preferred communication style: Simple, everyday language.
 - Text chat endpoint using OpenAI Responses API (`/api/chat/send-message`).
 - Voice chat WebSocket endpoint using OpenAI Realtime API (`/api/voice-chat`).
 - Gmail OAuth integration endpoints (`/api/personalization/gmail/authorize`, `/api/personalization/gmail/callback`, `/api/personalization/gmail/disconnect`, `/api/personalization/gmail/status`).
+- Custom ratings endpoints (`/api/custom-ratings` for POST, `/api/custom-ratings/:email` for GET) for saving and retrieving user-customized insurance provider ratings.
 
 ### Data Storage
 
@@ -64,6 +66,7 @@ Preferred communication style: Simple, everyday language.
 - `vehicle_policies` table: `vehicle_id` (composite PK), `email_id` (composite PK, FK), `driver_age`, `vehicle_registration_number`, `vehicle_manufacturer_name`, `vehicle_model`, `vehicle_year`, `type_of_fuel`, `type_of_cover_needed`, `no_claim_bonus_years`, `voluntary_excess`, `whisper_preferences` (nullable).
 - `chat_messages` table: `id` (serial PK), `email_id` (FK to users), `role` ('user' or 'assistant'), `content`, `created_at` (timestamp, default now()).
 - `personalizations` table: `email_id` (PK, FK to users), `gmail_id` (connected Gmail email), `gmail_access_token`, `gmail_refresh_token`, `gmail_token_expiry`, `email_enabled` (boolean), `created_at`, `updated_at`.
+- `custom_ratings` table: `email_id` (PK, FK to users), `trustpilot_data` (JSONB), `defacto_ratings` (JSONB), `use_custom_ratings` (boolean), `created_at`, `updated_at`.
 
 ## External Dependencies
 
