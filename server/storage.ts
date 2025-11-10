@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { users, vehiclePolicies, chatMessages, personalizations } from "@shared/schema";
-import { type User, type InsertUser, type VehiclePolicy, type InsertVehiclePolicy, type ChatMessage, type InsertChatMessage, type Personalization } from "@shared/schema";
+import { users, vehiclePolicies, chatMessages, personalizations, notifications } from "@shared/schema";
+import { type User, type InsertUser, type VehiclePolicy, type InsertVehiclePolicy, type ChatMessage, type InsertChatMessage, type Personalization, type Notification, type InsertNotification } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 export interface IStorage {
@@ -15,6 +15,11 @@ export interface IStorage {
   getPersonalization(email: string): Promise<Personalization | undefined>;
   saveGmailTokens(email: string, tokens: Partial<Personalization>): Promise<Personalization>;
   clearGmailTokens(email: string): Promise<void>;
+  updateLastEmailScan(email: string): Promise<void>;
+  getNotifications(email: string): Promise<Notification[]>;
+  getActiveNotificationsByDestination(email: string, destination: string): Promise<Notification[]>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  dismissNotification(id: number): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -106,6 +111,45 @@ export class DbStorage implements IStorage {
         updated_at: new Date(),
       })
       .where(eq(personalizations.email_id, email));
+  }
+
+  async updateLastEmailScan(email: string): Promise<void> {
+    await db.update(personalizations)
+      .set({
+        last_email_scan: new Date(),
+        updated_at: new Date(),
+      })
+      .where(eq(personalizations.email_id, email));
+  }
+
+  async getNotifications(email: string): Promise<Notification[]> {
+    return await db.select()
+      .from(notifications)
+      .where(eq(notifications.email_id, email))
+      .orderBy(desc(notifications.created_at));
+  }
+
+  async getActiveNotificationsByDestination(email: string, destination: string): Promise<Notification[]> {
+    return await db.select()
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.email_id, email),
+          eq(notifications.destination, destination),
+          eq(notifications.dismissed, false)
+        )
+      );
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const result = await db.insert(notifications).values(notification).returning();
+    return result[0];
+  }
+
+  async dismissNotification(id: number): Promise<void> {
+    await db.update(notifications)
+      .set({ dismissed: true })
+      .where(eq(notifications.id, id));
   }
 }
 

@@ -17,6 +17,7 @@ import ChatDialog from "./ChatDialog";
 import { VoiceChatDialog } from "./VoiceChatDialog";
 import { PersonalizeDialog } from "./PersonalizeDialog";
 import { NotificationPanel } from "./NotificationPanel";
+import { ConfigureAutoSageDialog } from "./ConfigureAutoSageDialog";
 
 interface WelcomeScreenProps {
   userName: string;
@@ -41,6 +42,7 @@ export default function WelcomeScreen({
   const [showVoiceChat, setShowVoiceChat] = useState(false);
   const [showPersonalize, setShowPersonalize] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showConfigureAutoSage, setShowConfigureAutoSage] = useState(false);
   
   const { data: policies = [], isLoading } = useQuery<VehiclePolicy[]>({
     queryKey: ["/api/vehicle-policies", userEmail],
@@ -299,6 +301,22 @@ export default function WelcomeScreen({
         onOpenChange={setShowNotifications}
         userEmail={userEmail}
       />
+
+      {/* Configure AutoSage Dialog */}
+      <ConfigureAutoSageDialog
+        open={showConfigureAutoSage}
+        onOpenChange={setShowConfigureAutoSage}
+        userEmail={userEmail}
+      />
+
+      {/* Fixed Configure AutoSage Link at Bottom */}
+      <button
+        className="fixed bottom-4 left-1/2 -translate-x-1/2 text-xs text-muted-foreground underline hover-elevate cursor-pointer"
+        onClick={() => setShowConfigureAutoSage(true)}
+        data-testid="link-configure-autosage"
+      >
+        Configure AutoSage
+      </button>
     </div>
   );
 }

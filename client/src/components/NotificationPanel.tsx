@@ -6,7 +6,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { X, Plane } from "lucide-react";
 
 interface Notification {
@@ -14,9 +16,11 @@ interface Notification {
   email_id: string;
   message: string;
   destination: string | null;
+  email_subject: string | null;
+  email_date: string | null;
   departure_date: string | null;
+  dismissed: boolean;
   created_at: string;
-  is_read: boolean;
 }
 
 interface NotificationPanelProps {
@@ -26,10 +30,46 @@ interface NotificationPanelProps {
 }
 
 export function NotificationPanel({ open, onOpenChange, userEmail }: NotificationPanelProps) {
-  const { data: notifications = [], isLoading } = useQuery<Notification[]>({
+  const { toast } = useToast();
+
+  const { data: allNotifications = [], isLoading } = useQuery<Notification[]>({
     queryKey: ["/api/notifications", userEmail],
+    queryFn: async () => {
+      const response = await fetch(`/api/notifications/${encodeURIComponent(userEmail)}`);
+      if (!response.ok) throw new Error("Failed to fetch notifications");
+      return response.json();
+    },
     enabled: open,
   });
+
+  // Filter out dismissed notifications
+  const notifications = allNotifications.filter(n => !n.dismissed);
+
+  // Dismiss notification mutation
+  const dismissMutation = useMutation({
+    mutationFn: async (notificationId: number) => {
+      return apiRequest("POST", `/api/notifications/${notificationId}/dismiss`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications", userEmail] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/count", userEmail] });
+      toast({
+        title: "Notification Dismissed",
+        description: "The notification has been dismissed.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to dismiss notification",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDismiss = (notificationId: number) => {
+    dismissMutation.mutate(notificationId);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -92,6 +132,18 @@ export function NotificationPanel({ open, onOpenChange, userEmail }: Notificatio
                       <p className="text-xs text-muted-foreground">
                         {new Date(notification.created_at).toLocaleString()}
                       </p>
+                      <div className="mt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDismiss(notification.id)}
+                          disabled={dismissMutation.isPending}
+                          className="text-xs"
+                          data-testid={`button-dismiss-${notification.id}`}
+                        >
+                          {dismissMutation.isPending ? "Dismissing..." : "Dismiss"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>

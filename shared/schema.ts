@@ -182,8 +182,10 @@ export const notifications = pgTable("notifications", {
   email_id: text("email_id").notNull().references(() => users.email_id),
   message: text("message").notNull(),
   destination: text("destination"),
+  email_subject: text("email_subject"),
+  email_date: timestamp("email_date"),
   departure_date: text("departure_date"),
-  is_read: boolean("is_read").notNull().default(false),
+  dismissed: boolean("dismissed").notNull().default(false),
   created_at: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -193,6 +195,11 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 }).extend({
   email_id: z.string().email("Invalid email address").toLowerCase().trim(),
   message: z.string().min(1, "Notification message is required").trim(),
+  destination: z.string().optional(),
+  email_subject: z.string().optional(),
+  email_date: z.date().optional(),
+  departure_date: z.string().optional(),
+  dismissed: z.boolean().optional(),
 });
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;

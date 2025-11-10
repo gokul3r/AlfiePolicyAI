@@ -8,6 +8,7 @@ import multer from "multer";
 import { sendChatMessage } from "./openai-realtime";
 import { handleVoiceChat } from "./voice-chat-handler";
 import { handleGmailAuthorize, handleGmailCallback, handleGmailDisconnect, handleGmailStatus } from "./gmail-oauth";
+import { scanGmailForTravelEmails } from "./gmail-scanner";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configure multer for file uploads (store in memory)
@@ -357,6 +358,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/personalization/gmail/callback", handleGmailCallback);
   app.post("/api/personalization/gmail/disconnect", handleGmailDisconnect);
   app.get("/api/personalization/gmail/status", handleGmailStatus);
+
+  // Gmail scanning for travel notifications
+  app.post("/api/gmail/scan", async (req, res) => {
+    try {
+      const { email_id } = req.body;
+      
+      if (!email_id || typeof email_id !== "string") {
+        return res.status(400).json({ error: "email_id is required" });
+      }
+      
+      const email = email_id.toLowerCase().trim();
+      
+      // Verify user exists
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      console.log(`[Gmail Scanner] Starting scan for ${email}`);
+      const notificationsCreated = await scanGmailForTravelEmails(email);
+      console.log(`[Gmail Scanner] Created ${notificationsCreated} new notifications for ${email}`);
+      
+      res.json({ 
+        success: true, 
+        notificationsCreated,
+        message: `Scan complete. Found ${notificationsCreated} new travel notification(s).`
+      });
+    } catch (error: any) {
+      console.error("[Gmail Scanner] Error:", error);
+      res.status(500).json({ 
+        error: "Failed to scan Gmail", 
+        message: error.message 
+      });
+    }
+  });
+
+  // Get all notifications for a user
+  app.get("/api/notifications/:email", async (req, res) => {
+    try {
+      const email = req.params.email.toLowerCase().trim();
+      const notifications = await storage.getNotifications(email);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  // Dismiss a notification
+  app.post("/api/notifications/:id/dismiss", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid notification ID" });
+      }
+      
+      await storage.dismissNotification(id);
+      res.json({ success: true, message: "Notification dismissed" });
+    } catch (error) {
+      console.error("Error dismissing notification:", error);
+      res.status(500).json({ error: "Failed to dismiss notification" });
+    }
+  });
 
   const httpServer = createServer(app);
 
