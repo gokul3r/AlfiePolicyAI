@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MessageCircle, Car } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
+
+const AVAILABLE_FEATURES = [
+  "legal cover",
+  "windshield cover",
+  "courtesy car",
+  "breakdown cover",
+  "personal accident cover",
+  "european cover",
+  "no claim bonus protection",
+] as const;
 
 interface WhisperDialogProps {
   open: boolean;
@@ -27,15 +37,124 @@ export default function WhisperDialog({
   const [selectedVehicle, setSelectedVehicle] = useState<VehiclePolicy | null>(null);
   const [preferences, setPreferences] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFeatures, setSelectedFeatures] = useState<Set<string>>(new Set());
+  const [interactedFeatures, setInteractedFeatures] = useState<string[]>([]);
+
+  const detectFeaturesInText = (text: string): string[] => {
+    const lowerText = text.toLowerCase();
+    return AVAILABLE_FEATURES.filter(feature => 
+      lowerText.includes(feature.toLowerCase())
+    );
+  };
+
+  const calculateRecommendations = (text: string) => {
+    const mentionedFeatures = detectFeaturesInText(text);
+    const remaining = AVAILABLE_FEATURES.filter(
+      feature => !mentionedFeatures.includes(feature)
+    );
+    return remaining.slice(0, 3);
+  };
+
+  const getDisplayedFeatures = (): string[] => {
+    const mentionedFeatures = detectFeaturesInText(preferences);
+    const mentionedSet = new Set(mentionedFeatures);
+    
+    const selectedArray = Array.from(selectedFeatures);
+    const interactedSet = new Set(interactedFeatures);
+    
+    const newSelections = selectedArray.filter(f => !interactedSet.has(f));
+    const allRelevant = [...interactedFeatures, ...newSelections];
+    
+    const recentThree = allRelevant.slice(-3);
+    
+    if (recentThree.length >= 3) {
+      return recentThree;
+    }
+    
+    const remaining = AVAILABLE_FEATURES.filter(
+      f => !mentionedSet.has(f) && !allRelevant.includes(f)
+    );
+    
+    const slotsAvailable = Math.max(0, 3 - recentThree.length);
+    const newRecommendations = remaining.slice(0, slotsAvailable);
+    
+    return [...recentThree, ...newRecommendations];
+  };
+
+  useEffect(() => {
+    if (selectedVehicle) {
+      const lines = preferences.split('\n');
+      const selectedFromText = new Set<string>();
+      
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('*')) {
+          const feature = trimmed.substring(1).trim().toLowerCase();
+          const matchedFeature = AVAILABLE_FEATURES.find(f => f.toLowerCase() === feature);
+          if (matchedFeature) {
+            selectedFromText.add(matchedFeature);
+          }
+        }
+      });
+      
+      const mentionedFeatures = detectFeaturesInText(preferences);
+      mentionedFeatures.forEach(f => selectedFromText.add(f));
+      
+      setSelectedFeatures(selectedFromText);
+    }
+  }, [preferences, selectedVehicle]);
 
   const handleVehicleSelect = (vehicle: VehiclePolicy) => {
     setSelectedVehicle(vehicle);
-    setPreferences(vehicle.whisper_preferences || "");
+    const prefs = vehicle.whisper_preferences || "";
+    setPreferences(prefs);
+    
+    const lines = prefs.split('\n');
+    const interacted: string[] = [];
+    lines.forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('*')) {
+        const feature = trimmed.substring(1).trim().toLowerCase();
+        const matchedFeature = AVAILABLE_FEATURES.find(f => f.toLowerCase() === feature);
+        if (matchedFeature && !interacted.includes(matchedFeature)) {
+          interacted.push(matchedFeature);
+        }
+      }
+    });
+    setInteractedFeatures(interacted);
+  };
+
+  const handleFeatureToggle = (feature: string) => {
+    const isSelected = selectedFeatures.has(feature);
+    
+    const newInteracted = interactedFeatures.filter(f => f !== feature);
+    newInteracted.push(feature);
+    setInteractedFeatures(newInteracted);
+    
+    if (isSelected) {
+      const lines = preferences.split('\n');
+      const filteredLines = lines.filter(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('*')) {
+          const lineFeature = trimmed.substring(1).trim().toLowerCase();
+          return lineFeature !== feature.toLowerCase();
+        }
+        return true;
+      });
+      setPreferences(filteredLines.join('\n'));
+    } else {
+      const newPrefs = preferences.trim() 
+        ? `${preferences}\n* ${feature}` 
+        : `* ${feature}`;
+      setPreferences(newPrefs);
+    }
   };
 
   const handleBack = () => {
     setSelectedVehicle(null);
     setPreferences("");
+    setSelectedFeatures(new Set());
+    setInteractedFeatures([]);
   };
 
   const handleSubmit = async () => {
@@ -46,6 +165,8 @@ export default function WhisperDialog({
       await onSubmit(selectedVehicle.vehicle_id, preferences);
       setSelectedVehicle(null);
       setPreferences("");
+      setSelectedFeatures(new Set());
+      setInteractedFeatures([]);
       onOpenChange(false);
     } catch (error) {
       console.error("Error saving whisper preferences:", error);
@@ -58,6 +179,8 @@ export default function WhisperDialog({
     if (!open) {
       setSelectedVehicle(null);
       setPreferences("");
+      setSelectedFeatures(new Set());
+      setInteractedFeatures([]);
     }
     onOpenChange(open);
   };
@@ -127,6 +250,30 @@ export default function WhisperDialog({
                 data-testid="textarea-whisper-preferences"
               />
             </div>
+
+            {getDisplayedFeatures().length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Popular among drivers with similar vehicles and coverage preferences
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {getDisplayedFeatures().map((feature: string) => {
+                    const isSelected = selectedFeatures.has(feature);
+                    return (
+                      <Button
+                        key={feature}
+                        variant={isSelected ? "default" : "outline"}
+                        onClick={() => handleFeatureToggle(feature)}
+                        className="min-h-11 text-sm"
+                        data-testid={`button-feature-${feature.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        {feature}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-2">
               <Button
