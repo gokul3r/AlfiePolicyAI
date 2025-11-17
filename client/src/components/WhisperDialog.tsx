@@ -38,7 +38,7 @@ export default function WhisperDialog({
   const [preferences, setPreferences] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFeatures, setSelectedFeatures] = useState<Set<string>>(new Set());
-  const [interactedFeatures, setInteractedFeatures] = useState<string[]>([]);
+  const [initialRecommendations, setInitialRecommendations] = useState<string[]>([]);
 
   const detectFeaturesInText = (text: string): string[] => {
     const lowerText = text.toLowerCase();
@@ -56,29 +56,7 @@ export default function WhisperDialog({
   };
 
   const getDisplayedFeatures = (): string[] => {
-    const mentionedFeatures = detectFeaturesInText(preferences);
-    const mentionedSet = new Set(mentionedFeatures);
-    
-    const selectedArray = Array.from(selectedFeatures);
-    const interactedSet = new Set(interactedFeatures);
-    
-    const newSelections = selectedArray.filter(f => !interactedSet.has(f));
-    const allRelevant = [...interactedFeatures, ...newSelections];
-    
-    const recentThree = allRelevant.slice(-3);
-    
-    if (recentThree.length >= 3) {
-      return recentThree;
-    }
-    
-    const remaining = AVAILABLE_FEATURES.filter(
-      f => !mentionedSet.has(f) && !allRelevant.includes(f)
-    );
-    
-    const slotsAvailable = Math.max(0, 3 - recentThree.length);
-    const newRecommendations = remaining.slice(0, slotsAvailable);
-    
-    return [...recentThree, ...newRecommendations];
+    return initialRecommendations;
   };
 
   useEffect(() => {
@@ -97,9 +75,6 @@ export default function WhisperDialog({
         }
       });
       
-      const mentionedFeatures = detectFeaturesInText(preferences);
-      mentionedFeatures.forEach(f => selectedFromText.add(f));
-      
       setSelectedFeatures(selectedFromText);
     }
   }, [preferences, selectedVehicle]);
@@ -109,27 +84,12 @@ export default function WhisperDialog({
     const prefs = vehicle.whisper_preferences || "";
     setPreferences(prefs);
     
-    const lines = prefs.split('\n');
-    const interacted: string[] = [];
-    lines.forEach(line => {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('*')) {
-        const feature = trimmed.substring(1).trim().toLowerCase();
-        const matchedFeature = AVAILABLE_FEATURES.find(f => f.toLowerCase() === feature);
-        if (matchedFeature && !interacted.includes(matchedFeature)) {
-          interacted.push(matchedFeature);
-        }
-      }
-    });
-    setInteractedFeatures(interacted);
+    const recommendations = calculateRecommendations(prefs);
+    setInitialRecommendations(recommendations);
   };
 
   const handleFeatureToggle = (feature: string) => {
     const isSelected = selectedFeatures.has(feature);
-    
-    const newInteracted = interactedFeatures.filter(f => f !== feature);
-    newInteracted.push(feature);
-    setInteractedFeatures(newInteracted);
     
     if (isSelected) {
       const lines = preferences.split('\n');
@@ -154,7 +114,7 @@ export default function WhisperDialog({
     setSelectedVehicle(null);
     setPreferences("");
     setSelectedFeatures(new Set());
-    setInteractedFeatures([]);
+    setInitialRecommendations([]);
   };
 
   const handleSubmit = async () => {
@@ -166,7 +126,7 @@ export default function WhisperDialog({
       setSelectedVehicle(null);
       setPreferences("");
       setSelectedFeatures(new Set());
-      setInteractedFeatures([]);
+      setInitialRecommendations([]);
       onOpenChange(false);
     } catch (error) {
       console.error("Error saving whisper preferences:", error);
@@ -180,7 +140,7 @@ export default function WhisperDialog({
       setSelectedVehicle(null);
       setPreferences("");
       setSelectedFeatures(new Set());
-      setInteractedFeatures([]);
+      setInitialRecommendations([]);
     }
     onOpenChange(open);
   };
