@@ -29,7 +29,7 @@ Preferred communication style: Simple, everyday language.
 - **`OnboardingDialog`**: Post-login modal for document upload or manual entry.
 - **`UploadDialog`**: PDF upload interface with extraction integration (6MB max, 8-10 sec processing).
 - **`ManualEntryForm`**: Comprehensive vehicle policy form supporting create/edit, pre-filling, and validation.
-- **`WhisperDialog`**: Interface for recording and editing user insurance preferences per vehicle.
+- **`WhisperDialog`**: Interface for recording and editing user insurance preferences per vehicle. Features intelligent recommendations system that displays up to 3 popular insurance feature buttons (legal cover, windshield cover, courtesy car, breakdown cover, personal accident cover, european cover, no claim bonus protection) not already mentioned in preferences. Buttons toggle between gray outline (unselected) and blue (selected) states, automatically adding/removing "* feature" lines in the textarea. Case-insensitive feature detection supports both button clicks and free-text mentions. All touch targets meet 44px minimum for mobile accessibility.
 - **`QuoteSearchDialog`**: Initiates insurance quote search for a selected vehicle, with retry logic and loading indicators. Fetches custom ratings if enabled and includes them in quote search request.
 - **`QuotesScreen`**: Displays up to 10 insurance quotes for a selected vehicle, with a sticky header.
 - **`QuoteCard`**: Displays individual quotes with insurer info, Trustpilot rating, features matching, AutoSage Score, and AI analysis.
