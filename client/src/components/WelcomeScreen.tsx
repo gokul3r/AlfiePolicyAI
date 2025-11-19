@@ -25,6 +25,8 @@ import { InfoBadge } from "./InfoBadge";
 import logoImage from "@assets/image_1763588796393.png";
 import { AnimatedMic } from "./AnimatedMic";
 import { useTypewriter } from "@/hooks/useTypewriter";
+import { AnimatedIconButton } from "./AnimatedIconButton";
+import { FileText, Volume2, Umbrella } from "lucide-react";
 
 // Time-based greeting utility
 function getTimeBasedGreeting(): string {
@@ -205,117 +207,43 @@ export default function WelcomeScreen({
           </form>
         </div>
 
-        {/* Action Buttons */}
-        <div className="w-full bg-card rounded-md p-6 space-y-3 shadow-lg">
-          <Button
+        {/* Action Icon Grid */}
+        <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-3">
+          <AnimatedIconButton
+            icon={FileText}
+            label="Policy Details"
+            onClick={handlePolicyDetailsClick}
+            disabled={!hasPolicies || isLoading}
+            index={0}
+            testId="button-policy-details"
+          />
+          
+          <AnimatedIconButton
+            icon={Volume2}
+            label="Whisper"
+            onClick={onWhisper}
+            disabled={!hasPolicies || isLoading}
+            index={1}
+            testId="button-whisper"
+          />
+          
+          <AnimatedIconButton
+            icon={SearchCheck}
+            label="Quote Search"
+            onClick={onSearchQuotes}
+            disabled={!hasPolicies || isLoading}
+            index={2}
+            testId="button-search-quotes"
+          />
+          
+          <AnimatedIconButton
+            icon={Umbrella}
+            secondaryIcon={Plus}
+            label="Add Policy"
             onClick={onAddPolicy}
-            className="w-full"
-            size="lg"
-            data-testid="button-add-policy"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Add Policy
-          </Button>
-
-          {hasPolicies && (
-            <Button
-              variant="outline"
-              onClick={handlePolicyDetailsClick}
-              className="w-full"
-              size="lg"
-              data-testid="button-policy-details"
-              disabled={isLoading}
-            >
-              <Car className="w-5 h-5 mr-2" />
-              {showVehicleList ? "Hide Policy Details" : "Policy Details"}
-            </Button>
-          )}
-
-          {hasPolicies && (
-            <>
-              <div className="space-y-1">
-                <div className="flex items-center justify-center">
-                  <Button
-                    variant="outline"
-                    onClick={onWhisper}
-                    className="w-full"
-                    size="lg"
-                    data-testid="button-whisper"
-                    disabled={isLoading}
-                  >
-                    <MessageCircle className="w-5 h-5 mr-2" />
-                    <span className="font-bold">Whisper</span>
-                  </Button>
-                  <InfoBadge
-                    icon={Mic}
-                    title="Record User Preferences"
-                    description="Tell AutoSage what matters most to you in an insurance policy. Your preferences help find quotes that match your needs."
-                    tip="Set preferences for each vehicle to get personalized quote recommendations"
-                  />
-                </div>
-                <p className="text-xs text-center text-muted-foreground">
-                  Record user preferences
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center justify-center">
-                  <Button
-                    variant="outline"
-                    onClick={onSearchQuotes}
-                    className="w-full"
-                    size="lg"
-                    data-testid="button-search-quotes"
-                    disabled={isLoading}
-                  >
-                    <Search className="w-5 h-5 mr-2" />
-                    <span className="font-bold">Search Quotes</span>
-                  </Button>
-                  <InfoBadge
-                    icon={SearchCheck}
-                    title="Find Best Insurance Quotes"
-                    description="Search and compare insurance quotes from top UK providers. Get instant results with AutoSage Score ratings to help you choose."
-                    tip="Make sure to set your preferences first for better quote matches"
-                  />
-                </div>
-                <p className="text-xs text-center text-muted-foreground">
-                  Find best insurance deals
-                </p>
-              </div>
-
-              {/* Schedule Quote Search Toggle */}
-              <Card className="p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 flex-1">
-                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <Label className="text-sm font-medium cursor-pointer flex-1" htmlFor="schedule-toggle">
-                      Schedule Quote Search
-                    </Label>
-                    <InfoBadge
-                      icon={Calendar}
-                      title="Scheduled Quote Search"
-                      description="Let AutoSage do the quote search for you. Choose how often you want to receive updated insurance quotes via email."
-                      tip="Coming soon: Automated quote searches delivered to your inbox"
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center justify-center gap-3 mt-3">
-                  <span className={`text-sm ${scheduleFrequency === "monthly" ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
-                    Monthly
-                  </span>
-                  <Switch
-                    id="schedule-toggle"
-                    checked={scheduleFrequency === "weekly"}
-                    onCheckedChange={(checked) => setScheduleFrequency(checked ? "weekly" : "monthly")}
-                    data-testid="switch-schedule-frequency"
-                  />
-                  <span className={`text-sm ${scheduleFrequency === "weekly" ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
-                    Weekly
-                  </span>
-                </div>
-              </Card>
-            </>
-          )}
+            index={3}
+            testId="button-add-policy"
+          />
         </div>
 
         {hasPolicies && showVehicleList && (
