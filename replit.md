@@ -25,7 +25,10 @@ Preferred communication style: Simple, everyday language.
 **Key UI Components**
 - **`HomePage`**: Landing with "New User" and "Existing User" options.
 - **`NewUserDialog` / `ExistingUserDialog`**: Modals for user registration/login.
-- **`WelcomeScreen`**: Dashboard displaying policies, "Add Policy", "Policy Details", "Whisper", "Search Quotes", "Chat with AutoSage" buttons, and a toggleable vehicle list.
+- **`WelcomeScreen`**: Modern dashboard featuring AutoSage logo, time-based greeting, prominent AI chat input with integrated animated microphone, and 4-column responsive icon grid (2x2 on mobile). Grid contains: Policy Details (FileText), Whisper (Volume2), Quote Search (SearchCheck), and Add Policy (Plus+Umbrella icons). Hamburger menu provides access to Schedule Quote Search, Personalize, and Email Notifications. All elements feature entrance stagger animations and micro-interactions.
+- **`AnimatedMic`**: Pulsing microphone button integrated into chat input box, opens ChatModeSelector when clicked, prevents form submission via proper event handling.
+- **`AnimatedIconButton`**: Reusable card-based action button with primary/secondary icons, label, uniform accent color, and micro-animations (entrance stagger, hover scale 1.02, tap scale 0.98).
+- **`ScheduleQuoteDialog`**: Two-column responsive dialog (stacks on mobile) for scheduling automated quote searches. Features vehicle selector dropdown (left), monthly/weekly frequency toggle (right), and calculated next search date preview. State management resets on open/close and syncs with parent props. Currently stores preferences locally (backend integration pending).
 - **`OnboardingDialog`**: Post-login modal for document upload or manual entry.
 - **`UploadDialog`**: PDF upload interface with extraction integration (6MB max, 8-10 sec processing).
 - **`ManualEntryForm`**: Comprehensive vehicle policy form supporting create/edit, pre-filling, and validation.
