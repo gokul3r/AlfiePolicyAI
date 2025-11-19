@@ -23,6 +23,8 @@ import { NotificationPanel } from "./NotificationPanel";
 import { ConfigureAutoSageDialog } from "./ConfigureAutoSageDialog";
 import { InfoBadge } from "./InfoBadge";
 import logoImage from "@assets/image_1763588796393.png";
+import { AnimatedMic } from "./AnimatedMic";
+import { useTypewriter } from "@/hooks/useTypewriter";
 
 // Time-based greeting utility
 function getTimeBasedGreeting(): string {
@@ -59,6 +61,13 @@ export default function WelcomeScreen({
   const [scheduleFrequency, setScheduleFrequency] = useState<"monthly" | "weekly">("monthly");
   const [aiInputMessage, setAiInputMessage] = useState("");
   const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>(undefined);
+  
+  // Typewriter effect for placeholder
+  const { displayedText: placeholderText } = useTypewriter({
+    text: "How can I help you today?",
+    speed: 50,
+    startDelay: 500,
+  });
   
   const { data: policies = [], isLoading } = useQuery<VehiclePolicy[]>({
     queryKey: ["/api/vehicle-policies", userEmail],
@@ -168,24 +177,30 @@ export default function WelcomeScreen({
             <p className="text-sm text-muted-foreground">{userEmail}</p>
           </div>
 
-          {/* Large AI Input Box */}
+          {/* Large AI Input Box with Voice */}
           <form onSubmit={handleAiInputSubmit} className="w-full">
-            <div className="relative flex gap-2">
+            <div className="relative">
               <Input
                 value={aiInputMessage}
                 onChange={(e) => setAiInputMessage(e.target.value)}
-                placeholder="How can I help you today?"
-                className="flex-1 text-base"
+                placeholder={placeholderText}
+                className="flex-1 text-base pr-24 py-6"
                 data-testid="input-ai-chat"
               />
-              <Button
-                type="submit"
-                size="icon"
-                disabled={!aiInputMessage.trim()}
-                data-testid="button-ai-submit"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                <AnimatedMic 
+                  onClick={() => setShowModeSelector(true)}
+                  className="p-2"
+                />
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={!aiInputMessage.trim()}
+                  data-testid="button-ai-submit"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </form>
         </div>
@@ -299,31 +314,6 @@ export default function WelcomeScreen({
                   </span>
                 </div>
               </Card>
-
-              <div className="space-y-1">
-                <div className="flex items-center justify-center">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowModeSelector(true)}
-                    className="w-full"
-                    size="lg"
-                    data-testid="button-voice-chat"
-                    disabled={isLoading}
-                  >
-                    <Mic className="w-5 h-5 mr-2" />
-                    <span className="font-bold">Voice Chat</span>
-                  </Button>
-                  <InfoBadge
-                    icon={Bot}
-                    title="Voice Assistant"
-                    description="Talk to AutoSage AI using voice. Get instant spoken answers about insurance policies, coverage options, and claims."
-                    tip="Click to start a voice conversation with your AI insurance assistant"
-                  />
-                </div>
-                <p className="text-xs text-center text-muted-foreground">
-                  Talk to AI assistant
-                </p>
-              </div>
             </>
           )}
         </div>
