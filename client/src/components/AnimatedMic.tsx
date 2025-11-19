@@ -1,5 +1,6 @@
 import { Mic } from "lucide-react";
 import { motion } from "framer-motion";
+import { MouseEvent } from "react";
 
 interface AnimatedMicProps {
   onClick?: () => void;
@@ -7,7 +8,7 @@ interface AnimatedMicProps {
 }
 
 export function AnimatedMic({ onClick, className = "" }: AnimatedMicProps) {
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
     onClick?.();

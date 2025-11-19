@@ -26,6 +26,7 @@ import logoImage from "@assets/image_1763588796393.png";
 import { AnimatedMic } from "./AnimatedMic";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { AnimatedIconButton } from "./AnimatedIconButton";
+import { ScheduleQuoteDialog } from "./ScheduleQuoteDialog";
 import { FileText, Volume2, Umbrella } from "lucide-react";
 
 // Time-based greeting utility
@@ -60,6 +61,7 @@ export default function WelcomeScreen({
   const [showPersonalize, setShowPersonalize] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showConfigureAutoSage, setShowConfigureAutoSage] = useState(false);
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [scheduleFrequency, setScheduleFrequency] = useState<"monthly" | "weekly">("monthly");
   const [aiInputMessage, setAiInputMessage] = useState("");
   const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>(undefined);
@@ -148,6 +150,13 @@ export default function WelcomeScreen({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                onClick={() => setShowScheduleDialog(true)}
+                data-testid="menu-item-schedule-search"
+                disabled={!hasPolicies}
+              >
+                Schedule Quote Search
+              </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={() => setShowPersonalize(true)}
                 data-testid="menu-item-personalize"
@@ -340,6 +349,14 @@ export default function WelcomeScreen({
         open={showConfigureAutoSage}
         onOpenChange={setShowConfigureAutoSage}
         userEmail={userEmail}
+      />
+
+      {/* Schedule Quote Search Dialog */}
+      <ScheduleQuoteDialog
+        open={showScheduleDialog}
+        onOpenChange={setShowScheduleDialog}
+        policies={policies}
+        initialFrequency={scheduleFrequency}
       />
 
       {/* Fixed Configure AutoSage Link at Bottom */}
