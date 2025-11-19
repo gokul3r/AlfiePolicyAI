@@ -1,5 +1,5 @@
-import { Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import logoImage from "@assets/image_1763588796393.png";
 
 interface HomePageProps {
   onNewUser: () => void;
@@ -12,15 +12,15 @@ export default function HomePage({ onNewUser, onExistingUser }: HomePageProps) {
       <div className="w-full max-w-md mx-auto space-y-12">
         <div className="text-center space-y-3">
           <div className="flex justify-center mb-4">
-            <div className="bg-primary/10 p-4 rounded-2xl">
-              <Shield className="w-12 h-12 text-primary" strokeWidth={2} />
-            </div>
+            <img 
+              src={logoImage} 
+              alt="AutoSage Logo" 
+              className="h-24 w-auto"
+              data-testid="img-logo"
+            />
           </div>
-          <h1 className="text-4xl font-bold text-foreground tracking-tight">
-            AutoSage
-          </h1>
           <p className="text-sm text-muted-foreground">
-            Your Insurance Companion
+            Your AI Insurance Companion
           </p>
         </div>
 

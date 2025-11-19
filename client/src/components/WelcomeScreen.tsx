@@ -22,6 +22,7 @@ import { PersonalizeDialog } from "./PersonalizeDialog";
 import { NotificationPanel } from "./NotificationPanel";
 import { ConfigureAutoSageDialog } from "./ConfigureAutoSageDialog";
 import { InfoBadge } from "./InfoBadge";
+import logoImage from "@assets/image_1763588796393.png";
 
 // Time-based greeting utility
 function getTimeBasedGreeting(): string {
@@ -97,7 +98,14 @@ export default function WelcomeScreen({
     <div className="min-h-screen bg-background flex flex-col p-6">
       {/* Top Navigation Bar */}
       <div className="w-full max-w-md mx-auto mb-4">
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <img 
+            src={logoImage} 
+            alt="AutoSage Logo" 
+            className="h-12 w-auto"
+            data-testid="img-logo"
+          />
+          <div className="flex items-center gap-2">
           {/* Bell Icon with Notification Badge */}
           <Button
             variant="ghost"
@@ -143,6 +151,7 @@ export default function WelcomeScreen({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       </div>
 
