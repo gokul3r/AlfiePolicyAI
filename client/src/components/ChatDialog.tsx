@@ -18,10 +18,12 @@ interface ChatDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userEmail: string;
+  initialMessage?: string;
 }
 
-export default function ChatDialog({ open, onOpenChange, userEmail }: ChatDialogProps) {
+export default function ChatDialog({ open, onOpenChange, userEmail, initialMessage }: ChatDialogProps) {
   const [messageInput, setMessageInput] = useState("");
+  const [hasProcessedInitialMessage, setHasProcessedInitialMessage] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -60,6 +62,18 @@ export default function ChatDialog({ open, onOpenChange, userEmail }: ChatDialog
       }
     }
   }, [messages]);
+
+  // Auto-send initial message when dialog opens
+  useEffect(() => {
+    if (open && initialMessage && !hasProcessedInitialMessage && !isLoading) {
+      setHasProcessedInitialMessage(true);
+      sendMessageMutation.mutate(initialMessage);
+    }
+    // Reset the flag when dialog closes
+    if (!open) {
+      setHasProcessedInitialMessage(false);
+    }
+  }, [open, initialMessage, hasProcessedInitialMessage, isLoading]);
 
   const handleSendMessage = async () => {
     const trimmedMessage = messageInput.trim();

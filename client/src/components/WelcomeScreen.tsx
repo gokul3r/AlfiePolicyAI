@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Car, MessageCircle, Search, MessageSquare, Bell, Menu, Mic, SearchCheck, Bot, Calendar } from "lucide-react";
+import { Shield, Plus, Car, MessageCircle, Search, MessageSquare, Bell, Menu, Mic, SearchCheck, Bot, Calendar, Send, Sparkles } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
 import { ChatModeSelector } from "./ChatModeSelector";
 import ChatDialog from "./ChatDialog";
@@ -21,6 +22,14 @@ import { PersonalizeDialog } from "./PersonalizeDialog";
 import { NotificationPanel } from "./NotificationPanel";
 import { ConfigureAutoSageDialog } from "./ConfigureAutoSageDialog";
 import { InfoBadge } from "./InfoBadge";
+
+// Time-based greeting utility
+function getTimeBasedGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
 
 interface WelcomeScreenProps {
   userName: string;
@@ -47,6 +56,8 @@ export default function WelcomeScreen({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showConfigureAutoSage, setShowConfigureAutoSage] = useState(false);
   const [scheduleFrequency, setScheduleFrequency] = useState<"monthly" | "weekly">("monthly");
+  const [aiInputMessage, setAiInputMessage] = useState("");
+  const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>(undefined);
   
   const { data: policies = [], isLoading } = useQuery<VehiclePolicy[]>({
     queryKey: ["/api/vehicle-policies", userEmail],
@@ -70,6 +81,16 @@ export default function WelcomeScreen({
 
   const handleLogout = () => {
     window.location.href = "/";
+  };
+
+  const handleAiInputSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiInputMessage.trim()) return;
+    
+    // Set initial message and open chat dialog
+    setInitialChatMessage(aiInputMessage);
+    setShowTextChat(true);
+    setAiInputMessage("");
   };
 
   return (
@@ -127,156 +148,175 @@ export default function WelcomeScreen({
 
       {/* Main Content */}
       <div className="w-full max-w-md mx-auto space-y-6 flex-1 flex flex-col items-center justify-center">
-        <div className="bg-card rounded-2xl p-8 space-y-6 text-center shadow-lg">
-          <div className="flex justify-center">
-            <div className="bg-primary/10 p-4 rounded-full">
-              <Shield className="w-16 h-16 text-primary" strokeWidth={2} />
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-foreground" data-testid="text-welcome-message">
-              Welcome, {userName}
+        {/* AI Hero Section with Greeting and Input */}
+        <div className="w-full space-y-6">
+          {/* Greeting */}
+          <div className="text-center space-y-1">
+            <h1 className="text-3xl font-bold text-foreground flex items-center justify-center gap-2" data-testid="text-welcome-message">
+              <Sparkles className="w-6 h-6 text-primary" />
+              {getTimeBasedGreeting()}, {userName}
             </h1>
             <p className="text-sm text-muted-foreground">{userEmail}</p>
           </div>
 
-          <div className="space-y-3 pt-2">
-            <Button
-              onClick={onAddPolicy}
-              className="w-full py-6 text-base font-medium rounded-xl"
-              size="lg"
-              data-testid="button-add-policy"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Add Policy
-            </Button>
-
-            {hasPolicies && (
+          {/* Large AI Input Box */}
+          <form onSubmit={handleAiInputSubmit} className="w-full">
+            <div className="relative flex gap-2">
+              <Input
+                value={aiInputMessage}
+                onChange={(e) => setAiInputMessage(e.target.value)}
+                placeholder="How can I help you today?"
+                className="flex-1 text-base"
+                data-testid="input-ai-chat"
+              />
               <Button
-                variant="outline"
-                onClick={handlePolicyDetailsClick}
-                className="w-full py-6 text-base font-medium rounded-xl"
-                size="lg"
-                data-testid="button-policy-details"
-                disabled={isLoading}
+                type="submit"
+                size="icon"
+                disabled={!aiInputMessage.trim()}
+                data-testid="button-ai-submit"
               >
-                <Car className="w-5 h-5 mr-2" />
-                {showVehicleList ? "Hide Policy Details" : "Policy Details"}
+                <Send className="h-4 w-4" />
               </Button>
-            )}
+            </div>
+          </form>
+        </div>
 
-            {hasPolicies && (
-              <>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-center">
-                    <Button
-                      variant="outline"
-                      onClick={onWhisper}
-                      className="w-full py-6 text-base font-medium rounded-xl"
-                      size="lg"
-                      data-testid="button-whisper"
-                      disabled={isLoading}
-                    >
-                      <MessageCircle className="w-5 h-5 mr-2" />
-                      <span className="font-bold">Whisper</span>
-                    </Button>
-                    <InfoBadge
-                      icon={Mic}
-                      title="Record User Preferences"
-                      description="Tell AutoSage what matters most to you in an insurance policy. Your preferences help find quotes that match your needs."
-                      tip="Set preferences for each vehicle to get personalized quote recommendations"
-                    />
-                  </div>
-                  <p className="text-xs text-center text-muted-foreground">
-                    Record user preferences
-                  </p>
+        {/* Action Buttons */}
+        <div className="w-full bg-card rounded-md p-6 space-y-3 shadow-lg">
+          <Button
+            onClick={onAddPolicy}
+            className="w-full"
+            size="lg"
+            data-testid="button-add-policy"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Add Policy
+          </Button>
+
+          {hasPolicies && (
+            <Button
+              variant="outline"
+              onClick={handlePolicyDetailsClick}
+              className="w-full"
+              size="lg"
+              data-testid="button-policy-details"
+              disabled={isLoading}
+            >
+              <Car className="w-5 h-5 mr-2" />
+              {showVehicleList ? "Hide Policy Details" : "Policy Details"}
+            </Button>
+          )}
+
+          {hasPolicies && (
+            <>
+              <div className="space-y-1">
+                <div className="flex items-center justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={onWhisper}
+                    className="w-full"
+                    size="lg"
+                    data-testid="button-whisper"
+                    disabled={isLoading}
+                  >
+                    <MessageCircle className="w-5 h-5 mr-2" />
+                    <span className="font-bold">Whisper</span>
+                  </Button>
+                  <InfoBadge
+                    icon={Mic}
+                    title="Record User Preferences"
+                    description="Tell AutoSage what matters most to you in an insurance policy. Your preferences help find quotes that match your needs."
+                    tip="Set preferences for each vehicle to get personalized quote recommendations"
+                  />
                 </div>
+                <p className="text-xs text-center text-muted-foreground">
+                  Record user preferences
+                </p>
+              </div>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-center">
-                    <Button
-                      variant="outline"
-                      onClick={onSearchQuotes}
-                      className="w-full py-6 text-base font-medium rounded-xl"
-                      size="lg"
-                      data-testid="button-search-quotes"
-                      disabled={isLoading}
-                    >
-                      <Search className="w-5 h-5 mr-2" />
-                      <span className="font-bold">Search Quotes</span>
-                    </Button>
-                    <InfoBadge
-                      icon={SearchCheck}
-                      title="Find Best Insurance Quotes"
-                      description="Search and compare insurance quotes from top UK providers. Get instant results with AutoSage Score ratings to help you choose."
-                      tip="Make sure to set your preferences first for better quote matches"
-                    />
-                  </div>
-                  <p className="text-xs text-center text-muted-foreground">
-                    Find best insurance deals
-                  </p>
+              <div className="space-y-1">
+                <div className="flex items-center justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={onSearchQuotes}
+                    className="w-full"
+                    size="lg"
+                    data-testid="button-search-quotes"
+                    disabled={isLoading}
+                  >
+                    <Search className="w-5 h-5 mr-2" />
+                    <span className="font-bold">Search Quotes</span>
+                  </Button>
+                  <InfoBadge
+                    icon={SearchCheck}
+                    title="Find Best Insurance Quotes"
+                    description="Search and compare insurance quotes from top UK providers. Get instant results with AutoSage Score ratings to help you choose."
+                    tip="Make sure to set your preferences first for better quote matches"
+                  />
                 </div>
+                <p className="text-xs text-center text-muted-foreground">
+                  Find best insurance deals
+                </p>
+              </div>
 
-                {/* Schedule Quote Search Toggle */}
-                <Card className="p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 flex-1">
-                      <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <Label className="text-sm font-medium cursor-pointer flex-1" htmlFor="schedule-toggle">
-                        Schedule Quote Search
-                      </Label>
-                      <InfoBadge
-                        icon={Calendar}
-                        title="Scheduled Quote Search"
-                        description="Let AutoSage do the quote search for you. Choose how often you want to receive updated insurance quotes via email."
-                        tip="Coming soon: Automated quote searches delivered to your inbox"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-center gap-3 mt-3">
-                    <span className={`text-sm ${scheduleFrequency === "monthly" ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
-                      Monthly
-                    </span>
-                    <Switch
-                      id="schedule-toggle"
-                      checked={scheduleFrequency === "weekly"}
-                      onCheckedChange={(checked) => setScheduleFrequency(checked ? "weekly" : "monthly")}
-                      data-testid="switch-schedule-frequency"
-                    />
-                    <span className={`text-sm ${scheduleFrequency === "weekly" ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
-                      Weekly
-                    </span>
-                  </div>
-                </Card>
-
-                <div className="space-y-1">
-                  <div className="flex items-center justify-center">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowModeSelector(true)}
-                      className="w-full py-6 text-base font-medium rounded-xl"
-                      size="lg"
-                      data-testid="button-chat-autosage"
-                      disabled={isLoading}
-                    >
-                      <MessageSquare className="w-5 h-5 mr-2" />
-                      <span className="font-bold">Chat with AutoSage</span>
-                    </Button>
+              {/* Schedule Quote Search Toggle */}
+              <Card className="p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-1">
+                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <Label className="text-sm font-medium cursor-pointer flex-1" htmlFor="schedule-toggle">
+                      Schedule Quote Search
+                    </Label>
                     <InfoBadge
-                      icon={Bot}
-                      title="AI Insurance Assistant"
-                      description="Chat with AutoSage AI to get instant answers about insurance policies, coverage options, and claims. Available in text or voice mode."
-                      tip="Ask questions like 'How can I lower my premium?' or 'Explain my coverage'"
+                      icon={Calendar}
+                      title="Scheduled Quote Search"
+                      description="Let AutoSage do the quote search for you. Choose how often you want to receive updated insurance quotes via email."
+                      tip="Coming soon: Automated quote searches delivered to your inbox"
                     />
                   </div>
-                  <p className="text-xs text-center text-muted-foreground">
-                    AI insurance assistant
-                  </p>
                 </div>
-              </>
-            )}
-          </div>
+                <div className="flex items-center justify-center gap-3 mt-3">
+                  <span className={`text-sm ${scheduleFrequency === "monthly" ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
+                    Monthly
+                  </span>
+                  <Switch
+                    id="schedule-toggle"
+                    checked={scheduleFrequency === "weekly"}
+                    onCheckedChange={(checked) => setScheduleFrequency(checked ? "weekly" : "monthly")}
+                    data-testid="switch-schedule-frequency"
+                  />
+                  <span className={`text-sm ${scheduleFrequency === "weekly" ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
+                    Weekly
+                  </span>
+                </div>
+              </Card>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowModeSelector(true)}
+                    className="w-full"
+                    size="lg"
+                    data-testid="button-voice-chat"
+                    disabled={isLoading}
+                  >
+                    <Mic className="w-5 h-5 mr-2" />
+                    <span className="font-bold">Voice Chat</span>
+                  </Button>
+                  <InfoBadge
+                    icon={Bot}
+                    title="Voice Assistant"
+                    description="Talk to AutoSage AI using voice. Get instant spoken answers about insurance policies, coverage options, and claims."
+                    tip="Click to start a voice conversation with your AI insurance assistant"
+                  />
+                </div>
+                <p className="text-xs text-center text-muted-foreground">
+                  Talk to AI assistant
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
         {hasPolicies && showVehicleList && (
@@ -337,8 +377,14 @@ export default function WelcomeScreen({
       {/* Text Chat Dialog */}
       <ChatDialog
         open={showTextChat}
-        onOpenChange={setShowTextChat}
+        onOpenChange={(open) => {
+          setShowTextChat(open);
+          if (!open) {
+            setInitialChatMessage(undefined);
+          }
+        }}
         userEmail={userEmail}
+        initialMessage={initialChatMessage}
       />
 
       {/* Voice Chat Dialog */}
