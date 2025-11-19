@@ -7,10 +7,17 @@ interface AnimatedMicProps {
 }
 
 export function AnimatedMic({ onClick, className = "" }: AnimatedMicProps) {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick?.();
+  };
+
   return (
-    <motion.div
-      className={`cursor-pointer ${className}`}
-      onClick={onClick}
+    <motion.button
+      type="button"
+      className={`cursor-pointer border-0 bg-transparent ${className}`}
+      onClick={handleClick}
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.95 }}
       data-testid="button-voice-mic"
@@ -42,6 +49,6 @@ export function AnimatedMic({ onClick, className = "" }: AnimatedMicProps) {
           }}
         />
       </motion.div>
-    </motion.div>
+    </motion.button>
   );
 }
