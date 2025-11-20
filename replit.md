@@ -25,8 +25,8 @@ Preferred communication style: Simple, everyday language.
 **Key UI Components**
 - **`HomePage`**: Landing with "New User" and "Existing User" options.
 - **`NewUserDialog` / `ExistingUserDialog`**: Modals for user registration/login.
-- **`WelcomeScreen`**: Modern dashboard featuring AutoSage logo, time-based greeting, prominent AI chat input with integrated animated microphone, and 4-column responsive icon grid (2x2 on mobile). Grid contains: Policy Details (FileText), Whisper (Volume2), Quote Search (SearchCheck), and Add Policy (Plus+Umbrella icons). Hamburger menu provides access to Schedule Quote Search, Personalize, and Email Notifications. All elements feature entrance stagger animations and micro-interactions.
-- **`AnimatedMic`**: Pulsing microphone button integrated into chat input box, opens ChatModeSelector when clicked, prevents form submission via proper event handling.
+- **`WelcomeScreen`**: Modern dashboard featuring AutoSage logo, time-based greeting, prominent AI chat input with integrated animated microphone, and 6-button responsive icon grid (2x3 on mobile, 3x2 on desktop). Grid contains: Policy Details (FileText), Whisper (Volume2), Quote Search (SearchCheck), Add Policy (Plus+Umbrella icons), Update Policy (FileEdit), and Cancel Policy (XCircle). Update Policy and Cancel Policy are placeholder buttons that show professional "coming soon" dialogs. Hamburger menu provides access to Schedule Quote Search, Personalize, and Email Notifications. All elements feature entrance stagger animations and micro-interactions.
+- **`AnimatedMic`**: Pulsing microphone button integrated into chat input box, directly opens VoiceChatDialog when clicked, prevents form submission via proper event handling.
 - **`AnimatedIconButton`**: Reusable card-based action button with primary/secondary icons, label, uniform accent color, and micro-animations (entrance stagger, hover scale 1.02, tap scale 0.98).
 - **`ScheduleQuoteDialog`**: Two-column responsive dialog (stacks on mobile) for scheduling automated quote searches. Features vehicle selector dropdown (left), monthly/weekly frequency toggle (right), and calculated next search date preview. State management resets on open/close and syncs with parent props. Currently stores preferences locally (backend integration pending).
 - **`OnboardingDialog`**: Post-login modal for document upload or manual entry.
@@ -36,9 +36,9 @@ Preferred communication style: Simple, everyday language.
 - **`QuoteSearchDialog`**: Initiates insurance quote search for a selected vehicle, with retry logic and loading indicators. Fetches custom ratings if enabled and includes them in quote search request.
 - **`QuotesScreen`**: Displays up to 10 insurance quotes for a selected vehicle, with a sticky header.
 - **`QuoteCard`**: Displays individual quotes with insurer info, Trustpilot rating, features matching, AutoSage Score, and AI analysis.
-- **`ChatModeSelector`**: Modal for selecting between text chat and voice chat modes.
 - **`ChatDialog`**: Text-based AI assistant chat interface with message history persistence and real-time updates using OpenAI Responses API.
-- **`VoiceChatDialog`**: Voice-based AI assistant with WebSocket audio streaming, real-time transcription display, and mic toggle.
+- **`VoiceChatDialog`**: Voice-based AI assistant with WebSocket audio streaming, real-time transcription display, mic toggle, and comprehensive error handling for microphone permissions (shows user-friendly error messages with retry/cancel options for permission denied, no microphone, or device in use scenarios).
+- **`ComingSoonDialog`**: Reusable professional dialog for upcoming features. Displays Sparkles icon, "Coming Soon" heading, and feature-specific message. Used for Update Policy and Cancel Policy placeholder buttons.
 - **`PersonalizeDialog`**: Settings dialog for Gmail OAuth integration, connection status, privacy consent, and disconnect option.
 - **`ConfigureAutoSageDialog`**: Settings dialog with Email Scan and Custom Ratings sections. Email Scan allows manual Gmail scanning for travel notifications. Custom Ratings section allows users to customize Trustpilot and Defacto ratings for 10 insurance providers (Admiral, PAXA, Baviva, IndirectLane, Churchwell, Ventura, Zorich, HestingsDrive, Assureon, Soga). Ratings must be numeric values between 0-5.0 (validated on both client and server). Toggle switch enables/disables custom ratings usage in quote searches.
 
