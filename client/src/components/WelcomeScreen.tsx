@@ -13,13 +13,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Car, MessageCircle, Search, MessageSquare, Bell, Menu, Mic, SearchCheck, Bot, Calendar, Send, Sparkles } from "lucide-react";
+import { Shield, Plus, Car, MessageCircle, Search, MessageSquare, Bell, Menu, Mic, SearchCheck, Bot, Calendar, Send, Sparkles, FileEdit, XCircle } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
 import ChatDialog from "./ChatDialog";
 import { VoiceChatDialog } from "./VoiceChatDialog";
 import { PersonalizeDialog } from "./PersonalizeDialog";
 import { NotificationPanel } from "./NotificationPanel";
 import { ConfigureAutoSageDialog } from "./ConfigureAutoSageDialog";
+import { ComingSoonDialog } from "./ComingSoonDialog";
 import { InfoBadge } from "./InfoBadge";
 import logoImage from "@assets/image_1763588796393.png";
 import { AnimatedMic } from "./AnimatedMic";
@@ -60,6 +61,8 @@ export default function WelcomeScreen({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showConfigureAutoSage, setShowConfigureAutoSage] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [showComingSoon, setShowComingSoon] = useState(false);
+  const [comingSoonFeature, setComingSoonFeature] = useState("");
   const [scheduleFrequency, setScheduleFrequency] = useState<"monthly" | "weekly">("monthly");
   const [aiInputMessage, setAiInputMessage] = useState("");
   const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>(undefined);
@@ -215,7 +218,7 @@ export default function WelcomeScreen({
         </div>
 
         {/* Action Icon Grid */}
-        <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="w-full grid grid-cols-2 md:grid-cols-3 gap-3">
           <AnimatedIconButton
             icon={FileText}
             label="Policy Details"
@@ -250,6 +253,30 @@ export default function WelcomeScreen({
             onClick={onAddPolicy}
             index={3}
             testId="button-add-policy"
+          />
+          
+          <AnimatedIconButton
+            icon={FileEdit}
+            label="Update Policy"
+            onClick={() => {
+              setComingSoonFeature("Policy Updates");
+              setShowComingSoon(true);
+            }}
+            disabled={!hasPolicies || isLoading}
+            index={4}
+            testId="button-update-policy"
+          />
+          
+          <AnimatedIconButton
+            icon={XCircle}
+            label="Cancel Policy"
+            onClick={() => {
+              setComingSoonFeature("Policy Cancellation");
+              setShowComingSoon(true);
+            }}
+            disabled={!hasPolicies || isLoading}
+            index={5}
+            testId="button-cancel-policy"
           />
         </div>
 
@@ -342,6 +369,13 @@ export default function WelcomeScreen({
         onOpenChange={setShowScheduleDialog}
         policies={policies}
         initialFrequency={scheduleFrequency}
+      />
+
+      {/* Coming Soon Dialog */}
+      <ComingSoonDialog
+        open={showComingSoon}
+        onOpenChange={setShowComingSoon}
+        featureName={comingSoonFeature}
       />
 
       {/* Fixed Configure AutoSage Link at Bottom */}
