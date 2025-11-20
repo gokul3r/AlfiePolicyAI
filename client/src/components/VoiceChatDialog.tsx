@@ -29,6 +29,7 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentUserTranscript, setCurrentUserTranscript] = useState("");
   const [currentAssistantTranscript, setCurrentAssistantTranscript] = useState("");
+  const [permissionError, setPermissionError] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -134,6 +135,9 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
 
   const startRecording = async () => {
     try {
+      // Clear any previous errors
+      setPermissionError(null);
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
 
@@ -173,8 +177,27 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
       };
 
       setIsRecording(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error("[VoiceChat] Error starting recording:", error);
+      
+      // Handle specific error cases
+      if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+        setPermissionError(
+          "Microphone access was denied. Please allow microphone permissions in your browser settings and try again."
+        );
+      } else if (error.name === "NotFoundError") {
+        setPermissionError(
+          "No microphone found. Please connect a microphone and try again."
+        );
+      } else if (error.name === "NotReadableError") {
+        setPermissionError(
+          "Your microphone is being used by another application. Please close other apps using the microphone and try again."
+        );
+      } else {
+        setPermissionError(
+          "Unable to access microphone. Please check your browser settings and try again."
+        );
+      }
     }
   };
 
@@ -241,6 +264,9 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
 
     // Reset connection state
     setIsConnecting(false);
+    
+    // Clear any error states
+    setPermissionError(null);
 
     console.log("[VoiceChat] Session cleaned up");
   };
@@ -377,29 +403,63 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         </ScrollArea>
 
         <div className="px-6 py-4 border-t">
-          <div className="flex items-center justify-center gap-4">
-            <Button
-              size="lg"
-              variant={isRecording ? "destructive" : "default"}
-              className="rounded-full h-16 w-16"
-              onClick={toggleRecording}
-              disabled={isConnecting}
-              data-testid="button-toggle-recording"
-            >
-              {isRecording ? (
-                <MicOff className="h-6 w-6" />
-              ) : (
-                <Mic className="h-6 w-6" />
-              )}
-            </Button>
-          </div>
-          <p className="text-center text-sm text-muted-foreground mt-3">
-            {isConnecting
-              ? "Connecting..."
-              : isRecording
-              ? "Listening... Tap to stop"
-              : "Tap to speak"}
-          </p>
+          {permissionError ? (
+            <div className="space-y-4">
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                <p className="text-sm text-destructive font-medium mb-2">
+                  Microphone Access Required
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {permissionError}
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    setPermissionError(null);
+                    startRecording();
+                  }}
+                  data-testid="button-retry-microphone"
+                >
+                  Try Again
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  data-testid="button-cancel-voice-chat"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-center gap-4">
+                <Button
+                  size="lg"
+                  variant={isRecording ? "destructive" : "default"}
+                  className="rounded-full h-16 w-16"
+                  onClick={toggleRecording}
+                  disabled={isConnecting}
+                  data-testid="button-toggle-recording"
+                >
+                  {isRecording ? (
+                    <MicOff className="h-6 w-6" />
+                  ) : (
+                    <Mic className="h-6 w-6" />
+                  )}
+                </Button>
+              </div>
+              <p className="text-center text-sm text-muted-foreground mt-3">
+                {isConnecting
+                  ? "Connecting..."
+                  : isRecording
+                  ? "Listening... Tap to stop"
+                  : "Tap to speak"}
+              </p>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>
