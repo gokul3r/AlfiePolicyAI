@@ -15,7 +15,6 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Shield, Plus, Car, MessageCircle, Search, MessageSquare, Bell, Menu, Mic, SearchCheck, Bot, Calendar, Send, Sparkles } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
-import { ChatModeSelector } from "./ChatModeSelector";
 import ChatDialog from "./ChatDialog";
 import { VoiceChatDialog } from "./VoiceChatDialog";
 import { PersonalizeDialog } from "./PersonalizeDialog";
@@ -55,7 +54,6 @@ export default function WelcomeScreen({
   onSearchQuotes,
 }: WelcomeScreenProps) {
   const [showVehicleList, setShowVehicleList] = useState(false);
-  const [showModeSelector, setShowModeSelector] = useState(false);
   const [showTextChat, setShowTextChat] = useState(false);
   const [showVoiceChat, setShowVoiceChat] = useState(false);
   const [showPersonalize, setShowPersonalize] = useState(false);
@@ -200,7 +198,7 @@ export default function WelcomeScreen({
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
                 <AnimatedMic 
-                  onClick={() => setShowModeSelector(true)}
+                  onClick={() => setShowVoiceChat(true)}
                   className="p-2"
                 />
                 <Button
@@ -296,19 +294,6 @@ export default function WelcomeScreen({
           </Card>
         )}
       </div>
-
-      {/* Chat Mode Selector */}
-      <ChatModeSelector
-        open={showModeSelector}
-        onOpenChange={setShowModeSelector}
-        onSelectMode={(mode) => {
-          if (mode === "text") {
-            setShowTextChat(true);
-          } else {
-            setShowVoiceChat(true);
-          }
-        }}
-      />
 
       {/* Text Chat Dialog */}
       <ChatDialog
