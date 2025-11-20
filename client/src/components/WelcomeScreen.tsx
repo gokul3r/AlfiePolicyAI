@@ -21,6 +21,7 @@ import { PersonalizeDialog } from "./PersonalizeDialog";
 import { NotificationPanel } from "./NotificationPanel";
 import { ConfigureAutoSageDialog } from "./ConfigureAutoSageDialog";
 import { ComingSoonDialog } from "./ComingSoonDialog";
+import { InsuranceTypeSelectorDialog } from "./InsuranceTypeSelectorDialog";
 import { InfoBadge } from "./InfoBadge";
 import logoImage from "@assets/image_1763588796393.png";
 import { AnimatedMic } from "./AnimatedMic";
@@ -63,6 +64,7 @@ export default function WelcomeScreen({
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [comingSoonFeature, setComingSoonFeature] = useState("");
+  const [showInsuranceTypeSelector, setShowInsuranceTypeSelector] = useState(false);
   const [scheduleFrequency, setScheduleFrequency] = useState<"monthly" | "weekly">("monthly");
   const [aiInputMessage, setAiInputMessage] = useState("");
   const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>(undefined);
@@ -250,7 +252,7 @@ export default function WelcomeScreen({
             icon={Umbrella}
             secondaryIcon={Plus}
             label="Add Policy"
-            onClick={onAddPolicy}
+            onClick={() => setShowInsuranceTypeSelector(true)}
             index={3}
             testId="button-add-policy"
           />
@@ -369,6 +371,21 @@ export default function WelcomeScreen({
         onOpenChange={setShowScheduleDialog}
         policies={policies}
         initialFrequency={scheduleFrequency}
+      />
+
+      {/* Insurance Type Selector Dialog */}
+      <InsuranceTypeSelectorDialog
+        open={showInsuranceTypeSelector}
+        onOpenChange={setShowInsuranceTypeSelector}
+        onSelectCar={() => {
+          setShowInsuranceTypeSelector(false);
+          onAddPolicy();
+        }}
+        onSelectInactive={(insuranceName) => {
+          setShowInsuranceTypeSelector(false);
+          setComingSoonFeature(`${insuranceName} Insurance`);
+          setShowComingSoon(true);
+        }}
       />
 
       {/* Coming Soon Dialog */}
