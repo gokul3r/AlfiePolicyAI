@@ -14,8 +14,10 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calendar, Sparkles } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
+import { TimelapseDialog } from "./TimelapseDialog";
 
 interface ScheduleQuoteDialogProps {
   open: boolean;
@@ -32,6 +34,7 @@ export function ScheduleQuoteDialog({
 }: ScheduleQuoteDialogProps) {
   const [selectedVehicle, setSelectedVehicle] = useState<string>("");
   const [frequency, setFrequency] = useState<"monthly" | "weekly">(initialFrequency);
+  const [timelapseOpen, setTimelapseOpen] = useState(false);
 
   // Reset and sync state when dialog opens or frequency changes
   useEffect(() => {
@@ -117,20 +120,34 @@ export function ScheduleQuoteDialog({
           {/* Right Column: Frequency Toggle */}
           <div className="space-y-2">
             <Label>Search Frequency</Label>
-            <ToggleGroup
-              type="single"
-              value={frequency}
-              onValueChange={handleFrequencyChange}
-              className="justify-start"
-              data-testid="toggle-frequency"
-            >
-              <ToggleGroupItem value="monthly" data-testid="toggle-monthly">
-                Monthly
-              </ToggleGroupItem>
-              <ToggleGroupItem value="weekly" data-testid="toggle-weekly">
-                Weekly
-              </ToggleGroupItem>
-            </ToggleGroup>
+            <div className="flex flex-wrap gap-2 items-center">
+              <ToggleGroup
+                type="single"
+                value={frequency}
+                onValueChange={handleFrequencyChange}
+                className="justify-start"
+                data-testid="toggle-frequency"
+              >
+                <ToggleGroupItem value="monthly" data-testid="toggle-monthly">
+                  Monthly
+                </ToggleGroupItem>
+                <ToggleGroupItem value="weekly" data-testid="toggle-weekly">
+                  Weekly
+                </ToggleGroupItem>
+              </ToggleGroup>
+
+              {/* Magical Timelapse button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setTimelapseOpen(true)}
+                className="group relative overflow-visible hover-elevate active-elevate-2"
+                data-testid="button-timelapse"
+              >
+                <Sparkles className="w-4 h-4 mr-1.5 text-purple-500 group-hover:text-purple-600 transition-colors" />
+                <span className="shimmer-text font-semibold">Timelapse</span>
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground">
               How often should we search for quotes?
             </p>
@@ -150,6 +167,12 @@ export function ScheduleQuoteDialog({
         <p className="text-xs text-muted-foreground text-center">
           Preferences stored locally (backend integration coming soon)
         </p>
+
+        {/* Timelapse Dialog */}
+        <TimelapseDialog 
+          open={timelapseOpen} 
+          onOpenChange={setTimelapseOpen}
+        />
       </DialogContent>
     </Dialog>
   );
