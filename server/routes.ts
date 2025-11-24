@@ -174,12 +174,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get a specific vehicle policy
-  app.get("/api/vehicle-policies/:email/:vehicleId", async (req, res) => {
+  app.get("/api/vehicle-policies/:email/:policyId", async (req, res) => {
     try {
       const email = req.params.email.toLowerCase().trim();
-      const vehicleId = req.params.vehicleId;
+      const policyId = req.params.policyId;
       
-      const policy = await storage.getVehiclePolicy(vehicleId, email);
+      const policy = await storage.getVehiclePolicy(policyId, email);
       if (!policy) {
         return res.status(404).json({ error: "Vehicle policy not found" });
       }
@@ -199,26 +199,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("[vehicle-policies] Validated data:", JSON.stringify(validatedData));
       
       // Check if user exists
-      const user = await storage.getUserByEmail(validatedData.email_id);
+      const user = await storage.getUserByEmail(validatedData.policy.email_id);
       console.log("[vehicle-policies] User lookup result:", user ? `Found: ${user.email_id}` : "Not found");
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
 
-      // Check if vehicle policy already exists
-      const existingPolicy = await storage.getVehiclePolicy(validatedData.vehicle_id, validatedData.email_id);
-      console.log("[vehicle-policies] Existing policy check:", existingPolicy ? "Found existing" : "No existing policy");
-      if (existingPolicy) {
-        return res.status(400).json({ error: "Vehicle policy already exists for this vehicle ID and email" });
-      }
-
       console.log("[vehicle-policies] Attempting to create policy...");
       const policy = await storage.createVehiclePolicy(validatedData);
       console.log("[vehicle-policies] Policy created successfully:", JSON.stringify(policy));
-      
-      // Verify the policy was actually saved
-      const verifyPolicy = await storage.getVehiclePolicy(policy.vehicle_id, policy.email_id);
-      console.log("[vehicle-policies] Verification query result:", verifyPolicy ? "Policy found in DB" : "Policy NOT found in DB");
       
       res.status(201).json(policy);
     } catch (error) {
@@ -232,22 +221,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update an existing vehicle policy
-  app.put("/api/vehicle-policies/:email/:vehicleId", async (req, res) => {
+  app.put("/api/vehicle-policies/:email/:policyId", async (req, res) => {
     try {
       const email = req.params.email.toLowerCase().trim();
-      const vehicleId = req.params.vehicleId;
+      const policyId = req.params.policyId;
       
       // Check if the policy exists
-      const existingPolicy = await storage.getVehiclePolicy(vehicleId, email);
+      const existingPolicy = await storage.getVehiclePolicy(policyId, email);
       if (!existingPolicy) {
         return res.status(404).json({ error: "Vehicle policy not found" });
       }
 
-      // Validate the update data (partial schema)
-      const updateSchema = insertVehiclePolicySchema.partial().omit({ vehicle_id: true, email_id: true });
-      const validatedUpdates = updateSchema.parse(req.body);
+      // Validate the update data
+      const validatedData = insertVehiclePolicySchema.parse(req.body);
       
-      const updatedPolicy = await storage.updateVehiclePolicy(vehicleId, email, validatedUpdates);
+      const updatedPolicy = await storage.updateVehiclePolicy(policyId, email, validatedData);
       res.json(updatedPolicy);
     } catch (error) {
       if (error instanceof z.ZodError) {
