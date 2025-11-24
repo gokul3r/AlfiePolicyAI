@@ -24,6 +24,7 @@ interface ScheduleQuoteDialogProps {
   onOpenChange: (open: boolean) => void;
   policies: VehiclePolicy[];
   initialFrequency?: "monthly" | "weekly";
+  userEmail: string;
 }
 
 export function ScheduleQuoteDialog({
@@ -31,6 +32,7 @@ export function ScheduleQuoteDialog({
   onOpenChange,
   policies,
   initialFrequency = "monthly",
+  userEmail,
 }: ScheduleQuoteDialogProps) {
   const [selectedVehicle, setSelectedVehicle] = useState<string>("");
   const [frequency, setFrequency] = useState<"monthly" | "weekly">(initialFrequency);
@@ -172,6 +174,9 @@ export function ScheduleQuoteDialog({
         <TimelapseDialog 
           open={timelapseOpen} 
           onOpenChange={setTimelapseOpen}
+          selectedVehicleId={selectedVehicle}
+          frequency={frequency}
+          userEmail={userEmail}
         />
       </DialogContent>
     </Dialog>

@@ -16,6 +16,8 @@ import { sendChatMessage } from "./openai-realtime";
 import { handleVoiceChat } from "./voice-chat-handler";
 import { handleGmailAuthorize, handleGmailCallback, handleGmailDisconnect, handleGmailStatus } from "./gmail-oauth";
 import { scanGmailForTravelEmails } from "./gmail-scanner";
+import { parseWhisperPreferences } from "./preference-parser";
+import { calculateFinancialBreakdown } from "./financial-calculator";
 
 // Helper function to flatten policy response for frontend compatibility
 function flattenPolicyResponse(policy: VehiclePolicyWithDetails): any {
@@ -144,6 +146,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         error: "Failed to search quotes", 
         message: error.message 
+      });
+    }
+  });
+
+  // Timelapse search endpoint - simulates scheduled quote search over time
+  app.post("/api/timelapse-search", async (req, res) => {
+    try {
+      const { policy_id, email_id, frequency } = req.body;
+
+      if (!policy_id || !email_id || !frequency) {
+        return res.status(400).json({
+          error: "Missing required fields: policy_id, email_id, and frequency",
+        });
+      }
+
+      if (!["weekly", "monthly"].includes(frequency)) {
+        return res.status(400).json({
+          error: "Invalid frequency. Must be 'weekly' or 'monthly'",
+        });
+      }
+
+      // Get policy details from database
+      const policy = await storage.getVehiclePolicy(policy_id, email_id);
+      if (!policy) {
+        return res.status(404).json({ error: "Policy not found" });
+      }
+
+      // Parse whisper preferences using OpenAI
+      const whisperText = policy.whisper_preferences || "";
+      const parsedPrefs = await parseWhisperPreferences(whisperText);
+
+      // Calculate iteration interval
+      const intervalDays = frequency === "weekly" ? 7 : 30;
+      const today = new Date();
+      const policyEndDate = new Date(policy.policy_end_date);
+
+      // Generate search iterations
+      const iterations: Array<{
+        date: string;
+        match_found: boolean;
+        quote_data?: any;
+        financial_breakdown?: any;
+        message?: string;
+      }> = [];
+
+      let currentDate = new Date(today);
+      const allMatches: any[] = [];
+
+      while (currentDate <= policyEndDate) {
+        const dateStr = currentDate.toISOString().split("T")[0];
+
+        // Prepare request for NEW enriched Quote API
+        const quoteRequestBody = {
+          insurance_details: {
+            current_insurance_provider: policy.current_insurance_provider,
+            policy_id: policy.policy_id,
+            policy_type: policy.policy_type,
+            policy_start_date: policy.policy_start_date,
+            policy_end_date: policy.policy_end_date,
+            policy_number: policy.policy_number,
+            current_policy_cost: policy.current_policy_cost,
+            // Add vehicle details
+            ...policy.details,
+          },
+          user_preferences: whisperText,
+          conversation_history: [],
+        };
+
+        // Call NEW enriched Quote API
+        const quoteResponse = await fetch(
+          "https://alfie-657860957693.europe-west4.run.app",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(quoteRequestBody),
+          }
+        );
+
+        if (!quoteResponse.ok) {
+          iterations.push({
+            date: dateStr,
+            match_found: false,
+            message: "API error - unable to fetch quotes",
+          });
+          currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+          continue;
+        }
+
+        const quoteData = await quoteResponse.json();
+        const quotes = quoteData.quotes_with_insights || [];
+
+        // Find best matching quote
+        let bestMatch = null;
+        for (const quote of quotes) {
+          const quotePrice = quote.price_analysis?.quote_price || quote.original_quote?.output?.policy_cost;
+          const insurerName = quote.insurer_name || quote.original_quote?.output?.insurer_name;
+          const availableFeatures = quote.available_features || [];
+
+          if (!quotePrice || !insurerName) continue;
+
+          // Check budget constraint
+          if (parsedPrefs.budget && quotePrice > parsedPrefs.budget) continue;
+
+          // Check required features
+          const hasAllFeatures = parsedPrefs.features.every((requiredFeature) =>
+            availableFeatures.some((availableFeature: string) =>
+              availableFeature.toLowerCase().includes(requiredFeature.replace("_included", ""))
+            )
+          );
+
+          if (!hasAllFeatures) continue;
+
+          // Found a match!
+          if (!bestMatch || quotePrice < bestMatch.price) {
+            bestMatch = {
+              price: quotePrice,
+              insurer: insurerName,
+              features: availableFeatures,
+              trustpilot_rating: quote.trustpilot_rating || quote.original_quote?.output?.trustpilot_rating,
+              ai_insight: quote.ai_driven_insight || quote.original_quote?.output?.ai_driven_insight,
+              full_quote_data: quote,
+            };
+          }
+        }
+
+        if (bestMatch) {
+          // Calculate financial breakdown
+          const financialBreakdown = calculateFinancialBreakdown(
+            bestMatch.price,
+            bestMatch.insurer,
+            policy.current_policy_cost,
+            policy.policy_start_date,
+            policy.policy_end_date,
+            20, // £20 cancellation fee
+            currentDate
+          );
+
+          const matchIteration = {
+            date: dateStr,
+            match_found: true,
+            quote_data: bestMatch,
+            financial_breakdown: financialBreakdown,
+            message: `Match found: ${bestMatch.insurer} for £${bestMatch.price}`,
+          };
+
+          iterations.push(matchIteration);
+          allMatches.push(matchIteration);
+        } else {
+          iterations.push({
+            date: dateStr,
+            match_found: false,
+            message: parsedPrefs.budget
+              ? `No quotes within £${parsedPrefs.budget} budget with required features`
+              : "No quotes match required features",
+          });
+        }
+
+        // Move to next iteration date
+        currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+      }
+
+      res.json({
+        policy_id: policy.policy_id,
+        frequency,
+        parsed_preferences: parsedPrefs,
+        iterations,
+        all_matches: allMatches,
+        total_iterations: iterations.length,
+        total_matches: allMatches.length,
+      });
+    } catch (error: any) {
+      console.error("Error in timelapse search:", error);
+      res.status(500).json({
+        error: "Failed to perform timelapse search",
+        message: error.message,
       });
     }
   });

@@ -370,6 +370,7 @@ export default function WelcomeScreen({
         onOpenChange={setShowScheduleDialog}
         policies={policies}
         initialFrequency={scheduleFrequency}
+        userEmail={userEmail}
       />
 
       {/* Insurance Type Selector Dialog */}
