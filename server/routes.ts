@@ -2,7 +2,14 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
 import { storage } from "./storage";
-import { insertUserSchema, loginSchema, insertVehiclePolicySchema, insertChatMessageSchema, VehiclePolicyWithDetails } from "@shared/schema";
+import { 
+  insertUserSchema, 
+  loginSchema, 
+  insertVehiclePolicySchema,
+  updateVehiclePolicySchema,
+  insertChatMessageSchema, 
+  VehiclePolicyWithDetails 
+} from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import { sendChatMessage } from "./openai-realtime";
@@ -258,14 +265,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Vehicle policy not found" });
       }
 
-      // Validate the update data
-      const validatedData = insertVehiclePolicySchema.parse(req.body);
+      // Validate the update data using the proper update schema
+      const validatedData = updateVehiclePolicySchema.parse(req.body);
       
       const updatedPolicy = await storage.updateVehiclePolicy(policyId, email, validatedData);
       // Flatten policy for frontend compatibility
       res.json(flattenPolicyResponse(updatedPolicy));
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("Validation error during policy update:", JSON.stringify(error.errors));
         return res.status(400).json({ error: "Invalid update data", details: error.errors });
       }
       console.error("Error updating vehicle policy:", error);

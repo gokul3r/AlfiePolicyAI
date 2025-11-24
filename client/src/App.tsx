@@ -27,6 +27,13 @@ function sanitizePolicyForForm(policy: VehiclePolicy | Partial<VehiclePolicyForm
   if (!policy) return undefined;
   
   const sanitized: Partial<VehiclePolicyFormData> = {
+    // New policy fields
+    policy_number: policy.policy_number,
+    policy_start_date: policy.policy_start_date,
+    policy_end_date: policy.policy_end_date,
+    current_policy_cost: policy.current_policy_cost,
+    current_insurance_provider: policy.current_insurance_provider,
+    // Vehicle detail fields
     driver_age: policy.driver_age,
     vehicle_registration_number: policy.vehicle_registration_number,
     vehicle_manufacturer_name: policy.vehicle_manufacturer_name,
@@ -261,27 +268,29 @@ function AppContent() {
     if (!currentUser) return;
 
     if (editingPolicy) {
-      // Update existing policy - restructure for new API format
+      // Update existing policy - merge existing data with form updates to preserve all fields
       const policyData = {
         policy: {
           email_id: currentUser.email_id,
-          policy_type: 'car' as const,
-          policy_number: formData.policy_number,
-          policy_start_date: formData.policy_start_date,
-          policy_end_date: formData.policy_end_date,
-          current_policy_cost: formData.current_policy_cost,
-          current_insurance_provider: formData.current_insurance_provider,
+          policy_type: editingPolicy.policy_type || ('car' as const),
+          // Use form values if provided, otherwise keep existing values
+          policy_number: formData.policy_number ?? editingPolicy.policy_number,
+          policy_start_date: formData.policy_start_date ?? editingPolicy.policy_start_date,
+          policy_end_date: formData.policy_end_date ?? editingPolicy.policy_end_date,
+          current_policy_cost: formData.current_policy_cost ?? editingPolicy.current_policy_cost,
+          current_insurance_provider: formData.current_insurance_provider ?? editingPolicy.current_insurance_provider,
+          whisper_preferences: editingPolicy.whisper_preferences,
         },
         details: {
-          driver_age: formData.driver_age,
-          vehicle_registration_number: formData.vehicle_registration_number,
-          vehicle_manufacturer_name: formData.vehicle_manufacturer_name,
-          vehicle_model: formData.vehicle_model,
-          vehicle_year: formData.vehicle_year,
-          type_of_fuel: formData.type_of_fuel,
-          type_of_cover_needed: formData.type_of_cover_needed,
-          no_claim_bonus_years: formData.no_claim_bonus_years,
-          voluntary_excess: formData.voluntary_excess,
+          driver_age: formData.driver_age ?? editingPolicy.driver_age,
+          vehicle_registration_number: formData.vehicle_registration_number ?? editingPolicy.vehicle_registration_number,
+          vehicle_manufacturer_name: formData.vehicle_manufacturer_name ?? editingPolicy.vehicle_manufacturer_name,
+          vehicle_model: formData.vehicle_model ?? editingPolicy.vehicle_model,
+          vehicle_year: formData.vehicle_year ?? editingPolicy.vehicle_year,
+          type_of_fuel: formData.type_of_fuel ?? editingPolicy.type_of_fuel,
+          type_of_cover_needed: formData.type_of_cover_needed ?? editingPolicy.type_of_cover_needed,
+          no_claim_bonus_years: formData.no_claim_bonus_years ?? editingPolicy.no_claim_bonus_years,
+          voluntary_excess: formData.voluntary_excess ?? editingPolicy.voluntary_excess,
         },
       };
 

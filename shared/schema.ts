@@ -102,8 +102,8 @@ export const insertPolicySchema = createInsertSchema(policies).omit({
   policy_end_date: z.string().min(1, "Policy end date is required"),
   current_policy_cost: z.number().min(0, "Policy cost must be positive"),
   current_insurance_provider: z.string().min(1, "Insurance provider is required").trim(),
-  whisper_preferences: z.string().optional(),
-  status: z.string().optional(),
+  whisper_preferences: z.string().nullish(),  // Allow null, undefined, or string
+  status: z.string().nullish(),  // Allow null, undefined, or string
 });
 
 // Vehicle policy details insert schema
@@ -129,11 +129,18 @@ export const insertVehiclePolicySchema = z.object({
   details: insertVehiclePolicyDetailsSchema,
 });
 
+// Update schema for vehicle policy (allows partial fields)
+export const updateVehiclePolicySchema = z.object({
+  policy: insertPolicySchema.partial(),
+  details: insertVehiclePolicyDetailsSchema.partial(),
+});
+
 export type InsertPolicy = z.infer<typeof insertPolicySchema>;
 export type Policy = typeof policies.$inferSelect;
 export type InsertVehiclePolicyDetails = z.infer<typeof insertVehiclePolicyDetailsSchema>;
 export type VehiclePolicyDetails = typeof vehiclePolicyDetails.$inferSelect;
 export type InsertVehiclePolicy = z.infer<typeof insertVehiclePolicySchema>;
+export type UpdateVehiclePolicy = z.infer<typeof updateVehiclePolicySchema>;
 
 // Combined type for fetching vehicle policy with details
 export type VehiclePolicyWithDetails = Policy & {

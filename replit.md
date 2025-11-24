@@ -66,10 +66,15 @@ Preferred communication style: Simple, everyday language.
 - **Schema-First Design** with shared TypeScript schemas.
 
 **Database Schema**
+Multi-insurance hybrid architecture with core policies table + type-specific detail tables:
+
 - `users` table: `email_id` (PK), `user_name`.
-- `vehicle_policies` table: `vehicle_id` (composite PK), `email_id` (composite PK, FK), `driver_age`, `vehicle_registration_number`, `vehicle_manufacturer_name`, `vehicle_model`, `vehicle_year`, `type_of_fuel`, `type_of_cover_needed`, `no_claim_bonus_years`, `voluntary_excess`, `whisper_preferences` (nullable).
-- `chat_messages` table: `id` (serial PK), `email_id` (FK to users), `role` ('user' or 'assistant'), `content`, `created_at` (timestamp, default now()).
-- `personalizations` table: `email_id` (PK, FK to users), `gmail_id` (connected Gmail email), `gmail_access_token`, `gmail_refresh_token`, `gmail_token_expiry`, `email_enabled` (boolean), `created_at`, `updated_at`.
+- `policies` table (core): `policy_id` (PK, UUID), `email_id` (FK to users), `policy_type` (enum: car/van/home/pet/travel/business), `policy_number`, `policy_start_date`, `policy_end_date`, `current_policy_cost`, `current_insurance_provider`, `whisper_preferences` (nullable), `status` (nullable), `created_at`, `updated_at`.
+- `vehicle_policy_details` table: `policy_id` (PK, FK to policies), `driver_age`, `vehicle_registration_number`, `vehicle_manufacturer_name`, `vehicle_model`, `vehicle_year`, `type_of_fuel`, `type_of_cover_needed`, `no_claim_bonus_years`, `voluntary_excess`.
+- Type-specific detail tables: `van_policy_details`, `home_policy_details`, `pet_policy_details`, `travel_policy_details`, `business_policy_details` (future activation).
+- `vehicle_policies` table (legacy, deprecated): Maintained for migration reference only.
+- `chat_messages` table: `id` (serial PK), `email_id` (FK to users), `role` ('user' or 'assistant'), `content`, `created_at`.
+- `personalizations` table: `email_id` (PK, FK to users), `gmail_id`, `gmail_access_token`, `gmail_refresh_token`, `gmail_token_expiry`, `email_enabled`, `created_at`, `updated_at`.
 - `custom_ratings` table: `email_id` (PK, FK to users), `trustpilot_data` (JSONB), `defacto_ratings` (JSONB), `use_custom_ratings` (boolean), `created_at`, `updated_at`.
 
 ## External Dependencies

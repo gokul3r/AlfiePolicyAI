@@ -15,6 +15,7 @@ import {
   type Policy,
   type VehiclePolicyWithDetails,
   type InsertVehiclePolicy,
+  type UpdateVehiclePolicy,
   type VehiclePolicy,
   type ChatMessage, 
   type InsertChatMessage, 
@@ -32,7 +33,7 @@ export interface IStorage {
   getVehiclePoliciesByEmail(email: string): Promise<VehiclePolicyWithDetails[]>;
   getVehiclePolicy(policyId: string, email: string): Promise<VehiclePolicyWithDetails | undefined>;
   createVehiclePolicy(policy: InsertVehiclePolicy): Promise<VehiclePolicyWithDetails>;
-  updateVehiclePolicy(policyId: string, email: string, updates: InsertVehiclePolicy): Promise<VehiclePolicyWithDetails>;
+  updateVehiclePolicy(policyId: string, email: string, updates: UpdateVehiclePolicy): Promise<VehiclePolicyWithDetails>;
   getChatHistory(email: string): Promise<ChatMessage[]>;
   saveChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getPersonalization(email: string): Promise<Personalization | undefined>;
@@ -114,24 +115,37 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async updateVehiclePolicy(policyId: string, email: string, policyData: InsertVehiclePolicy): Promise<VehiclePolicyWithDetails> {
+  async updateVehiclePolicy(policyId: string, email: string, policyData: UpdateVehiclePolicy): Promise<VehiclePolicyWithDetails> {
     const { policy, details } = policyData;
     
-    // Update policy table
-    await db.update(policies)
-      .set({ ...policy, updated_at: new Date() })
-      .where(
-        and(
-          eq(policies.policy_id, policyId),
-          eq(policies.email_id, email)
-        )
-      );
+    // Filter out undefined values from policy to prevent accidental nullification
+    const policyUpdates = Object.fromEntries(
+      Object.entries(policy).filter(([_, value]) => value !== undefined)
+    );
     
-    // Only update details if they are provided and not empty
-    if (details && Object.keys(details).length > 0) {
-      await db.update(vehiclePolicyDetails)
-        .set(details)
-        .where(eq(vehiclePolicyDetails.policy_id, policyId));
+    // Only update policy table if there are valid fields to update
+    if (Object.keys(policyUpdates).length > 0) {
+      await db.update(policies)
+        .set({ ...policyUpdates, updated_at: new Date() })
+        .where(
+          and(
+            eq(policies.policy_id, policyId),
+            eq(policies.email_id, email)
+          )
+        );
+    }
+    
+    // Filter out undefined values from details and only update if provided
+    if (details) {
+      const detailUpdates = Object.fromEntries(
+        Object.entries(details).filter(([_, value]) => value !== undefined)
+      );
+      
+      if (Object.keys(detailUpdates).length > 0) {
+        await db.update(vehiclePolicyDetails)
+          .set(detailUpdates)
+          .where(eq(vehiclePolicyDetails.policy_id, policyId));
+      }
     }
     
     const updated = await this.getVehiclePolicy(policyId, email);
