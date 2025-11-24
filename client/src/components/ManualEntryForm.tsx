@@ -29,8 +29,15 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
-// Form schema - excludes vehicle_id and email_id as they're handled separately
+// Form schema - includes both policy and vehicle details fields
 const manualEntryFormSchema = z.object({
+  // Policy fields
+  policy_number: z.string().min(1, "Policy number is required").trim(),
+  policy_start_date: z.string().min(1, "Policy start date is required"),
+  policy_end_date: z.string().min(1, "Policy end date is required"),
+  current_insurance_provider: z.string().min(1, "Insurance provider is required").trim(),
+  current_policy_cost: z.coerce.number().min(0, "Policy cost must be positive"),
+  // Vehicle details fields
   driver_age: z.coerce.number().int().min(18, "Driver must be at least 18 years old").max(100, "Age must be 100 or less"),
   vehicle_registration_number: z.string().min(1, "Registration number is required").trim(),
   vehicle_manufacturer_name: z.string().min(1, "Manufacturer name is required").trim(),
@@ -70,6 +77,11 @@ export default function ManualEntryForm({
   const form = useForm<VehiclePolicyFormData>({
     resolver: zodResolver(manualEntryFormSchema),
     defaultValues: {
+      policy_number: initialValues?.policy_number ?? "",
+      policy_start_date: initialValues?.policy_start_date ?? "",
+      policy_end_date: initialValues?.policy_end_date ?? "",
+      current_insurance_provider: initialValues?.current_insurance_provider ?? "",
+      current_policy_cost: initialValues?.current_policy_cost ?? undefined,
       driver_age: initialValues?.driver_age ?? undefined,
       vehicle_registration_number: initialValues?.vehicle_registration_number ?? "",
       vehicle_manufacturer_name: initialValues?.vehicle_manufacturer_name ?? "",
@@ -86,6 +98,11 @@ export default function ManualEntryForm({
   useEffect(() => {
     if (initialValues) {
       form.reset({
+        policy_number: initialValues?.policy_number ?? "",
+        policy_start_date: initialValues?.policy_start_date ?? "",
+        policy_end_date: initialValues?.policy_end_date ?? "",
+        current_insurance_provider: initialValues?.current_insurance_provider ?? "",
+        current_policy_cost: initialValues?.current_policy_cost ?? undefined,
         driver_age: initialValues?.driver_age ?? undefined,
         vehicle_registration_number: initialValues?.vehicle_registration_number ?? "",
         vehicle_manufacturer_name: initialValues?.vehicle_manufacturer_name ?? "",
@@ -140,6 +157,103 @@ export default function ManualEntryForm({
                   data-testid="input-email-readonly"
                 />
               </div>
+
+              <FormField
+                control={form.control}
+                name="policy_number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Policy Number</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., POL-123456"
+                        {...field}
+                        className="h-11 rounded-lg"
+                        data-testid="input-policy-number"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="current_insurance_provider"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Current Insurance Provider</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., Admiral, AXA"
+                        {...field}
+                        className="h-11 rounded-lg"
+                        data-testid="input-insurance-provider"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="current_policy_cost"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Current Policy Cost (£)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="e.g., 1200.00"
+                        {...field}
+                        className="h-11 rounded-lg"
+                        data-testid="input-policy-cost"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="policy_start_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Policy Start Date</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                        className="h-11 rounded-lg"
+                        data-testid="input-policy-start-date"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="policy_end_date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Policy End Date</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                        className="h-11 rounded-lg"
+                        data-testid="input-policy-end-date"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}

@@ -119,7 +119,7 @@ function AppContent() {
       console.log("[createVehiclePolicy] Starting mutation with data:", policyData);
       const res = await apiRequest("POST", "/api/vehicle-policies", policyData);
       console.log("[createVehiclePolicy] API request successful, response status:", res.status);
-      const data = await res.json() as VehiclePolicy;
+      const data = await res.json();
       console.log("[createVehiclePolicy] Response parsed:", data);
       return data;
     },
@@ -144,9 +144,9 @@ function AppContent() {
   });
 
   const updateVehiclePolicyMutation = useMutation({
-    mutationFn: async ({ vehicleId, email, updates }: { vehicleId: string; email: string; updates: Partial<InsertVehiclePolicy> }) => {
-      const res = await apiRequest("PUT", `/api/vehicle-policies/${email}/${vehicleId}`, updates);
-      return await res.json() as VehiclePolicy;
+    mutationFn: async ({ policyId, email, updates }: { policyId: string; email: string; updates: InsertVehiclePolicy }) => {
+      const res = await apiRequest("PUT", `/api/vehicle-policies/${email}/${policyId}`, updates);
+      return await res.json();
     },
     onSuccess: () => {
       setManualEntryFormOpen(false);
@@ -255,21 +255,58 @@ function AppContent() {
     if (!currentUser) return;
 
     if (editingPolicy) {
-      // Update existing policy
+      // Update existing policy - restructure for new API format
+      const policyData = {
+        policy: {
+          email_id: currentUser.email_id,
+          policy_type: 'car' as const,
+          policy_number: formData.policy_number,
+          policy_start_date: formData.policy_start_date,
+          policy_end_date: formData.policy_end_date,
+          current_policy_cost: formData.current_policy_cost,
+          current_insurance_provider: formData.current_insurance_provider,
+        },
+        details: {
+          driver_age: formData.driver_age,
+          vehicle_registration_number: formData.vehicle_registration_number,
+          vehicle_manufacturer_name: formData.vehicle_manufacturer_name,
+          vehicle_model: formData.vehicle_model,
+          vehicle_year: formData.vehicle_year,
+          type_of_fuel: formData.type_of_fuel,
+          type_of_cover_needed: formData.type_of_cover_needed,
+          no_claim_bonus_years: formData.no_claim_bonus_years,
+          voluntary_excess: formData.voluntary_excess,
+        },
+      };
+
       updateVehiclePolicyMutation.mutate({
-        vehicleId: editingPolicy.vehicle_id,
+        policyId: editingPolicy.policy_id,
         email: currentUser.email_id,
-        updates: formData,
+        updates: policyData,
       });
     } else {
-      // Create new policy - Generate vehicle_id from manufacturer name + random numbers
-      const randomSuffix = Math.floor(Math.random() * 1000);
-      const vehicle_id = `${formData.vehicle_manufacturer_name}${randomSuffix}`;
-
+      // Create new policy - restructure for new API format
       const policyData = {
-        vehicle_id,
-        email_id: currentUser.email_id,
-        ...formData,
+        policy: {
+          email_id: currentUser.email_id,
+          policy_type: 'car' as const,
+          policy_number: formData.policy_number,
+          policy_start_date: formData.policy_start_date,
+          policy_end_date: formData.policy_end_date,
+          current_policy_cost: formData.current_policy_cost,
+          current_insurance_provider: formData.current_insurance_provider,
+        },
+        details: {
+          driver_age: formData.driver_age,
+          vehicle_registration_number: formData.vehicle_registration_number,
+          vehicle_manufacturer_name: formData.vehicle_manufacturer_name,
+          vehicle_model: formData.vehicle_model,
+          vehicle_year: formData.vehicle_year,
+          type_of_fuel: formData.type_of_fuel,
+          type_of_cover_needed: formData.type_of_cover_needed,
+          no_claim_bonus_years: formData.no_claim_bonus_years,
+          voluntary_excess: formData.voluntary_excess,
+        },
       };
 
       createVehiclePolicyMutation.mutate(policyData);
