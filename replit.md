@@ -8,6 +8,21 @@ AutoSage is a mobile-first insurance policy management application designed as a
 
 Preferred communication style: Simple, everyday language.
 
+## Backlog
+
+### quote_Api_url_change
+**Priority**: Medium  
+**Description**: Migrate from current Quote Search API to new enhanced API with richer analytics.  
+**Current API**: `https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis`  
+**New API**: `https://alfie-657860957693.europe-west4.run.app` (base URL change)  
+**Key Changes**:
+- Request: Add `conversation_history` array field
+- Response: New top-level `parsed_preferences` object + enriched quote data (`available_features`, `price_analysis`, `score_breakdown`, `trade_offs`)
+- Effort: Medium (1-2 days for implementation + testing)
+- Testing: Contract tests, E2E tests, regression tests required
+- Risk: Manageable with proper error handling and fallbacks
+**Files to Update**: `server/routes.ts`, `client/src/components/QuoteSearchDialog.tsx`, `client/src/components/QuoteCard.tsx`, type definitions
+
 ## System Architecture
 
 ### Frontend Architecture
