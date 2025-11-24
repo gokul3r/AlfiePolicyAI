@@ -1,15 +1,38 @@
 import { db } from "./db";
-import { users, vehiclePolicies, chatMessages, personalizations, notifications, customRatings } from "@shared/schema";
-import { type User, type InsertUser, type VehiclePolicy, type InsertVehiclePolicy, type ChatMessage, type InsertChatMessage, type Personalization, type Notification, type InsertNotification, type CustomRatings, type InsertCustomRatings } from "@shared/schema";
+import { 
+  users, 
+  policies, 
+  vehiclePolicyDetails, 
+  vehiclePolicies, 
+  chatMessages, 
+  personalizations, 
+  notifications, 
+  customRatings 
+} from "@shared/schema";
+import { 
+  type User, 
+  type InsertUser, 
+  type Policy,
+  type VehiclePolicyWithDetails,
+  type InsertVehiclePolicy,
+  type VehiclePolicy,
+  type ChatMessage, 
+  type InsertChatMessage, 
+  type Personalization, 
+  type Notification, 
+  type InsertNotification, 
+  type CustomRatings, 
+  type InsertCustomRatings 
+} from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  getVehiclePoliciesByEmail(email: string): Promise<VehiclePolicy[]>;
-  getVehiclePolicy(vehicleId: string, email: string): Promise<VehiclePolicy | undefined>;
-  createVehiclePolicy(policy: InsertVehiclePolicy): Promise<VehiclePolicy>;
-  updateVehiclePolicy(vehicleId: string, email: string, updates: Partial<InsertVehiclePolicy>): Promise<VehiclePolicy>;
+  getVehiclePoliciesByEmail(email: string): Promise<VehiclePolicyWithDetails[]>;
+  getVehiclePolicy(policyId: string, email: string): Promise<VehiclePolicyWithDetails | undefined>;
+  createVehiclePolicy(policy: InsertVehiclePolicy): Promise<VehiclePolicyWithDetails>;
+  updateVehiclePolicy(policyId: string, email: string, updates: InsertVehiclePolicy): Promise<VehiclePolicyWithDetails>;
   getChatHistory(email: string): Promise<ChatMessage[]>;
   saveChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getPersonalization(email: string): Promise<Personalization | undefined>;
@@ -35,36 +58,83 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
-  async getVehiclePoliciesByEmail(email: string): Promise<VehiclePolicy[]> {
-    return await db.select().from(vehiclePolicies).where(eq(vehiclePolicies.email_id, email));
-  }
-
-  async getVehiclePolicy(vehicleId: string, email: string): Promise<VehiclePolicy | undefined> {
-    const result = await db.select().from(vehiclePolicies).where(
-      and(
-        eq(vehiclePolicies.vehicle_id, vehicleId),
-        eq(vehiclePolicies.email_id, email)
-      )
-    );
-    return result[0];
-  }
-
-  async createVehiclePolicy(policy: InsertVehiclePolicy): Promise<VehiclePolicy> {
-    const result = await db.insert(vehiclePolicies).values(policy).returning();
-    return result[0];
-  }
-
-  async updateVehiclePolicy(vehicleId: string, email: string, updates: Partial<InsertVehiclePolicy>): Promise<VehiclePolicy> {
-    const result = await db.update(vehiclePolicies)
-      .set(updates)
+  async getVehiclePoliciesByEmail(email: string): Promise<VehiclePolicyWithDetails[]> {
+    const result = await db
+      .select()
+      .from(policies)
+      .leftJoin(vehiclePolicyDetails, eq(policies.policy_id, vehiclePolicyDetails.policy_id))
       .where(
         and(
-          eq(vehiclePolicies.vehicle_id, vehicleId),
-          eq(vehiclePolicies.email_id, email)
+          eq(policies.email_id, email),
+          eq(policies.policy_type, 'car')
         )
-      )
-      .returning();
-    return result[0];
+      );
+    
+    return result.map(row => ({
+      ...row.policies,
+      details: row.vehicle_policy_details!
+    }));
+  }
+
+  async getVehiclePolicy(policyId: string, email: string): Promise<VehiclePolicyWithDetails | undefined> {
+    const result = await db
+      .select()
+      .from(policies)
+      .leftJoin(vehiclePolicyDetails, eq(policies.policy_id, vehiclePolicyDetails.policy_id))
+      .where(
+        and(
+          eq(policies.policy_id, policyId),
+          eq(policies.email_id, email)
+        )
+      );
+    
+    if (result.length === 0 || !result[0].vehicle_policy_details) {
+      return undefined;
+    }
+    
+    return {
+      ...result[0].policies,
+      details: result[0].vehicle_policy_details
+    };
+  }
+
+  async createVehiclePolicy(policyData: InsertVehiclePolicy): Promise<VehiclePolicyWithDetails> {
+    const { policy, details } = policyData;
+    
+    const [createdPolicy] = await db.insert(policies).values(policy).returning();
+    
+    const [createdDetails] = await db.insert(vehiclePolicyDetails).values({
+      policy_id: createdPolicy.policy_id,
+      ...details
+    }).returning();
+    
+    return {
+      ...createdPolicy,
+      details: createdDetails
+    };
+  }
+
+  async updateVehiclePolicy(policyId: string, email: string, policyData: InsertVehiclePolicy): Promise<VehiclePolicyWithDetails> {
+    const { policy, details } = policyData;
+    
+    await db.update(policies)
+      .set({ ...policy, updated_at: new Date() })
+      .where(
+        and(
+          eq(policies.policy_id, policyId),
+          eq(policies.email_id, email)
+        )
+      );
+    
+    await db.update(vehiclePolicyDetails)
+      .set(details)
+      .where(eq(vehiclePolicyDetails.policy_id, policyId));
+    
+    const updated = await this.getVehiclePolicy(policyId, email);
+    if (!updated) {
+      throw new Error("Policy not found after update");
+    }
+    return updated;
   }
 
   async getChatHistory(email: string): Promise<ChatMessage[]> {
