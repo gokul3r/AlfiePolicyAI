@@ -281,6 +281,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cancel a policy
+  app.post("/api/cancel-policy", async (req, res) => {
+    try {
+      // Validate request body with Zod
+      const cancelPolicySchema = z.object({
+        policyId: z.string().min(1, "Policy ID is required"),
+        email: z.string().email("Valid email is required").toLowerCase().trim(),
+        cancel: z.literal(true, { errorMap: () => ({ message: "cancel must be true" }) }),
+      });
+      
+      const validatedData = cancelPolicySchema.parse(req.body);
+      
+      // Simulate delay (1-2 seconds) for realistic mock service
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Delete the policy from database
+      const policyNumber = await storage.deletePolicy(validatedData.policyId, validatedData.email);
+      
+      // Return mock service response
+      res.json({
+        policyNumber,
+        cancelled: true
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request data", details: error.errors });
+      }
+      console.error("Error cancelling policy:", error);
+      res.status(500).json({ error: "Failed to cancel policy" });
+    }
+  });
+
   // Get chat history for a user
   app.get("/api/chat/messages/:email", async (req, res) => {
     try {

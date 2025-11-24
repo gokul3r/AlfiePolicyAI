@@ -34,6 +34,7 @@ export interface IStorage {
   getVehiclePolicy(policyId: string, email: string): Promise<VehiclePolicyWithDetails | undefined>;
   createVehiclePolicy(policy: InsertVehiclePolicy): Promise<VehiclePolicyWithDetails>;
   updateVehiclePolicy(policyId: string, email: string, updates: UpdateVehiclePolicy): Promise<VehiclePolicyWithDetails>;
+  deletePolicy(policyId: string, email: string): Promise<string>;
   getChatHistory(email: string): Promise<ChatMessage[]>;
   saveChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getPersonalization(email: string): Promise<Personalization | undefined>;
@@ -153,6 +154,36 @@ export class DbStorage implements IStorage {
       throw new Error("Policy not found after update");
     }
     return updated;
+  }
+
+  async deletePolicy(policyId: string, email: string): Promise<string> {
+    // Get the policy first to retrieve policy_number before deletion
+    const policy = await db
+      .select()
+      .from(policies)
+      .where(
+        and(
+          eq(policies.policy_id, policyId),
+          eq(policies.email_id, email)
+        )
+      );
+    
+    if (policy.length === 0) {
+      throw new Error("Policy not found");
+    }
+    
+    const policyNumber = policy[0].policy_number;
+    
+    // Hard delete the policy (cascade will handle detail tables)
+    await db.delete(policies)
+      .where(
+        and(
+          eq(policies.policy_id, policyId),
+          eq(policies.email_id, email)
+        )
+      );
+    
+    return policyNumber;
   }
 
   async getChatHistory(email: string): Promise<ChatMessage[]> {

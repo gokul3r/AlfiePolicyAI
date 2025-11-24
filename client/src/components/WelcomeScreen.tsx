@@ -22,6 +22,7 @@ import { NotificationPanel } from "./NotificationPanel";
 import { ConfigureAutoSageDialog } from "./ConfigureAutoSageDialog";
 import { ComingSoonDialog } from "./ComingSoonDialog";
 import { InsuranceTypeSelectorDialog } from "./InsuranceTypeSelectorDialog";
+import { CancelPolicyDialog } from "./CancelPolicyDialog";
 import { InfoBadge } from "./InfoBadge";
 import logoImage from "@assets/image_1763588796393.png";
 import { AnimatedMic } from "./AnimatedMic";
@@ -65,6 +66,7 @@ export default function WelcomeScreen({
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [comingSoonFeature, setComingSoonFeature] = useState("");
   const [showInsuranceTypeSelector, setShowInsuranceTypeSelector] = useState(false);
+  const [showCancelPolicy, setShowCancelPolicy] = useState(false);
   const [scheduleFrequency, setScheduleFrequency] = useState<"monthly" | "weekly">("monthly");
   const [aiInputMessage, setAiInputMessage] = useState("");
   const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>(undefined);
@@ -272,10 +274,7 @@ export default function WelcomeScreen({
           <AnimatedIconButton
             icon={XCircle}
             label="Cancel Policy"
-            onClick={() => {
-              setComingSoonFeature("Policy Cancellation");
-              setShowComingSoon(true);
-            }}
+            onClick={() => setShowCancelPolicy(true)}
             disabled={!hasPolicies || isLoading}
             index={5}
             testId="button-cancel-policy"
@@ -393,6 +392,13 @@ export default function WelcomeScreen({
         open={showComingSoon}
         onOpenChange={setShowComingSoon}
         featureName={comingSoonFeature}
+      />
+
+      {/* Cancel Policy Dialog */}
+      <CancelPolicyDialog
+        open={showCancelPolicy}
+        onOpenChange={setShowCancelPolicy}
+        userEmail={userEmail}
       />
 
       {/* Fixed Configure AutoSage Link at Bottom */}
