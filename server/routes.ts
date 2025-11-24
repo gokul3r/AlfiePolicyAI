@@ -2,13 +2,35 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
 import { storage } from "./storage";
-import { insertUserSchema, loginSchema, insertVehiclePolicySchema, insertChatMessageSchema } from "@shared/schema";
+import { insertUserSchema, loginSchema, insertVehiclePolicySchema, insertChatMessageSchema, VehiclePolicyWithDetails } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import { sendChatMessage } from "./openai-realtime";
 import { handleVoiceChat } from "./voice-chat-handler";
 import { handleGmailAuthorize, handleGmailCallback, handleGmailDisconnect, handleGmailStatus } from "./gmail-oauth";
 import { scanGmailForTravelEmails } from "./gmail-scanner";
+
+// Helper function to flatten policy response for frontend compatibility
+function flattenPolicyResponse(policy: VehiclePolicyWithDetails): any {
+  return {
+    // Use policy_id as vehicle_id for backwards compatibility
+    vehicle_id: policy.policy_id,
+    policy_id: policy.policy_id,
+    email_id: policy.email_id,
+    policy_type: policy.policy_type,
+    policy_number: policy.policy_number,
+    policy_start_date: policy.policy_start_date,
+    policy_end_date: policy.policy_end_date,
+    current_policy_cost: policy.current_policy_cost,
+    current_insurance_provider: policy.current_insurance_provider,
+    whisper_preferences: policy.whisper_preferences,
+    status: policy.status,
+    created_at: policy.created_at,
+    updated_at: policy.updated_at,
+    // Spread detail fields at the top level
+    ...policy.details
+  };
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Configure multer for file uploads (store in memory)
@@ -166,7 +188,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const email = req.params.email.toLowerCase().trim();
       const policies = await storage.getVehiclePoliciesByEmail(email);
-      res.json(policies);
+      // Flatten policies for frontend compatibility
+      const flattenedPolicies = policies.map(flattenPolicyResponse);
+      res.json(flattenedPolicies);
     } catch (error) {
       console.error("Error fetching vehicle policies:", error);
       res.status(500).json({ error: "Failed to fetch vehicle policies" });
@@ -184,7 +208,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Vehicle policy not found" });
       }
       
-      res.json(policy);
+      // Flatten policy for frontend compatibility
+      res.json(flattenPolicyResponse(policy));
     } catch (error) {
       console.error("Error fetching vehicle policy:", error);
       res.status(500).json({ error: "Failed to fetch vehicle policy" });
@@ -209,7 +234,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const policy = await storage.createVehiclePolicy(validatedData);
       console.log("[vehicle-policies] Policy created successfully:", JSON.stringify(policy));
       
-      res.status(201).json(policy);
+      // Flatten policy for frontend compatibility
+      res.status(201).json(flattenPolicyResponse(policy));
     } catch (error) {
       if (error instanceof z.ZodError) {
         console.log("[vehicle-policies] Validation error:", JSON.stringify(error.errors));
@@ -236,7 +262,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertVehiclePolicySchema.parse(req.body);
       
       const updatedPolicy = await storage.updateVehiclePolicy(policyId, email, validatedData);
-      res.json(updatedPolicy);
+      // Flatten policy for frontend compatibility
+      res.json(flattenPolicyResponse(updatedPolicy));
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid update data", details: error.errors });

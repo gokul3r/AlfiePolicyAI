@@ -117,6 +117,7 @@ export class DbStorage implements IStorage {
   async updateVehiclePolicy(policyId: string, email: string, policyData: InsertVehiclePolicy): Promise<VehiclePolicyWithDetails> {
     const { policy, details } = policyData;
     
+    // Update policy table
     await db.update(policies)
       .set({ ...policy, updated_at: new Date() })
       .where(
@@ -126,9 +127,12 @@ export class DbStorage implements IStorage {
         )
       );
     
-    await db.update(vehiclePolicyDetails)
-      .set(details)
-      .where(eq(vehiclePolicyDetails.policy_id, policyId));
+    // Only update details if they are provided and not empty
+    if (details && Object.keys(details).length > 0) {
+      await db.update(vehiclePolicyDetails)
+        .set(details)
+        .where(eq(vehiclePolicyDetails.policy_id, policyId));
+    }
     
     const updated = await this.getVehiclePolicy(policyId, email);
     if (!updated) {

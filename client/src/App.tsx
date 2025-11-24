@@ -169,10 +169,16 @@ function AppContent() {
 
   const whisperUpdateMutation = useMutation({
     mutationFn: async ({ vehicleId, email, preferences }: { vehicleId: string; email: string; preferences: string }) => {
+      // vehicleId is actually policy_id now, but keeping parameter name for component compatibility
       const res = await apiRequest("PUT", `/api/vehicle-policies/${email}/${vehicleId}`, { 
-        whisper_preferences: preferences 
+        policy: {
+          email_id: email,
+          policy_type: 'car' as const,
+          whisper_preferences: preferences
+        },
+        details: {} // Empty details object, not updating vehicle details
       });
-      return await res.json() as VehiclePolicy;
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", currentUser?.email_id] });
