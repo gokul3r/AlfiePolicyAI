@@ -20,6 +20,127 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type LoginRequest = z.infer<typeof loginSchema>;
 export type User = typeof users.$inferSelect;
 
+// Core policies table - supports all insurance types
+export const policies = pgTable("policies", {
+  policy_id: text("policy_id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  email_id: text("email_id").notNull().references(() => users.email_id),
+  policy_type: text("policy_type").notNull(), // car, van, home, pet, travel, business
+  policy_number: text("policy_number").notNull(),
+  policy_start_date: text("policy_start_date").notNull(), // Stored as ISO date string
+  policy_end_date: text("policy_end_date").notNull(), // Stored as ISO date string
+  current_policy_cost: real("current_policy_cost").notNull(),
+  current_insurance_provider: text("current_insurance_provider").notNull(),
+  whisper_preferences: text("whisper_preferences"),
+  status: text("status").notNull().default("active"), // active, expired, cancelled
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  updated_at: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Vehicle-specific details (for car and van)
+export const vehiclePolicyDetails = pgTable("vehicle_policy_details", {
+  policy_id: text("policy_id").primaryKey().references(() => policies.policy_id, { onDelete: "cascade" }),
+  driver_age: integer("driver_age").notNull(),
+  vehicle_registration_number: text("vehicle_registration_number").notNull(),
+  vehicle_manufacturer_name: text("vehicle_manufacturer_name").notNull(),
+  vehicle_model: text("vehicle_model").notNull(),
+  vehicle_year: integer("vehicle_year").notNull(),
+  type_of_fuel: text("type_of_fuel").notNull(),
+  type_of_cover_needed: text("type_of_cover_needed").notNull(),
+  no_claim_bonus_years: integer("no_claim_bonus_years").notNull(),
+  voluntary_excess: real("voluntary_excess").notNull(),
+});
+
+// Home-specific details
+export const homePolicyDetails = pgTable("home_policy_details", {
+  policy_id: text("policy_id").primaryKey().references(() => policies.policy_id, { onDelete: "cascade" }),
+  property_address: text("property_address").notNull(),
+  property_type: text("property_type").notNull(), // house, apartment, condo
+  year_built: integer("year_built"),
+  square_footage: integer("square_footage"),
+});
+
+// Pet-specific details
+export const petPolicyDetails = pgTable("pet_policy_details", {
+  policy_id: text("policy_id").primaryKey().references(() => policies.policy_id, { onDelete: "cascade" }),
+  pet_name: text("pet_name").notNull(),
+  pet_type: text("pet_type").notNull(), // dog, cat, etc.
+  pet_breed: text("pet_breed"),
+  pet_age: integer("pet_age"),
+});
+
+// Travel-specific details
+export const travelPolicyDetails = pgTable("travel_policy_details", {
+  policy_id: text("policy_id").primaryKey().references(() => policies.policy_id, { onDelete: "cascade" }),
+  trip_destination: text("trip_destination").notNull(),
+  trip_start_date: text("trip_start_date").notNull(),
+  trip_end_date: text("trip_end_date").notNull(),
+  number_of_travelers: integer("number_of_travelers").notNull(),
+});
+
+// Business-specific details
+export const businessPolicyDetails = pgTable("business_policy_details", {
+  policy_id: text("policy_id").primaryKey().references(() => policies.policy_id, { onDelete: "cascade" }),
+  business_name: text("business_name").notNull(),
+  business_type: text("business_type").notNull(),
+  number_of_employees: integer("number_of_employees"),
+  annual_revenue: real("annual_revenue"),
+});
+
+// Policy type enum for validation
+const policyTypeEnum = z.enum(["car", "van", "home", "pet", "travel", "business"]);
+
+// Core policy insert schema
+export const insertPolicySchema = createInsertSchema(policies).omit({
+  policy_id: true,
+  created_at: true,
+  updated_at: true,
+}).extend({
+  email_id: z.string().email("Invalid email address").toLowerCase().trim(),
+  policy_type: policyTypeEnum,
+  policy_number: z.string().min(1, "Policy number is required").trim(),
+  policy_start_date: z.string().min(1, "Policy start date is required"),
+  policy_end_date: z.string().min(1, "Policy end date is required"),
+  current_policy_cost: z.number().min(0, "Policy cost must be positive"),
+  current_insurance_provider: z.string().min(1, "Insurance provider is required").trim(),
+  whisper_preferences: z.string().optional(),
+  status: z.string().optional(),
+});
+
+// Vehicle policy details insert schema
+export const insertVehiclePolicyDetailsSchema = createInsertSchema(vehiclePolicyDetails).omit({
+  policy_id: true,
+}).extend({
+  driver_age: z.number().int().min(18, "Driver must be at least 18 years old").max(100),
+  vehicle_registration_number: z.string().min(1, "Registration number is required").trim(),
+  vehicle_manufacturer_name: z.string().min(1, "Manufacturer name is required").trim(),
+  vehicle_model: z.string().min(1, "Vehicle model is required").trim(),
+  vehicle_year: z.number().int().min(1900).max(new Date().getFullYear() + 1),
+  type_of_fuel: z.enum(["Electric", "Hybrid", "Petrol", "Diesel"], {
+    errorMap: () => ({ message: "Please select a valid fuel type" })
+  }),
+  type_of_cover_needed: z.string().min(1, "Cover type is required").trim(),
+  no_claim_bonus_years: z.number().int().min(0).max(20),
+  voluntary_excess: z.number().min(0),
+});
+
+// Combined schema for creating a vehicle policy (car/van)
+export const insertVehiclePolicySchema = z.object({
+  policy: insertPolicySchema,
+  details: insertVehiclePolicyDetailsSchema,
+});
+
+export type InsertPolicy = z.infer<typeof insertPolicySchema>;
+export type Policy = typeof policies.$inferSelect;
+export type InsertVehiclePolicyDetails = z.infer<typeof insertVehiclePolicyDetailsSchema>;
+export type VehiclePolicyDetails = typeof vehiclePolicyDetails.$inferSelect;
+export type InsertVehiclePolicy = z.infer<typeof insertVehiclePolicySchema>;
+
+// Combined type for fetching vehicle policy with details
+export type VehiclePolicyWithDetails = Policy & {
+  details: VehiclePolicyDetails;
+};
+
+// Legacy support - keep old table for migration
 export const vehiclePolicies = pgTable("vehicle_policies", {
   vehicle_id: text("vehicle_id").notNull(),
   email_id: text("email_id").notNull().references(() => users.email_id),
@@ -37,24 +158,6 @@ export const vehiclePolicies = pgTable("vehicle_policies", {
   pk: primaryKey({ columns: [table.vehicle_id, table.email_id] })
 }));
 
-export const insertVehiclePolicySchema = createInsertSchema(vehiclePolicies).extend({
-  vehicle_id: z.string().min(1, "Vehicle ID is required").trim(),
-  email_id: z.string().email("Invalid email address").toLowerCase().trim(),
-  driver_age: z.number().int().min(18, "Driver must be at least 18 years old").max(100),
-  vehicle_registration_number: z.string().min(1, "Registration number is required").trim(),
-  vehicle_manufacturer_name: z.string().min(1, "Manufacturer name is required").trim(),
-  vehicle_model: z.string().min(1, "Vehicle model is required").trim(),
-  vehicle_year: z.number().int().min(1900).max(new Date().getFullYear() + 1),
-  type_of_fuel: z.enum(["Electric", "Hybrid", "Petrol", "Diesel"], {
-    errorMap: () => ({ message: "Please select a valid fuel type" })
-  }),
-  type_of_cover_needed: z.string().min(1, "Cover type is required").trim(),
-  no_claim_bonus_years: z.number().int().min(0).max(20),
-  voluntary_excess: z.number().min(0),
-  whisper_preferences: z.string().optional(),
-});
-
-export type InsertVehiclePolicy = z.infer<typeof insertVehiclePolicySchema>;
 export type VehiclePolicy = typeof vehiclePolicies.$inferSelect;
 
 // Quote Search Types
