@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,8 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Mail, CheckCircle2, XCircle, Shield } from "lucide-react";
+import { Mail, CheckCircle2, XCircle, Shield, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PersonalizationTimelapseDialog } from "./PersonalizationTimelapseDialog";
 
 interface PersonalizeDialogProps {
   open: boolean;
@@ -23,6 +24,7 @@ interface PersonalizeDialogProps {
 
 export function PersonalizeDialog({ open, onOpenChange, userEmail }: PersonalizeDialogProps) {
   const { toast } = useToast();
+  const [showTimelapse, setShowTimelapse] = useState(false);
 
   // Fetch Gmail connection status
   const { data: gmailStatus, isLoading, refetch } = useQuery({
@@ -117,6 +119,7 @@ export function PersonalizeDialog({ open, onOpenChange, userEmail }: Personalize
   const isConnected = gmailStatus?.isConnected || false;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
@@ -180,29 +183,51 @@ export function PersonalizeDialog({ open, onOpenChange, userEmail }: Personalize
                       <p className="text-sm">{new Date(gmailStatus.last_scan).toLocaleString()}</p>
                     </div>
                   )}
-                  <Button
-                    variant="outline"
-                    onClick={handleDisconnectGmail}
-                    disabled={disconnectGmailMutation.isPending}
-                    className="w-full"
-                    data-testid="button-disconnect-gmail"
-                  >
-                    {disconnectGmailMutation.isPending ? "Disconnecting..." : "Disconnect Gmail"}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={handleDisconnectGmail}
+                      disabled={disconnectGmailMutation.isPending}
+                      className="flex-1"
+                      data-testid="button-disconnect-gmail"
+                    >
+                      {disconnectGmailMutation.isPending ? "Disconnecting..." : "Disconnect"}
+                    </Button>
+                    <Button
+                      variant="default"
+                      onClick={() => setShowTimelapse(true)}
+                      className="flex-1 gap-1.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                      data-testid="button-personalization-timelapse"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Timelapse
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">
                     Connect your Gmail to automatically get notified when you book travel and need insurance coverage.
                   </p>
-                  <Button
-                    onClick={handleConnectGmail}
-                    disabled={connectGmailMutation.isPending}
-                    className="w-full"
-                    data-testid="button-connect-gmail"
-                  >
-                    {connectGmailMutation.isPending ? "Connecting..." : "Connect Gmail"}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleConnectGmail}
+                      disabled={connectGmailMutation.isPending}
+                      className="flex-1"
+                      data-testid="button-connect-gmail"
+                    >
+                      {connectGmailMutation.isPending ? "Connecting..." : "Connect Gmail"}
+                    </Button>
+                    <Button
+                      variant="default"
+                      onClick={() => setShowTimelapse(true)}
+                      className="flex-1 gap-1.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                      data-testid="button-personalization-timelapse"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Timelapse
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -228,5 +253,11 @@ export function PersonalizeDialog({ open, onOpenChange, userEmail }: Personalize
         </div>
       </DialogContent>
     </Dialog>
+
+    <PersonalizationTimelapseDialog
+      open={showTimelapse}
+      onOpenChange={setShowTimelapse}
+    />
+    </>
   );
 }
