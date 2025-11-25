@@ -1,4 +1,4 @@
-# Design Guidelines for AutoSage - Insurance Policy Management App
+# Design Guidelines for AutoAnnie - Insurance Policy Management App
 
 ## Design Approach
 **Selected Approach:** Material Design System with minimalist refinement  
@@ -17,7 +17,7 @@
 ### A. Typography
 **Font Family:** Inter (via Google Fonts CDN) - excellent mobile readability  
 **Hierarchy:**
-- App Title "AutoSage": text-4xl font-bold (brand presence)
+- App Title "AutoAnnie": text-4xl font-bold (brand presence)
 - Section Headers: text-xl font-semibold
 - Button Text: text-base font-medium
 - Body/Form Labels: text-sm font-normal
@@ -44,7 +44,7 @@
 ### 1. Branding Header
 **Structure:**
 - Full-width container with centered content
-- "AutoSage" wordmark with subtle icon/logo element (e.g., shield or umbrella icon from Heroicons)
+- "AutoAnnie" wordmark with AI assistant icon element
 - Tagline beneath: "Your Insurance Companion" (text-sm)
 - Spacing: mb-12 to create breathing room
 

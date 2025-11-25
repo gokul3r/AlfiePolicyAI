@@ -335,7 +335,7 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
       <DialogContent className="sm:max-w-2xl h-[80vh] flex flex-col p-0">
         <DialogHeader className="px-6 py-4 border-b">
           <div className="flex items-center justify-between">
-            <DialogTitle>Talk with AutoSage</DialogTitle>
+            <DialogTitle>Talk with AutoAnnie</DialogTitle>
             <Button
               variant="ghost"
               size="icon"
@@ -361,7 +361,7 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
                 {msg.role === "assistant" && (
                   <Avatar className="h-8 w-8 mt-1">
                     <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                      AS
+                      AA
                     </AvatarFallback>
                   </Avatar>
                 )}
@@ -391,7 +391,7 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
               <div className="flex gap-3 justify-start">
                 <Avatar className="h-8 w-8 mt-1">
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    AS
+                    AA
                   </AvatarFallback>
                 </Avatar>
                 <div className="rounded-lg px-4 py-2 max-w-[75%] bg-muted/70">

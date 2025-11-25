@@ -18,13 +18,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { DEFAULT_TRUSTPILOT_DATA, DEFAULT_DEFACTO_RATINGS, PROVIDER_NAMES } from "@/lib/defaultRatings";
 import type { TrustPilotData, DefactoRatings } from "@shared/schema";
 
-interface ConfigureAutoSageDialogProps {
+interface ConfigureAutoAnnieDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userEmail: string;
 }
 
-export function ConfigureAutoSageDialog({ open, onOpenChange, userEmail }: ConfigureAutoSageDialogProps) {
+export function ConfigureAutoAnnieDialog({ open, onOpenChange, userEmail }: ConfigureAutoAnnieDialogProps) {
   const { toast } = useToast();
   
   // State for custom ratings
@@ -173,9 +173,9 @@ export function ConfigureAutoSageDialog({ open, onOpenChange, userEmail }: Confi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col p-0">
         <DialogHeader className="px-6 py-4 border-b shrink-0">
-          <DialogTitle>Configure AutoSage</DialogTitle>
+          <DialogTitle>Configure AutoAnnie</DialogTitle>
           <DialogDescription>
-            Manage your AutoSage settings, scan for travel notifications, and customize insurance ratings
+            Manage your AutoAnnie settings, scan for travel notifications, and customize insurance ratings
           </DialogDescription>
         </DialogHeader>
 
@@ -196,7 +196,7 @@ export function ConfigureAutoSageDialog({ open, onOpenChange, userEmail }: Confi
                 <div className="space-y-3">
                   <div>
                     <Label className="text-sm text-muted-foreground">
-                      AutoSage will scan your Gmail for flight tickets, hotel bookings, and travel itineraries.
+                      AutoAnnie will scan your Gmail for flight tickets, hotel bookings, and travel itineraries.
                       When found, you'll get notifications to find travel insurance for your trips.
                     </Label>
                   </div>

@@ -32,7 +32,7 @@ export function ComingSoonDialog({
             Coming Soon
           </DialogTitle>
           <DialogDescription className="text-center text-base pt-2">
-            AutoSage will support {featureName} soon. We're working hard to bring you this feature with the same level of care and intelligence you've come to expect.
+            AutoAnnie will support {featureName} soon. We're working hard to bring you this feature with the same level of care and intelligence you've come to expect.
           </DialogDescription>
         </DialogHeader>
         <div className="flex justify-center pt-4">

@@ -19,7 +19,7 @@ export function ChatModeSelector({ open, onOpenChange, onSelectMode }: ChatModeS
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Chat with AutoSage</DialogTitle>
+          <DialogTitle>Chat with AutoAnnie</DialogTitle>
           <DialogDescription>
             Choose how you'd like to interact
           </DialogDescription>

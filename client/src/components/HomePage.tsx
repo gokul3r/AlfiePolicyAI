@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import logoImage from "@assets/image_1763588796393.png";
+import logoImage from "@assets/generated_images/autoannie_ai_insurance_assistant_icon.png";
 
 interface HomePageProps {
   onNewUser: () => void;
@@ -14,11 +14,12 @@ export default function HomePage({ onNewUser, onExistingUser }: HomePageProps) {
           <div className="flex justify-center mb-4">
             <img 
               src={logoImage} 
-              alt="AutoSage Logo" 
-              className="h-24 w-auto"
+              alt="AutoAnnie Logo" 
+              className="h-24 w-auto rounded-2xl shadow-lg"
               data-testid="img-logo"
             />
           </div>
+          <h1 className="text-3xl font-bold text-foreground">AutoAnnie</h1>
           <p className="text-sm text-muted-foreground">
             Your AI Insurance Companion
           </p>

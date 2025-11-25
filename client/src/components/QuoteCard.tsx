@@ -213,11 +213,11 @@ export default function QuoteCard({ quote, index }: QuoteCardProps) {
           </div>
         </div>
 
-        {/* AutoSage AI Analysis section */}
+        {/* AutoAnnie AI Analysis section */}
         <div className="border-t border-border pt-4 space-y-2">
           <div className="flex items-center justify-between gap-4">
             <h4 className="text-sm font-semibold text-foreground">
-              AutoSage Score
+              AutoAnnie Score
             </h4>
             <div className="flex items-center gap-2">
               <div className="bg-primary/10 px-3 py-1 rounded-full">
@@ -231,7 +231,7 @@ export default function QuoteCard({ quote, index }: QuoteCardProps) {
 
           {alfie_message && (
             <div className="bg-primary/5 rounded-lg p-3">
-              <p className="text-sm text-foreground" data-testid={`text-autosage-analysis-${index}`}>
+              <p className="text-sm text-foreground" data-testid={`text-autoannie-analysis-${index}`}>
                 {alfie_message}
               </p>
             </div>

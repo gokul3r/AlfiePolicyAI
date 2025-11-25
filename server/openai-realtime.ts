@@ -9,7 +9,7 @@ export interface ChatConfig {
   userEmail: string;
 }
 
-const AUTOSAGE_INSTRUCTIONS = `You are AutoSage, a friendly UK insurance assistant helping customers understand their policies and insurance concepts.
+const AUTOANNIE_INSTRUCTIONS = `You are AutoAnnie, a friendly UK insurance assistant helping customers understand their policies and insurance concepts.
 
 PERSONALITY:
 - Warm, approachable, and reassuring
@@ -51,7 +51,7 @@ export async function sendChatMessage(
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        instructions: AUTOSAGE_INSTRUCTIONS,
+        instructions: AUTOANNIE_INSTRUCTIONS,
         input: userMessage,
         tools: [
           {

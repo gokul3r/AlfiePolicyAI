@@ -13,7 +13,7 @@ export default function OnboardingDialog({ onUploadDocuments, onEnterManually }:
         <div className="bg-card rounded-2xl p-8 space-y-6 shadow-lg animate-in fade-in zoom-in-95 duration-400">
           <div className="space-y-2 text-center">
             <h2 className="text-xl font-semibold text-foreground" data-testid="text-onboarding-heading">
-              How do you want to get onboarded to Auto Cergie
+              How do you want to get onboarded to AutoAnnie
             </h2>
           </div>
 

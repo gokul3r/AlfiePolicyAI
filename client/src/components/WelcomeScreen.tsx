@@ -19,12 +19,12 @@ import ChatDialog from "./ChatDialog";
 import { VoiceChatDialog } from "./VoiceChatDialog";
 import { PersonalizeDialog } from "./PersonalizeDialog";
 import { NotificationPanel } from "./NotificationPanel";
-import { ConfigureAutoSageDialog } from "./ConfigureAutoSageDialog";
+import { ConfigureAutoAnnieDialog } from "./ConfigureAutoAnnieDialog";
 import { ComingSoonDialog } from "./ComingSoonDialog";
 import { InsuranceTypeSelectorDialog } from "./InsuranceTypeSelectorDialog";
 import { CancelPolicyDialog } from "./CancelPolicyDialog";
 import { InfoBadge } from "./InfoBadge";
-import logoImage from "@assets/image_1763588796393.png";
+import logoImage from "@assets/generated_images/autoannie_ai_insurance_assistant_icon.png";
 import { AnimatedMic } from "./AnimatedMic";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { AnimatedIconButton } from "./AnimatedIconButton";
@@ -61,7 +61,7 @@ export default function WelcomeScreen({
   const [showVoiceChat, setShowVoiceChat] = useState(false);
   const [showPersonalize, setShowPersonalize] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showConfigureAutoSage, setShowConfigureAutoSage] = useState(false);
+  const [showConfigureAutoAnnie, setShowConfigureAutoAnnie] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [comingSoonFeature, setComingSoonFeature] = useState("");
@@ -119,8 +119,8 @@ export default function WelcomeScreen({
         <div className="flex items-center justify-between gap-2">
           <img 
             src={logoImage} 
-            alt="AutoSage Logo" 
-            className="h-12 w-auto"
+            alt="AutoAnnie Logo" 
+            className="h-12 w-auto rounded-lg"
             data-testid="img-logo"
           />
           <div className="flex items-center gap-2">
@@ -357,10 +357,10 @@ export default function WelcomeScreen({
         userEmail={userEmail}
       />
 
-      {/* Configure AutoSage Dialog */}
-      <ConfigureAutoSageDialog
-        open={showConfigureAutoSage}
-        onOpenChange={setShowConfigureAutoSage}
+      {/* Configure AutoAnnie Dialog */}
+      <ConfigureAutoAnnieDialog
+        open={showConfigureAutoAnnie}
+        onOpenChange={setShowConfigureAutoAnnie}
         userEmail={userEmail}
       />
 
@@ -402,13 +402,13 @@ export default function WelcomeScreen({
         userEmail={userEmail}
       />
 
-      {/* Fixed Configure AutoSage Link at Bottom */}
+      {/* Fixed Configure AutoAnnie Link at Bottom */}
       <button
         className="fixed bottom-4 left-1/2 -translate-x-1/2 text-xs text-muted-foreground underline hover-elevate cursor-pointer"
-        onClick={() => setShowConfigureAutoSage(true)}
-        data-testid="link-configure-autosage"
+        onClick={() => setShowConfigureAutoAnnie(true)}
+        data-testid="link-configure-autoannie"
       >
-        Configure AutoSage
+        Configure AutoAnnie
       </button>
     </div>
   );

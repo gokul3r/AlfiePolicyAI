@@ -101,7 +101,7 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
         <DialogHeader className="px-6 py-4 border-b shrink-0">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl font-bold">
-              Chat with AutoSage
+              Chat with AutoAnnie
             </DialogTitle>
             <Button
               variant="ghost"
@@ -127,7 +127,7 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
             <div className="flex items-center justify-center h-full">
               <div className="text-center space-y-2">
                 <p className="text-base font-medium text-foreground">
-                  Welcome to AutoSage Chat
+                  Welcome to AutoAnnie Chat
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Ask me anything about UK insurance or your policy
