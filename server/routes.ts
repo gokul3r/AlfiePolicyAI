@@ -122,6 +122,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Quote search proxy endpoint
   app.post("/api/search-quotes", async (req, res) => {
     try {
+      console.log("Quote search request payload:", JSON.stringify(req.body, null, 2));
+      
       // Forward request to Google Cloud Run Quote Search API
       const response = await fetch(
         "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
@@ -136,6 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "Unknown error");
+        console.error(`Quote API error (${response.status}):`, errorText);
         throw new Error(`External API error: ${response.status} - ${errorText}`);
       }
 
@@ -177,6 +180,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const whisperText = policy.whisper_preferences || "";
       const parsedPrefs = await parseWhisperPreferences(whisperText);
 
+      // Fetch custom ratings once (outside the loop for efficiency)
+      const customRatings = await storage.getCustomRatings(email_id);
+      const trustPilotData = customRatings?.use_custom_ratings ? customRatings.trustpilot_data : null;
+      const defactoRatings = customRatings?.use_custom_ratings ? customRatings.defacto_ratings : null;
+
       // Calculate iteration interval
       const intervalDays = frequency === "weekly" ? 7 : 30;
       const today = new Date();
@@ -202,18 +210,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Prepare request for NEW enriched Quote API
         const quoteRequestBody = {
           insurance_details: {
+            email_id: policy.email_id,
             current_insurance_provider: policy.current_insurance_provider,
             policy_id: policy.policy_id,
             policy_type: policy.policy_type,
-            policy_start_date: policy.policy_start_date,
-            policy_end_date: policy.policy_end_date,
-            policy_number: policy.policy_number,
-            current_policy_cost: policy.current_policy_cost,
             // Add vehicle details
             ...policy.details,
           },
           user_preferences: whisperText,
           conversation_history: [],
+          trust_pilot_data: trustPilotData,
+          defacto_ratings: defactoRatings,
         };
 
         // Call NEW enriched Quote API
@@ -229,11 +236,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
         if (!quoteResponse.ok) {
+          const errorBody = await quoteResponse.text().catch(() => "Unable to read error response");
+          console.error(`Quote API error (${quoteResponse.status}):`, errorBody);
+          console.error("Request payload:", JSON.stringify(quoteRequestBody, null, 2));
+          
           iterations.push({
             date: dateStr,
             match_found: false,
             iteration_index: iterationIndex,
-            message: "API error - unable to fetch quotes",
+            message: `API error ${quoteResponse.status} - unable to fetch quotes`,
           });
           iterationIndex++;
           currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
