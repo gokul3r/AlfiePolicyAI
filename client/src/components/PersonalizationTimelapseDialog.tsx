@@ -437,6 +437,11 @@ function TravelFormState({
   formData: TravelFormData;
   onSearchQuotes: () => void;
 }) {
+  const [gadgetCover, setGadgetCover] = useState(formData.gadgetCover);
+  const [winterSportsCover, setWinterSportsCover] = useState(formData.winterSportsCover);
+  const [cruiseCover, setCruiseCover] = useState(formData.cruiseCover);
+  const [medicalCondition, setMedicalCondition] = useState(formData.medicalCondition);
+
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
@@ -549,8 +554,8 @@ function TravelFormState({
             <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
               <Checkbox
                 id="gadgetCover"
-                checked={formData.gadgetCover}
-                disabled
+                checked={gadgetCover}
+                onCheckedChange={(checked) => setGadgetCover(checked === true)}
                 data-testid="checkbox-gadget-cover"
               />
               <Label htmlFor="gadgetCover" className="flex items-center gap-2 text-sm cursor-pointer">
@@ -562,8 +567,8 @@ function TravelFormState({
             <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
               <Checkbox
                 id="winterSportsCover"
-                checked={formData.winterSportsCover}
-                disabled
+                checked={winterSportsCover}
+                onCheckedChange={(checked) => setWinterSportsCover(checked === true)}
                 data-testid="checkbox-winter-sports-cover"
               />
               <Label htmlFor="winterSportsCover" className="flex items-center gap-2 text-sm cursor-pointer">
@@ -575,8 +580,8 @@ function TravelFormState({
             <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
               <Checkbox
                 id="cruiseCover"
-                checked={formData.cruiseCover}
-                disabled
+                checked={cruiseCover}
+                onCheckedChange={(checked) => setCruiseCover(checked === true)}
                 data-testid="checkbox-cruise-cover"
               />
               <Label htmlFor="cruiseCover" className="flex items-center gap-2 text-sm cursor-pointer">
@@ -589,8 +594,8 @@ function TravelFormState({
           <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
             <Checkbox
               id="medical"
-              checked={formData.medicalCondition}
-              disabled
+              checked={medicalCondition}
+              onCheckedChange={(checked) => setMedicalCondition(checked === true)}
               data-testid="checkbox-medical"
             />
             <Label htmlFor="medical" className="flex items-center gap-2 text-sm cursor-pointer">
@@ -832,7 +837,7 @@ function GadgetCoverPopup({ onRespond }: { onRespond: () => void }) {
               during the trip?
             </p>
             <p className="text-xs text-muted-foreground italic">
-              Based on your recent purchase detected via OpenBanking
+              Based on your recent purchase detected via email
             </p>
           </div>
 
