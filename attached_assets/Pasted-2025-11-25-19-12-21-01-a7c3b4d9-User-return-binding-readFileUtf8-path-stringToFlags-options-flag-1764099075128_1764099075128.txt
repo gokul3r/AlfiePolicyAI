@@ -1,0 +1,112 @@
+2025-11-25 19:12:21.01
+a7c3b4d9
+User
+return binding.readFileUtf8(path, stringToFlags(options.flag));
+2025-11-25 19:12:21.01
+a7c3b4d9
+User
+node:fs:449
+2025-11-25 19:12:21.01
+a7c3b4d9
+User
+at readFileSync (node:fs:449:20)
+2025-11-25 19:12:21.01
+a7c3b4d9
+User
+at buildPolicyContext (file:///home/runner/workspace/dist/index.js:642:29)
+2025-11-25 19:12:21.04
+a7c3b4d9
+System
+command finished with error [npm run start]: exit status 1
+2025-11-25 19:12:21.30
+a7c3b4d9
+User
+> rest-express@1.0.0 start
+2025-11-25 19:12:21.30
+a7c3b4d9
+User
+> NODE_ENV=production node dist/index.js
+2025-11-25 19:16:09.35
+a7c3b4d9
+User
+7:16:05 PM [express] serving on port 5000
+2025-11-25 19:16:53.47
+a7c3b4d9
+User
+[WebSocket] New voice chat connection: john@gmail.com
+2025-11-25 19:16:53.47
+a7c3b4d9
+User
+[VoiceChat] New connection for john@gmail.com
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+at buildPolicyContext (file:///home/runner/workspace/dist/index.js:642:29)
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+at handleVoiceChat (file:///home/runner/workspace/dist/index.js:673:25)
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+code: 'ENOENT',
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+at readFileSync (node:fs:449:20)
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+node:fs:449
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+return binding.readFileUtf8(path, stringToFlags(options.flag));
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+syscall: 'open',
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+errno: -2,
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+}
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+Node.js v20.19.3
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+Error: ENOENT: no such file or directory, open '/home/runner/workspace/dist/admiral-policy-context.txt'
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+path: '/home/runner/workspace/dist/admiral-policy-context.txt'
+2025-11-25 19:16:54.04
+a7c3b4d9
+User
+^
+2025-11-25 19:16:54.06
+a7c3b4d9
+System
+command finished with error [npm run start]: exit status 1
+2025-11-25 19:17:07.94
+a7c3b4d9
+User
+> NODE_ENV=production node dist/index.js
+2025-11-25 19:17:07.94
+a7c3b4d9
+User
+> rest-express@1.0.0 start
+2025-11-25 19:20:31.84
+a7c3b4d9
+User
+7:20:29 PM [express] serving on port 5000
