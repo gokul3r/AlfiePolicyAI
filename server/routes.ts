@@ -124,9 +124,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Quote search request payload:", JSON.stringify(req.body, null, 2));
       
-      // Forward request to Google Cloud Run Quote Search API
+      // Forward request to Google Cloud Run Quote Search API (OLD URL for home quote search)
       const response = await fetch(
-        "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
+        "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis",
         {
           method: "POST",
           headers: {
