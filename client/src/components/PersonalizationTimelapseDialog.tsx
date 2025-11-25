@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X, Sparkles, Search, Plane, Calendar, Users, Heart, User, Camera, Snowflake, Ship, Star, StarHalf, CheckCircle2, Shield } from "lucide-react";
+import { X, Sparkles, Search, Plane, Calendar, Users, Heart, User, Camera, Snowflake, Ship, Star, StarHalf, CheckCircle2, Shield, PartyPopper, Home, Phone, FileCheck } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AIThinkingStep } from "./AIThinkingStep";
@@ -24,7 +24,8 @@ type TimelapseState =
   | "starting_search"
   | "gadget_cover_popup"
   | "searching_quotes" 
-  | "travel_quotes_results";
+  | "travel_quotes_results"
+  | "purchasing_policy";
 
 interface TravelFormData {
   name: string;
@@ -45,6 +46,7 @@ export function PersonalizationTimelapseDialog({
 }: PersonalizationTimelapseDialogProps) {
   const [state, setState] = useState<TimelapseState>("intro");
   const [showNotification, setShowNotification] = useState(false);
+  const [selectedInsurer, setSelectedInsurer] = useState<string>("");
   const [formData, setFormData] = useState<TravelFormData>({
     name: "",
     age: 0,
@@ -128,6 +130,11 @@ export function PersonalizationTimelapseDialog({
     setState("travel_quotes_results");
   }, []);
 
+  const handleProceedToBuy = useCallback((insurerName: string) => {
+    setSelectedInsurer(insurerName);
+    setState("purchasing_policy");
+  }, []);
+
   const handleClose = useCallback(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -209,6 +216,15 @@ export function PersonalizationTimelapseDialog({
 
         {state === "travel_quotes_results" && (
           <TravelQuotesResultsState
+            destination={formData.destination}
+            onClose={handleClose}
+            onProceedToBuy={handleProceedToBuy}
+          />
+        )}
+
+        {state === "purchasing_policy" && (
+          <PurchasingPolicyState
+            insurerName={selectedInsurer}
             destination={formData.destination}
             onClose={handleClose}
           />
@@ -788,10 +804,12 @@ const MOCK_TRAVEL_QUOTES = [
 
 function TravelQuotesResultsState({ 
   destination, 
-  onClose 
+  onClose,
+  onProceedToBuy
 }: { 
   destination: string;
   onClose: () => void;
+  onProceedToBuy: (insurerName: string) => void;
 }) {
   const renderStars = (rating: number) => {
     const stars = [];
@@ -912,6 +930,14 @@ function TravelQuotesResultsState({
                       {quote.message}
                     </p>
                   </div>
+
+                  <Button
+                    className="w-full mt-4"
+                    onClick={() => onProceedToBuy(quote.insurer_name)}
+                    data-testid={`button-proceed-buy-${index}`}
+                  >
+                    Proceed and Buy
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -927,6 +953,210 @@ function TravelQuotesResultsState({
           >
             Close
           </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PurchasingPolicyState({
+  insurerName,
+  destination,
+  onClose
+}: {
+  insurerName: string;
+  destination: string;
+  onClose: () => void;
+}) {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const isMountedRef = useRef(true);
+
+  const PURCHASE_STEPS = [
+    { text: "AutoAnnie Contacting insurer", icon: Phone, duration: 2000 },
+    { text: `Buying policy from ${insurerName}`, icon: Shield, duration: 2500 },
+    { text: "Verifying policy document received", icon: FileCheck, duration: 2000 },
+  ];
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (currentStep >= PURCHASE_STEPS.length) {
+      const timer = setTimeout(() => {
+        if (isMountedRef.current) {
+          setShowCelebration(true);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+
+    const timer = setTimeout(() => {
+      if (isMountedRef.current) {
+        setCurrentStep(prev => prev + 1);
+      }
+    }, PURCHASE_STEPS[currentStep].duration);
+
+    return () => clearTimeout(timer);
+  }, [currentStep]);
+
+  const destinationCity = destination.split(",")[0];
+
+  if (showCelebration) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8 bg-white">
+        <div className="max-w-2xl w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="text-center">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
+              className="w-24 h-24 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center mx-auto mb-6 shadow-lg"
+            >
+              <PartyPopper className="w-12 h-12 text-white" />
+            </motion.div>
+            
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="text-3xl md:text-4xl font-bold text-foreground mb-4"
+            >
+              Your {destinationCity} travel is covered!
+            </motion.h2>
+            
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+              className="text-xl text-primary font-medium"
+            >
+              Policy purchased from {insurerName}
+            </motion.p>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+            className="flex justify-center pt-6"
+          >
+            <Button
+              size="lg"
+              onClick={onClose}
+              className="px-12 py-6 text-lg"
+              data-testid="button-close-celebration"
+            >
+              Done
+            </Button>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.2 }}
+            className="bg-blue-50 border border-blue-100 rounded-xl p-4 mt-8"
+          >
+            <div className="flex items-start gap-3">
+              <div className="bg-blue-100 p-2 rounded-lg shrink-0">
+                <Home className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-blue-800">
+                  Adding <span className="font-medium">Home Emergency Extra</span> cover in your home insurance can help your family when you are away.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full p-8 bg-white">
+      <div className="max-w-2xl w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="text-center mb-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
+            Completing Purchase
+          </h2>
+          <p className="text-muted-foreground">
+            AutoAnnie is handling everything for you...
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          {PURCHASE_STEPS.map((step, index) => {
+            const StepIcon = step.icon;
+            const isActive = index === currentStep;
+            const isCompleted = index < currentStep;
+            
+            return (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className={`flex items-center gap-4 p-4 rounded-xl border transition-all duration-300 ${
+                  isActive 
+                    ? "bg-primary/5 border-primary shadow-sm" 
+                    : isCompleted 
+                      ? "bg-green-50 border-green-200" 
+                      : "bg-muted/30 border-border"
+                }`}
+                data-testid={`step-purchase-${index}`}
+              >
+                <div className={`p-2 rounded-lg ${
+                  isActive 
+                    ? "bg-primary/10" 
+                    : isCompleted 
+                      ? "bg-green-100" 
+                      : "bg-muted"
+                }`}>
+                  {isCompleted ? (
+                    <CheckCircle2 className="w-6 h-6 text-green-600" />
+                  ) : (
+                    <StepIcon className={`w-6 h-6 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                  )}
+                </div>
+                
+                <span className={`text-lg font-medium ${
+                  isActive 
+                    ? "text-foreground" 
+                    : isCompleted 
+                      ? "text-green-700" 
+                      : "text-muted-foreground"
+                }`}>
+                  {step.text}
+                </span>
+
+                {isActive && (
+                  <div className="ml-auto flex gap-1">
+                    {[0, 1, 2].map((i) => (
+                      <motion.div
+                        key={i}
+                        className="w-2 h-2 bg-primary rounded-full"
+                        animate={{
+                          opacity: [0.3, 1, 0.3],
+                          scale: [0.8, 1.2, 0.8],
+                        }}
+                        transition={{
+                          duration: 0.6,
+                          repeat: Infinity,
+                          delay: i * 0.15,
+                          ease: "easeInOut",
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </div>
