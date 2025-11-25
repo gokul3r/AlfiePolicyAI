@@ -1,11 +1,12 @@
 import { Dialog, DialogContent, DialogClose, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X, Sparkles, Search, CheckCircle2, XCircle } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { flushSync } from "react-dom";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { IPhoneMockup } from "./IPhoneMockup";
+import { AIThinkingStep } from "./AIThinkingStep";
 
 interface TimelapseDialogProps {
   open: boolean;
@@ -15,7 +16,7 @@ interface TimelapseDialogProps {
   userEmail: string | null;
 }
 
-type TimelapseState = "intro" | "searching_with_phone" | "notification_slide" | "match_found" | "no_match" | "confirmed";
+type TimelapseState = "intro" | "searching_with_phone" | "notification_slide" | "match_found" | "no_match" | "confirming_purchase" | "celebration";
 
 interface MatchData {
   price: number;
@@ -193,7 +194,7 @@ export function TimelapseDialog({
   };
 
   const handleConfirmPurchase = () => {
-    setState("confirmed");
+    setState("confirming_purchase");
   };
 
   const handleKeepSearching = async () => {
@@ -337,9 +338,21 @@ export function TimelapseDialog({
           <NoMatchState onClose={handleClose} />
         )}
 
-        {/* Confirmed State */}
-        {state === "confirmed" && currentWeekMatches.length > 0 && (
-          <ConfirmedState insurer={currentWeekMatches[currentMatchIndex].insurer} onClose={handleClose} />
+        {/* Confirming Purchase State - AI Thinking Steps */}
+        {state === "confirming_purchase" && currentWeekMatches.length > 0 && (
+          <ConfirmingPurchaseState
+            newProvider={currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_insurer}
+            oldProvider={currentWeekMatches[currentMatchIndex].insurer}
+            onComplete={() => setState("celebration")}
+          />
+        )}
+
+        {/* Celebration State */}
+        {state === "celebration" && currentWeekMatches.length > 0 && (
+          <CelebrationState 
+            provider={currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_insurer}
+            onClose={handleClose} 
+          />
         )}
       </DialogContent>
     </Dialog>
@@ -525,28 +538,146 @@ function NoMatchState({ onClose }: { onClose: () => void }) {
   );
 }
 
-// Confirmed State Component
-function ConfirmedState({ insurer, onClose }: { insurer: string; onClose: () => void }) {
+// Confirming Purchase State - AI Thinking Steps
+function ConfirmingPurchaseState({ 
+  newProvider, 
+  oldProvider, 
+  onComplete 
+}: { 
+  newProvider: string; 
+  oldProvider: string; 
+  onComplete: () => void;
+}) {
+  const [currentStep, setCurrentStep] = useState(0);
+
+  const steps = [
+    { text: `Contacting ${newProvider}`, blinks: 3, duration: 1800 },
+    { text: `Buying policy from ${newProvider}`, blinks: 3, duration: 1800 },
+    { text: "Verifying policy document received", blinks: 2, duration: 1200 },
+    { text: `Cancelling policy from ${oldProvider}`, blinks: 3, duration: 1800 },
+    { text: `Receiving confirmation from ${oldProvider}`, blinks: 2, duration: 1200 },
+    { text: "Reviewing old policy cancellation", blinks: 2, duration: 1200 },
+  ];
+
+  useEffect(() => {
+    if (currentStep >= steps.length) {
+      // All steps completed - wait a moment then show celebration
+      const timer = setTimeout(() => {
+        onComplete();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+
+    // Process current step
+    const timer = setTimeout(() => {
+      setCurrentStep(prev => prev + 1);
+    }, steps[currentStep].duration);
+
+    return () => clearTimeout(timer);
+  }, [currentStep, steps.length, onComplete]);
+
   return (
-    <div className="flex flex-col items-center justify-center h-full space-y-8 p-8 bg-gradient-to-br from-background via-background to-green-500/5">
-      <div className="text-center space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <CheckCircle2 className="h-24 w-24 text-green-500 mx-auto" />
-        <h2 className="text-4xl md:text-5xl font-bold text-foreground">
-          You're Covered!
+    <div className="flex flex-col items-center justify-center h-full p-8 bg-gradient-to-br from-background via-background to-blue-500/5">
+      <div className="max-w-2xl w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
+            Switching your policy...
+          </h2>
+          <p className="text-lg text-muted-foreground">
+            Auto-Annie is working on your behalf
+          </p>
+        </div>
+
+        <div className="bg-card border border-border rounded-xl p-8 space-y-3" data-testid="ai-thinking-steps">
+          {steps.map((step, index) => (
+            <AIThinkingStep
+              key={index}
+              text={step.text}
+              status={
+                index < currentStep 
+                  ? "completed" 
+                  : index === currentStep 
+                  ? "processing" 
+                  : "pending"
+              }
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Celebration State with Confetti
+function CelebrationState({ provider, onClose }: { provider: string; onClose: () => void }) {
+  useEffect(() => {
+    // Create confetti particles
+    const confettiContainer = document.getElementById('confetti-container');
+    if (!confettiContainer) return;
+
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+    const particleCount = 50;
+
+    for (let i = 0; i < particleCount; i++) {
+      const particle = document.createElement('div');
+      particle.className = 'confetti-particle';
+      particle.style.cssText = `
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background-color: ${colors[Math.floor(Math.random() * colors.length)]};
+        left: ${Math.random() * 100}%;
+        top: -10px;
+        opacity: ${Math.random() * 0.8 + 0.2};
+        animation: confetti-fall ${Math.random() * 3 + 2}s linear forwards;
+        border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
+      `;
+      confettiContainer.appendChild(particle);
+    }
+
+    // Cleanup
+    return () => {
+      if (confettiContainer) {
+        confettiContainer.innerHTML = '';
+      }
+    };
+  }, []);
+
+  return (
+    <div className="relative flex flex-col items-center justify-center h-full space-y-8 p-8 bg-gradient-to-br from-background via-background to-green-500/5 overflow-hidden">
+      <div 
+        id="confetti-container" 
+        className="absolute inset-0 pointer-events-none z-10"
+        data-testid="confetti-container"
+      />
+
+      <style>{`
+        @keyframes confetti-fall {
+          to {
+            transform: translateY(100vh) rotate(720deg);
+            opacity: 0;
+          }
+        }
+      `}</style>
+
+      <div className="text-center space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 z-20">
+        <CheckCircle2 className="h-28 w-28 text-green-500 mx-auto animate-in zoom-in duration-500" />
+        <h2 className="text-5xl md:text-6xl font-bold text-foreground">
+          You're covered!
         </h2>
-        <p className="text-2xl text-muted-foreground">
-          You are now covered with <span className="font-semibold text-primary">{insurer}</span>
+        <p className="text-3xl text-foreground font-medium">
+          with <span className="text-primary">{provider}</span>
         </p>
-        <p className="text-base text-muted-foreground max-w-md mt-4">
-          This is a demo. In the real app, your policy would be switched automatically.
+        <p className="text-lg text-muted-foreground max-w-md mx-auto mt-6">
+          Auto-Annie has successfully switched your insurance policy
         </p>
       </div>
 
       <Button
         size="lg"
         onClick={onClose}
-        className="px-12 py-7 text-xl"
-        data-testid="button-close-confirmed"
+        className="px-12 py-7 text-xl z-20 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500"
+        data-testid="button-close-celebration"
       >
         Close
       </Button>
