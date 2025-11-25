@@ -124,7 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Forward request to Google Cloud Run Quote Search API
       const response = await fetch(
-        "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis",
+        "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
         {
           method: "POST",
           headers: {
@@ -186,6 +186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const iterations: Array<{
         date: string;
         match_found: boolean;
+        iteration_index?: number;
         quote_data?: any;
         financial_breakdown?: any;
         message?: string;
@@ -217,7 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Call NEW enriched Quote API
         const quoteResponse = await fetch(
-          "https://alfie-657860957693.europe-west4.run.app",
+          "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
           {
             method: "POST",
             headers: {
