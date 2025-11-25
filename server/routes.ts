@@ -208,14 +208,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const dateStr = currentDate.toISOString().split("T")[0];
 
         // Prepare request for NEW enriched Quote API
+        // CRITICAL: API requires exact capitalization for these field names
         const quoteRequestBody = {
           insurance_details: {
             email_id: policy.email_id,
             current_insurance_provider: policy.current_insurance_provider,
             policy_id: policy.policy_id,
             policy_type: policy.policy_type,
-            // Add vehicle details
-            ...policy.details,
+            // Vehicle details with API's required capitalization
+            driver_age: policy.details.driver_age,
+            vehicle_registration_number: policy.details.vehicle_registration_number,
+            vehicle_manufacturer_name: policy.details.vehicle_manufacturer_name,
+            vehicle_model: policy.details.vehicle_model,
+            vehicle_year: policy.details.vehicle_year,
+            type_of_fuel: policy.details.type_of_fuel,
+            type_of_Cover_needed: policy.details.type_of_cover_needed,  // Capital C required by API
+            No_Claim_bonus_years: policy.details.no_claim_bonus_years,  // Capital N and C required by API
+            Voluntary_Excess: policy.details.voluntary_excess,           // Capital V and E required by API
           },
           user_preferences: whisperText,
           conversation_history: [],
