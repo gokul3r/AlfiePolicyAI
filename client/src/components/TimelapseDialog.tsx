@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogClose, DialogTitle } from "@/components/ui
 import { Button } from "@/components/ui/button";
 import { X, Sparkles, Search, CheckCircle2, XCircle } from "lucide-react";
 import { useState } from "react";
+import { flushSync } from "react-dom";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -65,15 +66,20 @@ export function TimelapseDialog({
     setIsSearching(true);
 
     try {
-      const response: any = await apiRequest("POST", "/api/timelapse-search", {
+      const apiResponse = await apiRequest("POST", "/api/timelapse-search", {
         policy_id: selectedVehicleId,
         email_id: userEmail,
         frequency,
       });
 
+      // Parse the JSON response
+      const response: any = await apiResponse.json();
+
       // Store all matches and iterations from the response
       const matches: MatchData[] = response.all_matches || [];
       const iterations = response.iterations || [];
+      console.log(`[Frontend] Received ${iterations.length} iterations, ${matches.length} matches`);
+      console.log(`[Frontend] First iteration:`, iterations[0]);
       setAllMatches(matches);
       setAllIterations(iterations);
 
@@ -81,6 +87,7 @@ export function TimelapseDialog({
       let firstMatchFound = false;
       for (let i = 0; i < iterations.length; i++) {
         const iteration = iterations[i];
+        console.log(`[Frontend] Checking iteration ${i}: date=${iteration.date}, match_found=${iteration.match_found}`);
         setCurrentDate(iteration.date);
 
         // Wait 2 seconds before checking next date
@@ -88,19 +95,29 @@ export function TimelapseDialog({
 
         // Stop and show first match when found
         if (iteration.match_found && !firstMatchFound) {
+          console.log(`[Frontend] ✅ Match found at iteration ${i}! Setting state to match_found`);
           firstMatchFound = true;
-          setCurrentMatchIndex(0);
-          setState("match_found");
-          setIsSearching(false);
+          
+          // Use flushSync to force synchronous state updates and immediate re-render
+          flushSync(() => {
+            setCurrentMatchIndex(0);
+            setState("match_found");
+            setIsSearching(false);
+          });
+          
+          console.log(`[Frontend] State updated synchronously, component should re-render now`);
           return;
         }
       }
 
       // No match found after all iterations
+      console.log(`[Frontend] Loop completed without finding match. matches.length=${matches.length}`);
       if (matches.length === 0) {
+        console.log(`[Frontend] Setting state to no_match (no matches in array)`);
         setState("no_match");
       } else {
         // We have matches but simulation ended
+        console.log(`[Frontend] Setting state to match_found (matches exist but loop didn't find any)`);
         setCurrentMatchIndex(0);
         setState("match_found");
       }

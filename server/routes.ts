@@ -263,38 +263,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const quoteData = await quoteResponse.json();
         const quotes = quoteData.quotes_with_insights || [];
 
-        // Find best matching quote
+        console.log(`[Timelapse] Received ${quotes.length} quotes from API`);
+
+        // Find best matching quote using API's pre-computed matching data
         let bestMatch = null;
         for (const quote of quotes) {
           const quotePrice = quote.price_analysis?.quote_price || quote.original_quote?.output?.policy_cost;
           const insurerName = quote.insurer_name || quote.original_quote?.output?.insurer_name;
           const availableFeatures = quote.available_features || [];
 
-          if (!quotePrice || !insurerName) continue;
+          console.log(`[Timelapse] Checking ${insurerName}: price=${quotePrice}`);
 
-          // Check budget constraint
-          if (parsedPrefs.budget && quotePrice > parsedPrefs.budget) continue;
+          if (!quotePrice || !insurerName) {
+            console.log(`[Timelapse] ❌ ${insurerName || 'Unknown'}: Missing price or name`);
+            continue;
+          }
 
-          // Check required features
-          const hasAllFeatures = parsedPrefs.features.every((requiredFeature) =>
-            availableFeatures.some((availableFeature: string) =>
-              availableFeature.toLowerCase().includes(requiredFeature.replace("_included", ""))
-            )
-          );
+          // Use API's pre-computed budget check
+          const withinBudget = quote.price_analysis?.within_budget ?? true;
+          console.log(`[Timelapse] ${insurerName}: within_budget=${withinBudget}`);
+          if (!withinBudget) {
+            console.log(`[Timelapse] ❌ ${insurerName}: Not within budget`);
+            continue;
+          }
 
-          if (!hasAllFeatures) continue;
+          // Use API's pre-computed feature matching - if missing_required is empty, all requirements are met!
+          const missingRequired = quote.features_matching_requirements?.missing_required || [];
+          const matchedRequired = quote.features_matching_requirements?.matched_required || [];
+          console.log(`[Timelapse] ${insurerName}: matched=${JSON.stringify(matchedRequired)}, missing=${JSON.stringify(missingRequired)}`);
+          
+          if (missingRequired.length > 0) {
+            console.log(`[Timelapse] ❌ ${insurerName}: Missing required features: ${missingRequired.join(', ')}`);
+            continue;
+          }
 
           // Found a match!
+          console.log(`[Timelapse] ✅ ${insurerName}: MATCH FOUND at £${quotePrice}`);
           if (!bestMatch || quotePrice < bestMatch.price) {
             bestMatch = {
               price: quotePrice,
               insurer: insurerName,
               features: availableFeatures,
-              trustpilot_rating: quote.trustpilot_rating || quote.original_quote?.output?.trustpilot_rating,
-              ai_insight: quote.ai_driven_insight || quote.original_quote?.output?.ai_driven_insight,
+              trustpilot_rating: quote.trust_pilot_context?.rating || quote.original_quote?.output?.trustpilot_rating,
+              ai_insight: quote.alfie_message || quote.original_quote?.output?.ai_driven_insight,
               full_quote_data: quote,
             };
+            console.log(`[Timelapse] 🏆 ${insurerName} is now best match`);
           }
+        }
+
+        if (bestMatch) {
+          console.log(`[Timelapse] Final best match: ${bestMatch.insurer} at £${bestMatch.price}`);
+        } else {
+          console.log(`[Timelapse] ❌ No matches found in ${quotes.length} quotes`);
         }
 
         if (bestMatch) {
@@ -334,6 +355,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Move to next iteration date
         iterationIndex++;
         currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
+      }
+
+      console.log(`[Timelapse] Sending response: ${iterations.length} iterations, ${allMatches.length} matches`);
+      if (allMatches.length > 0) {
+        console.log(`[Timelapse] First match details:`, JSON.stringify(allMatches[0], null, 2));
       }
 
       res.json({
