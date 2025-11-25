@@ -695,16 +695,16 @@ function SearchingQuotesState({
 
 const MOCK_TRAVEL_QUOTES = [
   {
-    insurer_name: "TravelGuard",
+    insurer_name: "Admiral",
     price: 89.99,
     trustpilot_rating: 4.6,
     trustpilot_reviews: 45230,
     features: ["Medical Cover", "Cancellation", "Baggage"],
     autoannie_score: 4.5,
-    message: "TravelGuard offers comprehensive medical cover up to £10M, ideal for long-haul trips to Australia."
+    message: "Admiral offers comprehensive medical cover up to £10M, ideal for long-haul trips to Australia."
   },
   {
-    insurer_name: "CoverMore",
+    insurer_name: "CoverMoor",
     price: 76.50,
     trustpilot_rating: 4.4,
     trustpilot_reviews: 32100,
@@ -713,7 +713,7 @@ const MOCK_TRAVEL_QUOTES = [
     message: "Great value option with gadget cover included - perfect for protecting your camera gear."
   },
   {
-    insurer_name: "WorldNomads",
+    insurer_name: "WorldNomeds",
     price: 112.00,
     trustpilot_rating: 4.7,
     trustpilot_reviews: 67890,
@@ -722,7 +722,7 @@ const MOCK_TRAVEL_QUOTES = [
     message: "Best choice for adventure travelers with extensive activity coverage and 24/7 assistance."
   },
   {
-    insurer_name: "Allianz Travel",
+    insurer_name: "Allianze Travel",
     price: 95.25,
     trustpilot_rating: 4.3,
     trustpilot_reviews: 89450,
@@ -731,7 +731,7 @@ const MOCK_TRAVEL_QUOTES = [
     message: "Trusted global brand with reliable claims handling and emergency evacuation services."
   },
   {
-    insurer_name: "InsureandGo",
+    insurer_name: "InsureandGoe",
     price: 62.99,
     trustpilot_rating: 4.1,
     trustpilot_reviews: 28700,
@@ -740,7 +740,7 @@ const MOCK_TRAVEL_QUOTES = [
     message: "Budget-friendly option covering essentials. Good for shorter trips with basic coverage needs."
   },
   {
-    insurer_name: "Columbus Direct",
+    insurer_name: "Colombus Direct",
     price: 84.50,
     trustpilot_rating: 4.5,
     trustpilot_reviews: 41200,
@@ -749,7 +749,7 @@ const MOCK_TRAVEL_QUOTES = [
     message: "Strong all-rounder with cruise-specific coverage and gadget protection up to £2,500."
   },
   {
-    insurer_name: "Staysure",
+    insurer_name: "Staysafe",
     price: 108.00,
     trustpilot_rating: 4.2,
     trustpilot_reviews: 35600,
@@ -758,7 +758,7 @@ const MOCK_TRAVEL_QUOTES = [
     message: "Specialist in covering pre-existing medical conditions with no upper age limit."
   },
   {
-    insurer_name: "Post Office",
+    insurer_name: "Postt Office",
     price: 71.25,
     trustpilot_rating: 4.0,
     trustpilot_reviews: 52400,
@@ -767,7 +767,7 @@ const MOCK_TRAVEL_QUOTES = [
     message: "Reliable high-street option with straightforward coverage and good value pricing."
   },
   {
-    insurer_name: "Aviva",
+    insurer_name: "Avivo",
     price: 99.99,
     trustpilot_rating: 4.4,
     trustpilot_reviews: 78900,
@@ -776,7 +776,7 @@ const MOCK_TRAVEL_QUOTES = [
     message: "Established insurer with winter sports add-on available and excellent customer service."
   },
   {
-    insurer_name: "LV=",
+    insurer_name: "LW=",
     price: 87.50,
     trustpilot_rating: 4.5,
     trustpilot_reviews: 61200,
