@@ -21,6 +21,7 @@ import { PersonalizeDialog } from "./PersonalizeDialog";
 import { NotificationPanel } from "./NotificationPanel";
 import { ConfigureAutoAnnieDialog } from "./ConfigureAutoAnnieDialog";
 import { ComingSoonDialog } from "./ComingSoonDialog";
+import { OpenBankingDialog } from "./OpenBankingDialog";
 import { InsuranceTypeSelectorDialog } from "./InsuranceTypeSelectorDialog";
 import { CancelPolicyDialog } from "./CancelPolicyDialog";
 import { InfoBadge } from "./InfoBadge";
@@ -67,6 +68,7 @@ export default function WelcomeScreen({
   const [comingSoonFeature, setComingSoonFeature] = useState("");
   const [showInsuranceTypeSelector, setShowInsuranceTypeSelector] = useState(false);
   const [showCancelPolicy, setShowCancelPolicy] = useState(false);
+  const [showOpenBanking, setShowOpenBanking] = useState(false);
   const [scheduleFrequency, setScheduleFrequency] = useState<"monthly" | "weekly">("monthly");
   const [aiInputMessage, setAiInputMessage] = useState("");
   const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>(undefined);
@@ -167,6 +169,12 @@ export default function WelcomeScreen({
                 data-testid="menu-item-personalize"
               >
                 Personalize
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => setShowOpenBanking(true)}
+                data-testid="menu-item-openbanking"
+              >
+                Enroll - OpenBanking
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={handleLogout}
@@ -400,6 +408,12 @@ export default function WelcomeScreen({
         open={showCancelPolicy}
         onOpenChange={setShowCancelPolicy}
         userEmail={userEmail}
+      />
+
+      {/* OpenBanking Dialog */}
+      <OpenBankingDialog
+        open={showOpenBanking}
+        onOpenChange={setShowOpenBanking}
       />
 
       {/* Fixed Configure AutoAnnie Link at Bottom */}
