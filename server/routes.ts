@@ -193,6 +193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let currentDate = new Date(today);
       const allMatches: any[] = [];
+      let iterationIndex = 0;
 
       while (currentDate <= policyEndDate) {
         const dateStr = currentDate.toISOString().split("T")[0];
@@ -230,8 +231,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           iterations.push({
             date: dateStr,
             match_found: false,
+            iteration_index: iterationIndex,
             message: "API error - unable to fetch quotes",
           });
+          iterationIndex++;
           currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
           continue;
         }
@@ -288,6 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const matchIteration = {
             date: dateStr,
             match_found: true,
+            iteration_index: iterationIndex,
             quote_data: bestMatch,
             financial_breakdown: financialBreakdown,
             message: `Match found: ${bestMatch.insurer} for £${bestMatch.price}`,
@@ -299,6 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           iterations.push({
             date: dateStr,
             match_found: false,
+            iteration_index: iterationIndex,
             message: parsedPrefs.budget
               ? `No quotes within £${parsedPrefs.budget} budget with required features`
               : "No quotes match required features",
@@ -306,6 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Move to next iteration date
+        iterationIndex++;
         currentDate = new Date(currentDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
       }
 

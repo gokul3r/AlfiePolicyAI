@@ -16,6 +16,7 @@ interface TimelapseDialogProps {
 type TimelapseState = "intro" | "searching" | "match_found" | "no_match" | "confirmed";
 
 interface MatchData {
+  iteration_index: number;
   quote_data: {
     price: number;
     insurer: string;
@@ -45,6 +46,7 @@ export function TimelapseDialog({
   const [state, setState] = useState<TimelapseState>("intro");
   const [currentDate, setCurrentDate] = useState<string>("");
   const [allMatches, setAllMatches] = useState<MatchData[]>([]);
+  const [allIterations, setAllIterations] = useState<any[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState<number>(0);
   const [isSearching, setIsSearching] = useState(false);
   const { toast } = useToast();
@@ -63,20 +65,22 @@ export function TimelapseDialog({
     setIsSearching(true);
 
     try {
-      const response: any = await apiRequest("/api/timelapse-search", "POST", {
+      const response: any = await apiRequest("POST", "/api/timelapse-search", {
         policy_id: selectedVehicleId,
         email_id: userEmail,
         frequency,
       });
 
-      // Store all matches from the response
+      // Store all matches and iterations from the response
       const matches: MatchData[] = response.all_matches || [];
+      const iterations = response.iterations || [];
       setAllMatches(matches);
+      setAllIterations(iterations);
 
-      // Simulate iteration progress with 2-second delays
+      // Simulate iteration progress with 2-second delays until first match
       let firstMatchFound = false;
-      for (let i = 0; i < response.iterations.length; i++) {
-        const iteration = response.iterations[i];
+      for (let i = 0; i < iterations.length; i++) {
+        const iteration = iterations[i];
         setCurrentDate(iteration.date);
 
         // Wait 2 seconds before checking next date
@@ -117,17 +121,87 @@ export function TimelapseDialog({
     setState("confirmed");
   };
 
-  const handleKeepSearching = () => {
-    // Show next match if available
-    if (currentMatchIndex + 1 < allMatches.length) {
-      setCurrentMatchIndex(currentMatchIndex + 1);
-      setState("match_found");
-    } else {
-      // No more matches
+  const [isEndOfResults, setIsEndOfResults] = useState(false);
+
+  const handleKeepSearching = async () => {
+    // Check if there are more matches
+    if (currentMatchIndex + 1 >= allMatches.length) {
+      // No more matches - show end state
+      setIsEndOfResults(true);
+      setState("no_match");
+      return;
+    }
+
+    // Get the iteration indices directly from the match data
+    const currentMatchData = allMatches[currentMatchIndex];
+    const nextMatchData = allMatches[currentMatchIndex + 1];
+    
+    const currentMatchIterIndex = currentMatchData.iteration_index;
+    const nextMatchIterIndex = nextMatchData.iteration_index;
+
+    // Validate iteration data
+    if (
+      currentMatchIterIndex === undefined || 
+      nextMatchIterIndex === undefined ||
+      nextMatchIterIndex <= currentMatchIterIndex ||
+      !allIterations || 
+      allIterations.length === 0
+    ) {
+      // Missing iteration data - this is an error state
       toast({
-        title: "No more matches",
-        description: "You've seen all available matching quotes",
+        title: "Unable to continue search",
+        description: "Missing timeline data. Please try searching again.",
+        variant: "destructive",
       });
+      setIsSearching(false);
+      return;
+    }
+
+    // Verify all iterations exist in the range
+    for (let i = currentMatchIterIndex + 1; i <= nextMatchIterIndex; i++) {
+      if (!allIterations[i]) {
+        toast({
+          title: "Incomplete timeline data",
+          description: "Some dates are missing. Please try searching again.",
+          variant: "destructive",
+        });
+        setIsSearching(false);
+        return;
+      }
+    }
+
+    // Simulate searching through the iterations between matches
+    setState("searching");
+    setIsSearching(true);
+
+    // Play through iterations from current to next match
+    for (let i = currentMatchIterIndex + 1; i <= nextMatchIterIndex; i++) {
+      const iteration = allIterations[i];
+      
+      // Defensive guard - should never happen due to validation above
+      if (!iteration) {
+        toast({
+          title: "Timeline error",
+          description: "Missing iteration data at position " + i,
+          variant: "destructive",
+        });
+        setIsSearching(false);
+        // Stay in searching state to show error - don't jump to match
+        return;
+      }
+
+      setCurrentDate(iteration.date);
+      
+      // Wait 2 seconds before checking next date
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      
+      if (i === nextMatchIterIndex) {
+        // Reached the next match
+        setCurrentMatchIndex(currentMatchIndex + 1);
+        setState("match_found");
+        setIsSearching(false);
+        return;
+      }
     }
   };
 
@@ -135,8 +209,10 @@ export function TimelapseDialog({
     setState("intro");
     setCurrentDate("");
     setAllMatches([]);
+    setAllIterations([]);
     setCurrentMatchIndex(0);
     setIsSearching(false);
+    setIsEndOfResults(false);
     onOpenChange(false);
   };
 
@@ -205,7 +281,7 @@ export function TimelapseDialog({
 
         {/* No Match State */}
         {state === "no_match" && (
-          <NoMatchState onClose={handleClose} />
+          <NoMatchState onClose={handleClose} isEndOfResults={isEndOfResults} />
         )}
 
         {/* Confirmed State */}
@@ -424,19 +500,29 @@ function MatchFoundState({
 }
 
 // No Match State Component
-function NoMatchState({ onClose }: { onClose: () => void }) {
+function NoMatchState({ 
+  onClose, 
+  isEndOfResults = false 
+}: { 
+  onClose: () => void;
+  isEndOfResults?: boolean;
+}) {
   return (
     <div className="flex flex-col items-center justify-center h-full space-y-8 p-8 bg-gradient-to-br from-background via-background to-destructive/5">
       <div className="text-center space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <XCircle className="h-20 w-20 text-destructive mx-auto" />
         <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-          No Match Found
+          {isEndOfResults ? "No More Matches" : "No Match Found"}
         </h2>
         <p className="text-lg text-muted-foreground max-w-md">
-          Auto-Annie couldn't find a quote matching your budget and preferences before your policy end date.
+          {isEndOfResults 
+            ? "You've seen all available matching quotes from Auto-Annie's search through to your policy end date."
+            : "Auto-Annie couldn't find a quote matching your budget and preferences before your policy end date."}
         </p>
         <p className="text-base text-muted-foreground max-w-md">
-          Try adjusting your budget and preferences, then search again.
+          {isEndOfResults 
+            ? "Feel free to review the matches again or close to return."
+            : "Try adjusting your budget and preferences, then search again."}
         </p>
       </div>
 
