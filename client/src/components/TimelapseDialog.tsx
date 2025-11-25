@@ -5,6 +5,7 @@ import { useState } from "react";
 import { flushSync } from "react-dom";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { IPhoneMockup } from "./IPhoneMockup";
 
 interface TimelapseDialogProps {
   open: boolean;
@@ -14,7 +15,7 @@ interface TimelapseDialogProps {
   userEmail: string | null;
 }
 
-type TimelapseState = "intro" | "searching_week" | "week_no_match" | "match_found" | "no_match" | "confirmed";
+type TimelapseState = "intro" | "searching_with_phone" | "notification_slide" | "match_found" | "no_match" | "confirmed";
 
 interface MatchData {
   price: number;
@@ -49,6 +50,8 @@ export function TimelapseDialog({
   const [weekIndex, setWeekIndex] = useState<number>(0);
   const [policyEndDate, setPolicyEndDate] = useState<Date | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [vehicleName, setVehicleName] = useState<string>("");
+  const [showNotification, setShowNotification] = useState(false);
   const { toast } = useToast();
 
   // Calculate next search date based on frequency
@@ -69,7 +72,8 @@ export function TimelapseDialog({
     
     flushSync(() => {
       setCurrentDate(dateStr);
-      setState("searching_week");
+      setState("searching_with_phone");
+      setShowNotification(false);
     });
 
     try {
@@ -85,21 +89,17 @@ export function TimelapseDialog({
       console.log(`[Timelapse] Week ${dateStr}: ${matches.length} matches found`);
 
       if (matches.length > 0) {
-        // Match found! Pause and show results
+        // Match found! Show notification on iPhone
         flushSync(() => {
           setCurrentWeekMatches(matches);
           setCurrentMatchIndex(0);
-          setState("match_found");
+          setState("notification_slide");
+          setShowNotification(true);
           setIsSearching(false);
         });
       } else {
-        // No match - flash the date briefly then continue
-        flushSync(() => {
-          setState("week_no_match");
-        });
-
-        // Show "no match" state for 1 second
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // No match - continue searching (stay on iPhone screen)
+        await new Promise((resolve) => setTimeout(resolve, 800));
 
         // Continue to next week
         const nextDate = calculateNextDate(searchDate, frequency);
@@ -144,9 +144,10 @@ export function TimelapseDialog({
     setCurrentMatchIndex(0);
     setCurrentWeekMatches([]);
     setIsSearching(true);
+    setShowNotification(false);
 
     try {
-      // Fetch the actual policy to get the real end date
+      // Fetch the actual policy to get the real end date and vehicle name
       const policyResponse = await apiRequest("GET", `/api/vehicle-policies/${userEmail}`);
       const policies = await policyResponse.json();
       const currentPolicy = policies.find((p: any) => p.policy_id === selectedVehicleId);
@@ -165,6 +166,10 @@ export function TimelapseDialog({
       const endDate = new Date(currentPolicy.policy_end_date);
       setPolicyEndDate(endDate);
 
+      // Extract vehicle name for notifications
+      const vehicleDisplayName = `${currentPolicy.vehicle_manufacturer_name} ${currentPolicy.vehicle_model}`;
+      setVehicleName(vehicleDisplayName);
+
       console.log(`[Timelapse] Using real policy end date: ${endDate.toISOString().split("T")[0]}`);
 
       // Start searching from today, passing endDate as parameter to avoid async state issues
@@ -180,6 +185,11 @@ export function TimelapseDialog({
       setIsSearching(false);
       setState("intro");
     }
+  };
+
+  const handleNotificationTap = () => {
+    // User tapped the notification - hide iPhone and show match details
+    setState("match_found");
   };
 
   const handleConfirmPurchase = () => {
@@ -232,6 +242,8 @@ export function TimelapseDialog({
     setWeekIndex(0);
     setPolicyEndDate(null);
     setIsSearching(false);
+    setVehicleName("");
+    setShowNotification(false);
     onOpenChange(false);
   };
 
@@ -281,14 +293,31 @@ export function TimelapseDialog({
           </div>
         )}
 
-        {/* Searching Week State */}
-        {state === "searching_week" && (
-          <SearchingState currentDate={currentDate} frequency={frequency} />
+        {/* Searching with iPhone - Show iPhone screen while searching */}
+        {state === "searching_with_phone" && (
+          <div className="flex flex-col items-center justify-center h-full p-8">
+            <IPhoneMockup
+              showNotification={false}
+              searchDate={currentDate}
+              caption="Auto-Annie is searching in the background..."
+            />
+          </div>
         )}
 
-        {/* Week No Match State - briefly show date before auto-advancing */}
-        {state === "week_no_match" && (
-          <WeekNoMatchState currentDate={currentDate} />
+        {/* Notification Slide - Show notification on iPhone */}
+        {state === "notification_slide" && currentWeekMatches.length > 0 && (
+          <div className="flex flex-col items-center justify-center h-full p-8">
+            <IPhoneMockup
+              showNotification={showNotification}
+              notificationData={{
+                vehicle: vehicleName,
+                savings: Math.abs(currentWeekMatches[currentMatchIndex].financial_breakdown.annual_premium_delta),
+                provider: currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_insurer,
+              }}
+              onNotificationTap={handleNotificationTap}
+              caption="Tap the notification to view details"
+            />
+          </div>
         )}
 
         {/* Match Found State */}
@@ -314,78 +343,6 @@ export function TimelapseDialog({
         )}
       </DialogContent>
     </Dialog>
-  );
-}
-
-// Searching Week State Component - actively searching a specific week
-function SearchingState({ currentDate, frequency }: { currentDate: string; frequency: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full space-y-12 p-8 bg-gradient-to-br from-background via-background to-accent/5">
-      {/* Date Display */}
-      <div
-        className="text-center"
-        data-testid="text-search-date"
-      >
-        <p className="text-sm text-muted-foreground uppercase tracking-wider mb-2">Searching on</p>
-        <h3 className="text-4xl md:text-5xl font-bold text-primary animate-in fade-in slide-in-from-bottom-4 duration-300">
-          {currentDate}
-        </h3>
-        <p className="text-sm text-muted-foreground mt-2">
-          Checking {frequency} for matching quotes
-        </p>
-      </div>
-
-      {/* AI Search Animation */}
-      <div className="relative" data-testid="animation-searching">
-        {/* Pulsing search icon with gradient rings */}
-        <div className="relative w-48 h-48 flex items-center justify-center">
-          {/* Outer ring */}
-          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500/20 to-blue-500/20 animate-ping" />
-          
-          {/* Middle ring */}
-          <div className="absolute inset-8 rounded-full bg-gradient-to-r from-purple-500/30 to-blue-500/30 animate-pulse" />
-          
-          {/* Inner ring */}
-          <div className="absolute inset-16 rounded-full bg-gradient-to-r from-purple-500/40 to-blue-500/40" />
-          
-          {/* Center icon */}
-          <div className="relative z-10">
-            <Search className="h-24 w-24 text-primary animate-pulse" />
-          </div>
-
-          {/* Floating sparkles */}
-          <Sparkles className="absolute top-4 right-4 h-6 w-6 text-purple-400 animate-bounce delay-100" />
-          <Sparkles className="absolute bottom-4 left-4 h-5 w-5 text-blue-400 animate-bounce delay-300" />
-          <Sparkles className="absolute top-12 left-12 h-4 w-4 text-purple-300 animate-bounce delay-500" />
-        </div>
-      </div>
-
-      {/* Status Text */}
-      <div className="text-center space-y-2 animate-pulse">
-        <p className="text-xl md:text-2xl font-semibold text-foreground">
-          Searching for the best quotes...
-        </p>
-        <p className="text-muted-foreground">
-          Auto-Annie is checking insurance providers for you
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// Week No Match State Component - briefly flashes the date when no matches found
-function WeekNoMatchState({ currentDate }: { currentDate: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center h-full space-y-8 p-8 bg-gradient-to-br from-background via-background to-muted/10">
-      <div className="text-center">
-        <p className="text-sm text-muted-foreground uppercase tracking-wider mb-2">Searched on</p>
-        <h3 className="text-4xl md:text-5xl font-bold text-muted-foreground">
-          {currentDate}
-        </h3>
-        <p className="text-muted-foreground mt-4">No matching quotes found</p>
-        <p className="text-sm text-muted-foreground mt-2">Continuing to next week...</p>
-      </div>
-    </div>
   );
 }
 
