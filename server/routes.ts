@@ -380,6 +380,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Single-week timelapse search endpoint - searches quotes for ONE specific date
+  app.post("/api/timelapse-search-week", async (req, res) => {
+    try {
+      const { policy_id, email_id, search_date } = req.body;
+
+      if (!policy_id || !email_id || !search_date) {
+        return res.status(400).json({
+          error: "Missing required fields: policy_id, email_id, and search_date",
+        });
+      }
+
+      // Get policy details from database
+      const policy = await storage.getVehiclePolicy(policy_id, email_id);
+      if (!policy) {
+        return res.status(404).json({ error: "Policy not found" });
+      }
+
+      // Parse whisper preferences using OpenAI
+      const whisperText = policy.whisper_preferences || "";
+      const parsedPrefs = await parseWhisperPreferences(whisperText);
+
+      // Fetch custom ratings
+      const customRatings = await storage.getCustomRatings(email_id);
+      const trustPilotData = customRatings?.use_custom_ratings ? customRatings.trustpilot_data : null;
+      const defactoRatings = customRatings?.use_custom_ratings ? customRatings.defacto_ratings : null;
+
+      console.log(`[Timelapse Week] Searching on ${search_date}`);
+
+      // Prepare request for Quote API
+      const quoteRequestBody = {
+        insurance_details: {
+          email_id: policy.email_id,
+          current_insurance_provider: policy.current_insurance_provider,
+          policy_id: policy.policy_id,
+          policy_type: policy.policy_type,
+          driver_age: policy.details.driver_age,
+          vehicle_registration_number: policy.details.vehicle_registration_number,
+          vehicle_manufacturer_name: policy.details.vehicle_manufacturer_name,
+          vehicle_model: policy.details.vehicle_model,
+          vehicle_year: policy.details.vehicle_year,
+          type_of_fuel: policy.details.type_of_fuel,
+          type_of_Cover_needed: policy.details.type_of_cover_needed,
+          No_Claim_bonus_years: policy.details.no_claim_bonus_years,
+          Voluntary_Excess: policy.details.voluntary_excess,
+        },
+        user_preferences: whisperText,
+        conversation_history: [],
+        trust_pilot_data: trustPilotData,
+        defacto_ratings: defactoRatings,
+      };
+
+      // Call Quote API
+      const quoteResponse = await fetch(
+        "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(quoteRequestBody),
+        }
+      );
+
+      if (!quoteResponse.ok) {
+        const errorBody = await quoteResponse.text().catch(() => "Unable to read error response");
+        console.error(`[Timelapse Week] Quote API error (${quoteResponse.status}):`, errorBody);
+        
+        return res.json({
+          search_date,
+          match_found: false,
+          matches: [],
+          message: `API error ${quoteResponse.status} - unable to fetch quotes`,
+        });
+      }
+
+      const quoteData = await quoteResponse.json();
+      const quotes = quoteData.quotes_with_insights || [];
+
+      console.log(`[Timelapse Week] Received ${quotes.length} quotes from API`);
+
+      // Find all matching quotes (not just best one) using API's pre-computed matching data
+      const matches: any[] = [];
+      for (const quote of quotes) {
+        const quotePrice = quote.price_analysis?.quote_price || quote.original_quote?.output?.policy_cost;
+        const insurerName = quote.insurer_name || quote.original_quote?.output?.insurer_name;
+        const availableFeatures = quote.available_features || [];
+
+        if (!quotePrice || !insurerName) {
+          continue;
+        }
+
+        // Use API's pre-computed budget check
+        const withinBudget = quote.price_analysis?.within_budget ?? true;
+        if (!withinBudget) {
+          console.log(`[Timelapse Week] ❌ ${insurerName}: Not within budget`);
+          continue;
+        }
+
+        // Use API's pre-computed feature matching
+        const missingRequired = quote.features_matching_requirements?.missing_required || [];
+        if (missingRequired.length > 0) {
+          console.log(`[Timelapse Week] ❌ ${insurerName}: Missing required features: ${missingRequired.join(', ')}`);
+          continue;
+        }
+
+        // Found a match!
+        console.log(`[Timelapse Week] ✅ ${insurerName}: MATCH at £${quotePrice}`);
+        
+        // Calculate financial breakdown
+        const financialBreakdown = calculateFinancialBreakdown(
+          quotePrice,
+          insurerName,
+          policy.current_policy_cost,
+          policy.policy_start_date,
+          policy.policy_end_date,
+          20, // £20 cancellation fee
+          new Date(search_date)
+        );
+
+        matches.push({
+          price: quotePrice,
+          insurer: insurerName,
+          features: availableFeatures,
+          trustpilot_rating: quote.trust_pilot_context?.rating || quote.original_quote?.output?.trustpilot_rating,
+          ai_insight: quote.alfie_message || quote.original_quote?.output?.ai_driven_insight,
+          full_quote_data: quote,
+          financial_breakdown: financialBreakdown,
+        });
+      }
+
+      // Sort matches by price (cheapest first)
+      matches.sort((a, b) => a.price - b.price);
+
+      console.log(`[Timelapse Week] Found ${matches.length} matches on ${search_date}`);
+
+      res.json({
+        search_date,
+        match_found: matches.length > 0,
+        matches,
+        total_quotes_searched: quotes.length,
+        parsed_preferences: parsedPrefs,
+        message: matches.length > 0 
+          ? `Found ${matches.length} matching quote(s)` 
+          : parsedPrefs.budget
+            ? `No quotes within £${parsedPrefs.budget} budget with required features`
+            : "No quotes match required features",
+      });
+    } catch (error: any) {
+      console.error("[Timelapse Week] Error in single-week search:", error);
+      res.status(500).json({
+        error: "Failed to perform week search",
+        message: error.message,
+      });
+    }
+  });
+
   // Create new user
   app.post("/api/users", async (req, res) => {
     try {

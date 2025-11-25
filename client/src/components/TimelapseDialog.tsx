@@ -14,17 +14,15 @@ interface TimelapseDialogProps {
   userEmail: string | null;
 }
 
-type TimelapseState = "intro" | "searching" | "match_found" | "no_match" | "confirmed";
+type TimelapseState = "intro" | "searching_week" | "week_no_match" | "match_found" | "no_match" | "confirmed";
 
 interface MatchData {
-  iteration_index: number;
-  quote_data: {
-    price: number;
-    insurer: string;
-    features: string[];
-    trustpilot_rating: number;
-    ai_insight: string;
-  };
+  price: number;
+  insurer: string;
+  features: string[];
+  trustpilot_rating: number;
+  ai_insight: string;
+  full_quote_data: any;
   financial_breakdown: {
     new_quote_price: number;
     new_quote_insurer: string;
@@ -46,11 +44,90 @@ export function TimelapseDialog({
 }: TimelapseDialogProps) {
   const [state, setState] = useState<TimelapseState>("intro");
   const [currentDate, setCurrentDate] = useState<string>("");
-  const [allMatches, setAllMatches] = useState<MatchData[]>([]);
-  const [allIterations, setAllIterations] = useState<any[]>([]);
+  const [currentWeekMatches, setCurrentWeekMatches] = useState<MatchData[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState<number>(0);
+  const [weekIndex, setWeekIndex] = useState<number>(0);
+  const [policyEndDate, setPolicyEndDate] = useState<Date | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const { toast } = useToast();
+
+  // Calculate next search date based on frequency
+  const calculateNextDate = (currentDate: Date, frequency: "weekly" | "monthly"): Date => {
+    const nextDate = new Date(currentDate);
+    if (frequency === "weekly") {
+      nextDate.setDate(nextDate.getDate() + 7);
+    } else {
+      nextDate.setMonth(nextDate.getMonth() + 1);
+    }
+    return nextDate;
+  };
+
+  // Search for quotes on a specific week
+  const searchWeek = async (searchDate: Date, endDate: Date): Promise<void> => {
+    const dateStr = searchDate.toISOString().split("T")[0];
+    console.log(`[Timelapse] Searching week: ${dateStr}`);
+    
+    flushSync(() => {
+      setCurrentDate(dateStr);
+      setState("searching_week");
+    });
+
+    try {
+      const apiResponse = await apiRequest("POST", "/api/timelapse-search-week", {
+        policy_id: selectedVehicleId,
+        email_id: userEmail,
+        search_date: dateStr,
+      });
+
+      const response: any = await apiResponse.json();
+      const matches: MatchData[] = response.matches || [];
+
+      console.log(`[Timelapse] Week ${dateStr}: ${matches.length} matches found`);
+
+      if (matches.length > 0) {
+        // Match found! Pause and show results
+        flushSync(() => {
+          setCurrentWeekMatches(matches);
+          setCurrentMatchIndex(0);
+          setState("match_found");
+          setIsSearching(false);
+        });
+      } else {
+        // No match - flash the date briefly then continue
+        flushSync(() => {
+          setState("week_no_match");
+        });
+
+        // Show "no match" state for 1 second
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Continue to next week
+        const nextDate = calculateNextDate(searchDate, frequency);
+        setWeekIndex(prev => prev + 1);
+
+        // Check if we've reached the end
+        if (nextDate > endDate) {
+          console.log(`[Timelapse] Reached policy end date (${endDate.toISOString().split("T")[0]}). No matches found.`);
+          flushSync(() => {
+            setState("no_match");
+            setIsSearching(false);
+          });
+        } else {
+          // Continue searching next week
+          await searchWeek(nextDate, endDate);
+        }
+      }
+    } catch (error: any) {
+      console.error("[Timelapse] Error searching week:", error);
+      toast({
+        title: "Search Error",
+        description: error.message || "Failed to search this week",
+        variant: "destructive",
+      });
+      setState("intro");
+      setIsSearching(false);
+    }
+  };
 
   const handleStartTimelapse = async () => {
     if (!selectedVehicleId || !userEmail) {
@@ -62,75 +139,46 @@ export function TimelapseDialog({
       return;
     }
 
-    setState("searching");
+    // Reset state
+    setWeekIndex(0);
+    setCurrentMatchIndex(0);
+    setCurrentWeekMatches([]);
     setIsSearching(true);
 
     try {
-      const apiResponse = await apiRequest("POST", "/api/timelapse-search", {
-        policy_id: selectedVehicleId,
-        email_id: userEmail,
-        frequency,
-      });
+      // Fetch the actual policy to get the real end date
+      const policyResponse = await apiRequest("GET", `/api/vehicle-policies/${userEmail}`);
+      const policies = await policyResponse.json();
+      const currentPolicy = policies.find((p: any) => p.policy_id === selectedVehicleId);
 
-      // Parse the JSON response
-      const response: any = await apiResponse.json();
-
-      // Store all matches and iterations from the response
-      const matches: MatchData[] = response.all_matches || [];
-      const iterations = response.iterations || [];
-      console.log(`[Frontend] Received ${iterations.length} iterations, ${matches.length} matches`);
-      console.log(`[Frontend] First iteration:`, iterations[0]);
-      setAllMatches(matches);
-      setAllIterations(iterations);
-
-      // Simulate iteration progress with 2-second delays until first match
-      let firstMatchFound = false;
-      for (let i = 0; i < iterations.length; i++) {
-        const iteration = iterations[i];
-        console.log(`[Frontend] Checking iteration ${i}: date=${iteration.date}, match_found=${iteration.match_found}`);
-        setCurrentDate(iteration.date);
-
-        // Wait 2 seconds before checking next date
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // Stop and show first match when found
-        if (iteration.match_found && !firstMatchFound) {
-          console.log(`[Frontend] ✅ Match found at iteration ${i}! Setting state to match_found`);
-          firstMatchFound = true;
-          
-          // Use flushSync to force synchronous state updates and immediate re-render
-          flushSync(() => {
-            setCurrentMatchIndex(0);
-            setState("match_found");
-            setIsSearching(false);
-          });
-          
-          console.log(`[Frontend] State updated synchronously, component should re-render now`);
-          return;
-        }
+      if (!currentPolicy || !currentPolicy.policy_end_date) {
+        toast({
+          title: "Error",
+          description: "Could not find policy end date",
+          variant: "destructive",
+        });
+        setIsSearching(false);
+        return;
       }
 
-      // No match found after all iterations
-      console.log(`[Frontend] Loop completed without finding match. matches.length=${matches.length}`);
-      if (matches.length === 0) {
-        console.log(`[Frontend] Setting state to no_match (no matches in array)`);
-        setState("no_match");
-      } else {
-        // We have matches but simulation ended
-        console.log(`[Frontend] Setting state to match_found (matches exist but loop didn't find any)`);
-        setCurrentMatchIndex(0);
-        setState("match_found");
-      }
-      setIsSearching(false);
+      // Use the real policy end date from the database
+      const endDate = new Date(currentPolicy.policy_end_date);
+      setPolicyEndDate(endDate);
+
+      console.log(`[Timelapse] Using real policy end date: ${endDate.toISOString().split("T")[0]}`);
+
+      // Start searching from today, passing endDate as parameter to avoid async state issues
+      const today = new Date();
+      await searchWeek(today, endDate);
     } catch (error: any) {
-      console.error("Timelapse search error:", error);
+      console.error("[Timelapse] Error fetching policy:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to perform timelapse search",
+        description: "Failed to load policy data",
         variant: "destructive",
       });
-      setState("intro");
       setIsSearching(false);
+      setState("intro");
     }
   };
 
@@ -138,98 +186,52 @@ export function TimelapseDialog({
     setState("confirmed");
   };
 
-  const [isEndOfResults, setIsEndOfResults] = useState(false);
-
   const handleKeepSearching = async () => {
-    // Check if there are more matches
-    if (currentMatchIndex + 1 >= allMatches.length) {
-      // No more matches - show end state
-      setIsEndOfResults(true);
-      setState("no_match");
+    // Check if there are more matches in current week results
+    if (currentMatchIndex + 1 < currentWeekMatches.length) {
+      // Show next match from the same week
+      setCurrentMatchIndex(currentMatchIndex + 1);
       return;
     }
 
-    // Get the iteration indices directly from the match data
-    const currentMatchData = allMatches[currentMatchIndex];
-    const nextMatchData = allMatches[currentMatchIndex + 1];
-    
-    const currentMatchIterIndex = currentMatchData.iteration_index;
-    const nextMatchIterIndex = nextMatchData.iteration_index;
+    // No more matches in current week - continue to next week
+    setIsSearching(true);
+    setCurrentMatchIndex(0);
+    setCurrentWeekMatches([]);
 
-    // Validate iteration data
-    if (
-      currentMatchIterIndex === undefined || 
-      nextMatchIterIndex === undefined ||
-      nextMatchIterIndex <= currentMatchIterIndex ||
-      !allIterations || 
-      allIterations.length === 0
-    ) {
-      // Missing iteration data - this is an error state
-      toast({
-        title: "Unable to continue search",
-        description: "Missing timeline data. Please try searching again.",
-        variant: "destructive",
-      });
+    // Calculate next search date
+    const nextDate = calculateNextDate(new Date(currentDate), frequency);
+    setWeekIndex(prev => prev + 1);
+
+    // Check if we've reached the end - use policyEndDate from state
+    if (!policyEndDate) {
+      console.error("[Timelapse] policyEndDate is null in handleKeepSearching");
+      setState("no_match");
       setIsSearching(false);
       return;
     }
 
-    // Verify all iterations exist in the range
-    for (let i = currentMatchIterIndex + 1; i <= nextMatchIterIndex; i++) {
-      if (!allIterations[i]) {
-        toast({
-          title: "Incomplete timeline data",
-          description: "Some dates are missing. Please try searching again.",
-          variant: "destructive",
-        });
+    if (nextDate > policyEndDate) {
+      console.log(`[Timelapse] Reached policy end date after keeping searching.`);
+      flushSync(() => {
+        setState("no_match");
         setIsSearching(false);
-        return;
-      }
+      });
+      return;
     }
 
-    // Simulate searching through the iterations between matches
-    setState("searching");
-    setIsSearching(true);
-
-    // Play through iterations from current to next match
-    for (let i = currentMatchIterIndex + 1; i <= nextMatchIterIndex; i++) {
-      const iteration = allIterations[i];
-      
-      // Defensive guard - should never happen due to validation above
-      if (!iteration) {
-        toast({
-          title: "Timeline error",
-          description: "Missing iteration data at position " + i,
-          variant: "destructive",
-        });
-        setIsSearching(false);
-        // Stay in searching state to show error - don't jump to match
-        return;
-      }
-
-      setCurrentDate(iteration.date);
-      
-      // Wait 2 seconds before checking next date
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      
-      if (i === nextMatchIterIndex) {
-        // Reached the next match
-        setCurrentMatchIndex(currentMatchIndex + 1);
-        setState("match_found");
-        setIsSearching(false);
-        return;
-      }
-    }
+    // Continue searching from next week, passing endDate to avoid async state issues
+    await searchWeek(nextDate, policyEndDate);
   };
 
   const handleClose = () => {
     setState("intro");
     setCurrentDate("");
-    setAllMatches([]);
-    setAllIterations([]);
+    setCurrentWeekMatches([]);
     setCurrentMatchIndex(0);
+    setWeekIndex(0);
+    setPolicyEndDate(null);
     setIsSearching(false);
-    setIsEndOfResults(false);
     onOpenChange(false);
   };
 
@@ -279,49 +281,54 @@ export function TimelapseDialog({
           </div>
         )}
 
-        {/* Searching State */}
-        {state === "searching" && (
+        {/* Searching Week State */}
+        {state === "searching_week" && (
           <SearchingState currentDate={currentDate} frequency={frequency} />
         )}
 
+        {/* Week No Match State - briefly show date before auto-advancing */}
+        {state === "week_no_match" && (
+          <WeekNoMatchState currentDate={currentDate} />
+        )}
+
         {/* Match Found State */}
-        {state === "match_found" && allMatches.length > 0 && (
+        {state === "match_found" && currentWeekMatches.length > 0 && (
           <MatchFoundState
-            matchData={allMatches[currentMatchIndex]}
+            matchData={currentWeekMatches[currentMatchIndex]}
             matchNumber={currentMatchIndex + 1}
-            totalMatches={allMatches.length}
+            totalMatches={currentWeekMatches.length}
             onConfirmPurchase={handleConfirmPurchase}
             onKeepSearching={handleKeepSearching}
-            hasMoreMatches={currentMatchIndex + 1 < allMatches.length}
+            hasMoreMatches={currentMatchIndex + 1 < currentWeekMatches.length}
           />
         )}
 
         {/* No Match State */}
         {state === "no_match" && (
-          <NoMatchState onClose={handleClose} isEndOfResults={isEndOfResults} />
+          <NoMatchState onClose={handleClose} />
         )}
 
         {/* Confirmed State */}
-        {state === "confirmed" && allMatches.length > 0 && (
-          <ConfirmedState insurer={allMatches[currentMatchIndex].quote_data.insurer} onClose={handleClose} />
+        {state === "confirmed" && currentWeekMatches.length > 0 && (
+          <ConfirmedState insurer={currentWeekMatches[currentMatchIndex].insurer} onClose={handleClose} />
         )}
       </DialogContent>
     </Dialog>
   );
 }
 
-// Searching State Component
+// Searching Week State Component - actively searching a specific week
 function SearchingState({ currentDate, frequency }: { currentDate: string; frequency: string }) {
   return (
     <div className="flex flex-col items-center justify-center h-full space-y-12 p-8 bg-gradient-to-br from-background via-background to-accent/5">
-      {/* Blinking Date Display */}
+      {/* Date Display */}
       <div
-        className="text-center animate-pulse"
+        className="text-center"
         data-testid="text-search-date"
       >
         <p className="text-sm text-muted-foreground uppercase tracking-wider mb-2">Searching on</p>
-        <h3 className="text-4xl md:text-5xl font-bold text-primary">
-          {currentDate || "Starting..."}
+        <h3 className="text-4xl md:text-5xl font-bold text-primary animate-in fade-in slide-in-from-bottom-4 duration-300">
+          {currentDate}
         </h3>
         <p className="text-sm text-muted-foreground mt-2">
           Checking {frequency} for matching quotes
@@ -366,6 +373,22 @@ function SearchingState({ currentDate, frequency }: { currentDate: string; frequ
   );
 }
 
+// Week No Match State Component - briefly flashes the date when no matches found
+function WeekNoMatchState({ currentDate }: { currentDate: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full space-y-8 p-8 bg-gradient-to-br from-background via-background to-muted/10">
+      <div className="text-center">
+        <p className="text-sm text-muted-foreground uppercase tracking-wider mb-2">Searched on</p>
+        <h3 className="text-4xl md:text-5xl font-bold text-muted-foreground">
+          {currentDate}
+        </h3>
+        <p className="text-muted-foreground mt-4">No matching quotes found</p>
+        <p className="text-sm text-muted-foreground mt-2">Continuing to next week...</p>
+      </div>
+    </div>
+  );
+}
+
 // Match Found State Component
 function MatchFoundState({
   matchData,
@@ -382,7 +405,7 @@ function MatchFoundState({
   onKeepSearching: () => void;
   hasMoreMatches: boolean;
 }) {
-  const { quote_data, financial_breakdown } = matchData;
+  const { insurer, price, ai_insight, financial_breakdown } = matchData;
 
   return (
     <div className="flex flex-col h-full overflow-y-auto p-8 bg-gradient-to-br from-background via-background to-green-500/5">
@@ -465,27 +488,27 @@ function MatchFoundState({
           <div className="bg-card border border-border rounded-lg p-4">
             <h4 className="font-semibold mb-2">Features included</h4>
             <p className="text-sm text-muted-foreground">
-              {quote_data.features.join(", ")}
+              {matchData.features.join(", ")}
             </p>
           </div>
 
           <div className="bg-card border border-border rounded-lg p-4">
             <h4 className="font-semibold mb-2">Rating</h4>
             <p className="text-sm text-muted-foreground">
-              Trustpilot: {quote_data.trustpilot_rating?.toFixed(1) || "N/A"}
+              Trustpilot: {matchData.trustpilot_rating?.toFixed(1) || "N/A"}
             </p>
           </div>
         </div>
 
         {/* AI Insight */}
-        {quote_data.ai_insight && (
+        {ai_insight && (
           <div className="bg-accent/20 border border-accent rounded-lg p-4">
             <h4 className="font-semibold mb-2 flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
               Auto-Annie's Insight
             </h4>
             <p className="text-sm text-muted-foreground">
-              {quote_data.ai_insight}
+              {ai_insight}
             </p>
           </div>
         )}
@@ -517,29 +540,19 @@ function MatchFoundState({
 }
 
 // No Match State Component
-function NoMatchState({ 
-  onClose, 
-  isEndOfResults = false 
-}: { 
-  onClose: () => void;
-  isEndOfResults?: boolean;
-}) {
+function NoMatchState({ onClose }: { onClose: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center h-full space-y-8 p-8 bg-gradient-to-br from-background via-background to-destructive/5">
       <div className="text-center space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <XCircle className="h-20 w-20 text-destructive mx-auto" />
         <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-          {isEndOfResults ? "No More Matches" : "No Match Found"}
+          No Match Found
         </h2>
         <p className="text-lg text-muted-foreground max-w-md">
-          {isEndOfResults 
-            ? "You've seen all available matching quotes from Auto-Annie's search through to your policy end date."
-            : "Auto-Annie couldn't find a quote matching your budget and preferences before your policy end date."}
+          Auto-Annie couldn't find a quote matching your budget and preferences before your policy end date.
         </p>
         <p className="text-base text-muted-foreground max-w-md">
-          {isEndOfResults 
-            ? "Feel free to review the matches again or close to return."
-            : "Try adjusting your budget and preferences, then search again."}
+          Try adjusting your budget and preferences, then search again.
         </p>
       </div>
 
