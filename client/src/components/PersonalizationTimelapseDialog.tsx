@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { X, Sparkles, Search, Plane, Calendar, Users, Heart, User, Camera, Snowflake, Ship } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { X, Sparkles, Search, Plane, Calendar, Users, Heart, User, Camera, Snowflake, Ship, Star, StarHalf, CheckCircle2, Shield } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AIThinkingStep } from "./AIThinkingStep";
@@ -691,6 +693,99 @@ function SearchingQuotesState({
   );
 }
 
+const MOCK_TRAVEL_QUOTES = [
+  {
+    insurer_name: "TravelGuard",
+    price: 89.99,
+    trustpilot_rating: 4.6,
+    trustpilot_reviews: 45230,
+    features: ["Medical Cover", "Cancellation", "Baggage"],
+    autoannie_score: 4.5,
+    message: "TravelGuard offers comprehensive medical cover up to £10M, ideal for long-haul trips to Australia."
+  },
+  {
+    insurer_name: "CoverMore",
+    price: 76.50,
+    trustpilot_rating: 4.4,
+    trustpilot_reviews: 32100,
+    features: ["Medical Cover", "Gadget Cover", "Delays"],
+    autoannie_score: 4.3,
+    message: "Great value option with gadget cover included - perfect for protecting your camera gear."
+  },
+  {
+    insurer_name: "WorldNomads",
+    price: 112.00,
+    trustpilot_rating: 4.7,
+    trustpilot_reviews: 67890,
+    features: ["Adventure Sports", "Medical Cover", "Cancellation", "Baggage"],
+    autoannie_score: 4.7,
+    message: "Best choice for adventure travelers with extensive activity coverage and 24/7 assistance."
+  },
+  {
+    insurer_name: "Allianz Travel",
+    price: 95.25,
+    trustpilot_rating: 4.3,
+    trustpilot_reviews: 89450,
+    features: ["Medical Cover", "Trip Interruption", "Emergency Evac"],
+    autoannie_score: 4.2,
+    message: "Trusted global brand with reliable claims handling and emergency evacuation services."
+  },
+  {
+    insurer_name: "InsureandGo",
+    price: 62.99,
+    trustpilot_rating: 4.1,
+    trustpilot_reviews: 28700,
+    features: ["Medical Cover", "Cancellation"],
+    autoannie_score: 3.8,
+    message: "Budget-friendly option covering essentials. Good for shorter trips with basic coverage needs."
+  },
+  {
+    insurer_name: "Columbus Direct",
+    price: 84.50,
+    trustpilot_rating: 4.5,
+    trustpilot_reviews: 41200,
+    features: ["Medical Cover", "Gadget Cover", "Cruise Cover"],
+    autoannie_score: 4.4,
+    message: "Strong all-rounder with cruise-specific coverage and gadget protection up to £2,500."
+  },
+  {
+    insurer_name: "Staysure",
+    price: 108.00,
+    trustpilot_rating: 4.2,
+    trustpilot_reviews: 35600,
+    features: ["Medical Cover", "Pre-existing Conditions", "Cancellation"],
+    autoannie_score: 4.0,
+    message: "Specialist in covering pre-existing medical conditions with no upper age limit."
+  },
+  {
+    insurer_name: "Post Office",
+    price: 71.25,
+    trustpilot_rating: 4.0,
+    trustpilot_reviews: 52400,
+    features: ["Medical Cover", "Baggage", "Delays"],
+    autoannie_score: 3.9,
+    message: "Reliable high-street option with straightforward coverage and good value pricing."
+  },
+  {
+    insurer_name: "Aviva",
+    price: 99.99,
+    trustpilot_rating: 4.4,
+    trustpilot_reviews: 78900,
+    features: ["Medical Cover", "Cancellation", "Winter Sports"],
+    autoannie_score: 4.3,
+    message: "Established insurer with winter sports add-on available and excellent customer service."
+  },
+  {
+    insurer_name: "LV=",
+    price: 87.50,
+    trustpilot_rating: 4.5,
+    trustpilot_reviews: 61200,
+    features: ["Medical Cover", "Gadget Cover", "Cancellation", "Legal Expenses"],
+    autoannie_score: 4.4,
+    message: "Comprehensive policy including legal expenses cover and 24-hour emergency helpline."
+  }
+];
+
 function TravelQuotesResultsState({ 
   destination, 
   onClose 
@@ -698,36 +793,132 @@ function TravelQuotesResultsState({
   destination: string;
   onClose: () => void;
 }) {
+  const renderStars = (rating: number) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+    
+    for (let i = 0; i < 5; i++) {
+      if (i < fullStars) {
+        stars.push(
+          <Star
+            key={i}
+            className="w-4 h-4 fill-yellow-400 text-yellow-400"
+          />
+        );
+      } else if (i === fullStars && hasHalfStar) {
+        stars.push(
+          <StarHalf
+            key={i}
+            className="w-4 h-4 fill-yellow-400 text-yellow-400"
+          />
+        );
+      } else {
+        stars.push(
+          <Star
+            key={i}
+            className="w-4 h-4 text-muted-foreground"
+          />
+        );
+      }
+    }
+    return stars;
+  };
+
   return (
-    <div className="flex flex-col h-full p-8 overflow-y-auto">
+    <div className="flex flex-col h-full p-4 md:p-8 overflow-y-auto">
       <div className="max-w-4xl mx-auto w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <Plane className="w-8 h-8 text-white" />
-          </div>
-          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
-            Travel Quotes for {destination.split(",")[0]}
-          </h2>
-          <p className="text-muted-foreground">
-            {formatDate(new Date().toISOString())}
-          </p>
-        </div>
-
-        <div className="bg-card border border-border rounded-xl p-8 min-h-[300px] flex flex-col items-center justify-center">
-          <div className="text-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto">
-              <Search className="w-8 h-8 text-muted-foreground" />
+        <div className="text-center mb-6 sticky top-0 bg-background/95 backdrop-blur-sm py-4 z-10">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg">
+              <Plane className="w-6 h-6 text-white" />
             </div>
-            <h3 className="text-xl font-semibold text-muted-foreground">
-              Travel quotes will appear here
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-md">
-              Once the travel quote search API is ready, this section will display personalized insurance quotes for your trip.
-            </p>
+            <div className="text-left">
+              <h2 className="text-xl md:text-2xl font-bold text-foreground">
+                Travel Quotes for {destination.split(",")[0]}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {MOCK_TRAVEL_QUOTES.length} quotes found
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex justify-center pt-6">
+        <div className="space-y-4">
+          {MOCK_TRAVEL_QUOTES.map((quote, index) => (
+            <Card key={index} className="shadow-md" data-testid={`card-travel-quote-${index}`}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-primary/10 p-2 rounded-lg">
+                      <Shield className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg text-foreground" data-testid={`text-travel-insurer-${index}`}>
+                        {quote.insurer_name}
+                      </CardTitle>
+                      <p className="text-lg font-bold text-primary mt-1" data-testid={`text-travel-price-${index}`}>
+                        £{quote.price.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2 flex-wrap" data-testid={`rating-travel-${index}`}>
+                  <div className="flex items-center gap-1">
+                    {renderStars(quote.trustpilot_rating)}
+                  </div>
+                  <span className="text-sm font-medium text-foreground">
+                    {quote.trustpilot_rating.toFixed(1)} stars
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    ({quote.trustpilot_reviews.toLocaleString()} reviews)
+                  </span>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <span className="text-sm font-medium text-foreground">Matching Features</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2" data-testid={`features-travel-${index}`}>
+                    {quote.features.map((feature, fIndex) => (
+                      <Badge key={fIndex} variant="secondary" className="text-xs" data-testid={`badge-feature-${index}-${fIndex}`}>
+                        {feature}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-border pt-4 space-y-2">
+                  <div className="flex items-center justify-between gap-4">
+                    <h4 className="text-sm font-semibold text-foreground">
+                      AutoAnnie Score
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <div className="bg-primary/10 px-3 py-1 rounded-full" data-testid={`score-travel-${index}`}>
+                        <span className="text-lg font-bold text-primary">
+                          {quote.autoannie_score.toFixed(1)}
+                        </span>
+                        <span className="text-sm text-muted-foreground"> / 5</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-primary/5 rounded-lg p-3">
+                    <p className="text-sm text-foreground" data-testid={`text-travel-analysis-${index}`}>
+                      {quote.message}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="flex justify-center pt-6 pb-4">
           <Button
             size="lg"
             onClick={onClose}
