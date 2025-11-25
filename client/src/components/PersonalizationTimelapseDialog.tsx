@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { X, Sparkles, Search, Plane, Calendar, Users, Heart } from "lucide-react";
+import { X, Sparkles, Search, Plane, Calendar, Users, Heart, User, Camera, Snowflake, Ship } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AIThinkingStep } from "./AIThinkingStep";
@@ -19,15 +19,22 @@ type TimelapseState =
   | "notification_slide" 
   | "extracting_email" 
   | "travel_form" 
+  | "starting_search"
+  | "gadget_cover_popup"
   | "searching_quotes" 
   | "travel_quotes_results";
 
 interface TravelFormData {
+  name: string;
+  age: number;
   destination: string;
   startDate: string;
   endDate: string;
   travellers: number;
   medicalCondition: boolean;
+  gadgetCover: boolean;
+  winterSportsCover: boolean;
+  cruiseCover: boolean;
 }
 
 export function PersonalizationTimelapseDialog({
@@ -37,11 +44,16 @@ export function PersonalizationTimelapseDialog({
   const [state, setState] = useState<TimelapseState>("intro");
   const [showNotification, setShowNotification] = useState(false);
   const [formData, setFormData] = useState<TravelFormData>({
+    name: "",
+    age: 0,
     destination: "",
     startDate: "",
     endDate: "",
     travellers: 1,
     medicalCondition: false,
+    gadgetCover: false,
+    winterSportsCover: false,
+    cruiseCover: false,
   });
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -84,16 +96,29 @@ export function PersonalizationTimelapseDialog({
 
   const handleExtractionComplete = useCallback(() => {
     setFormData({
+      name: "James Wilson",
+      age: 34,
       destination: "Sydney, Australia",
       startDate: "2025-12-06",
       endDate: "2026-01-02",
       travellers: 1,
       medicalCondition: false,
+      gadgetCover: false,
+      winterSportsCover: false,
+      cruiseCover: false,
     });
     setState("travel_form");
   }, []);
 
   const handleSearchQuotes = useCallback(() => {
+    setState("starting_search");
+  }, []);
+
+  const handleStartingSearchComplete = useCallback(() => {
+    setState("gadget_cover_popup");
+  }, []);
+
+  const handleGadgetCoverResponse = useCallback(() => {
     setState("searching_quotes");
   }, []);
 
@@ -109,11 +134,16 @@ export function PersonalizationTimelapseDialog({
     setState("intro");
     setShowNotification(false);
     setFormData({
+      name: "",
+      age: 0,
       destination: "",
       startDate: "",
       endDate: "",
       travellers: 1,
       medicalCondition: false,
+      gadgetCover: false,
+      winterSportsCover: false,
+      cruiseCover: false,
     });
     onOpenChange(false);
   }, [onOpenChange]);
@@ -158,6 +188,14 @@ export function PersonalizationTimelapseDialog({
             formData={formData}
             onSearchQuotes={handleSearchQuotes}
           />
+        )}
+
+        {state === "starting_search" && (
+          <StartingSearchState onComplete={handleStartingSearchComplete} />
+        )}
+
+        {state === "gadget_cover_popup" && (
+          <GadgetCoverPopup onRespond={handleGadgetCoverResponse} />
         )}
 
         {state === "searching_quotes" && (
@@ -421,6 +459,35 @@ function TravelFormState({
         </div>
 
         <div className="bg-card border border-border rounded-xl p-6 space-y-5">
+          {/* Name and Age fields */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                <User className="h-4 w-4 text-primary" />
+                Name
+              </Label>
+              <Input
+                value={formData.name}
+                readOnly
+                className="bg-muted/50"
+                data-testid="input-traveller-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                <User className="h-4 w-4 text-primary" />
+                Age
+              </Label>
+              <Input
+                type="number"
+                value={formData.age}
+                readOnly
+                className="bg-muted/50"
+                data-testid="input-traveller-age"
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label className="flex items-center gap-2 text-sm font-medium">
               <Plane className="h-4 w-4 text-primary" />
@@ -473,6 +540,50 @@ function TravelFormState({
               className="bg-muted/50"
               data-testid="input-travellers"
             />
+          </div>
+
+          {/* Coverage options checkboxes */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium text-muted-foreground">Optional Coverage</Label>
+            
+            <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
+              <Checkbox
+                id="gadgetCover"
+                checked={formData.gadgetCover}
+                disabled
+                data-testid="checkbox-gadget-cover"
+              />
+              <Label htmlFor="gadgetCover" className="flex items-center gap-2 text-sm cursor-pointer">
+                <Camera className="h-4 w-4 text-primary" />
+                Gadget cover
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
+              <Checkbox
+                id="winterSportsCover"
+                checked={formData.winterSportsCover}
+                disabled
+                data-testid="checkbox-winter-sports-cover"
+              />
+              <Label htmlFor="winterSportsCover" className="flex items-center gap-2 text-sm cursor-pointer">
+                <Snowflake className="h-4 w-4 text-primary" />
+                Winter sports cover
+              </Label>
+            </div>
+
+            <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
+              <Checkbox
+                id="cruiseCover"
+                checked={formData.cruiseCover}
+                disabled
+                data-testid="checkbox-cruise-cover"
+              />
+              <Label htmlFor="cruiseCover" className="flex items-center gap-2 text-sm cursor-pointer">
+                <Ship className="h-4 w-4 text-primary" />
+                Cruise cover
+              </Label>
+            </div>
           </div>
 
           <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/30">
@@ -622,6 +733,130 @@ function TravelQuotesResultsState({
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StartingSearchState({ onComplete }: { onComplete: () => void }) {
+  const [currentStep, setCurrentStep] = useState(0);
+  const isMountedRef = useRef(true);
+
+  const STARTING_STEPS = [
+    { text: "Starting quote search...", duration: 1500 },
+    { text: "Preparing your travel details...", duration: 1200 },
+  ];
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (currentStep >= STARTING_STEPS.length) {
+      const timer = setTimeout(() => {
+        if (isMountedRef.current) {
+          onComplete();
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+
+    const timer = setTimeout(() => {
+      if (isMountedRef.current) {
+        setCurrentStep(prev => prev + 1);
+      }
+    }, STARTING_STEPS[currentStep].duration);
+
+    return () => clearTimeout(timer);
+  }, [currentStep, onComplete]);
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full p-8 bg-gradient-to-br from-background via-background to-purple-500/5">
+      <div className="max-w-2xl w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
+            Starting quote search...
+          </h2>
+          <p className="text-lg text-muted-foreground">
+            Auto-Annie is preparing to find the best quotes for you
+          </p>
+        </div>
+
+        <div className="bg-card border border-border rounded-xl p-8 space-y-3" data-testid="starting-search-steps">
+          {STARTING_STEPS.map((step, index) => (
+            <AIThinkingStep
+              key={index}
+              text={step.text}
+              status={
+                index < currentStep 
+                  ? "completed" 
+                  : index === currentStep 
+                  ? "processing" 
+                  : "pending"
+              }
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GadgetCoverPopup({ onRespond }: { onRespond: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full p-8 bg-gradient-to-br from-background via-background to-purple-500/5">
+      <motion.div 
+        className="max-w-md w-full animate-in fade-in slide-in-from-bottom-4 duration-500"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="bg-card border border-border rounded-2xl p-8 shadow-xl space-y-6">
+          <div className="flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+              <Camera className="w-8 h-8 text-white" />
+            </div>
+          </div>
+
+          <div className="text-center space-y-3">
+            <h2 className="text-xl font-bold text-foreground">
+              Gadget Cover Recommendation
+            </h2>
+            <p className="text-muted-foreground">
+              Do you want to add gadget cover for the{" "}
+              <span className="font-semibold text-foreground">
+                'Sony Alpha 7IV Full-Frame Mirrorless Camera'
+              </span>{" "}
+              during the trip?
+            </p>
+            <p className="text-xs text-muted-foreground italic">
+              Based on your recent purchase detected via OpenBanking
+            </p>
+          </div>
+
+          <div className="flex gap-4">
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={onRespond}
+              className="flex-1 py-6"
+              data-testid="button-gadget-cover-no"
+            >
+              No
+            </Button>
+            <Button
+              size="lg"
+              onClick={onRespond}
+              className="flex-1 py-6"
+              data-testid="button-gadget-cover-yes"
+            >
+              Yes
+            </Button>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
