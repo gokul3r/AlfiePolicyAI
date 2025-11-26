@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X, Sparkles, Search, Plane, Calendar, Users, Heart, User, Camera, Snowflake, Ship, Star, StarHalf, CheckCircle2, Shield, PartyPopper, Home, Phone, FileCheck } from "lucide-react";
+import { X, Sparkles, Search, Plane, Calendar, Users, Heart, User, Camera, Snowflake, Ship, Star, StarHalf, CheckCircle2, Shield, PartyPopper, Home, Phone, FileCheck, Stethoscope, Smartphone, XCircle, Luggage, Clock, Mountain, Anchor, Scale, AlertTriangle, Briefcase, ThumbsUp } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AIThinkingStep } from "./AIThinkingStep";
@@ -802,6 +803,21 @@ const MOCK_TRAVEL_QUOTES = [
   }
 ];
 
+const FEATURE_CONFIG: Record<string, { icon: typeof Stethoscope; color: string; bgColor: string }> = {
+  "Medical Cover": { icon: Stethoscope, color: "text-emerald-600 dark:text-emerald-400", bgColor: "bg-emerald-50 dark:bg-emerald-950/50" },
+  "Gadget Cover": { icon: Smartphone, color: "text-blue-600 dark:text-blue-400", bgColor: "bg-blue-50 dark:bg-blue-950/50" },
+  "Cancellation": { icon: XCircle, color: "text-orange-600 dark:text-orange-400", bgColor: "bg-orange-50 dark:bg-orange-950/50" },
+  "Baggage": { icon: Luggage, color: "text-purple-600 dark:text-purple-400", bgColor: "bg-purple-50 dark:bg-purple-950/50" },
+  "Delays": { icon: Clock, color: "text-amber-600 dark:text-amber-400", bgColor: "bg-amber-50 dark:bg-amber-950/50" },
+  "Adventure Sports": { icon: Mountain, color: "text-rose-600 dark:text-rose-400", bgColor: "bg-rose-50 dark:bg-rose-950/50" },
+  "Winter Sports": { icon: Snowflake, color: "text-cyan-600 dark:text-cyan-400", bgColor: "bg-cyan-50 dark:bg-cyan-950/50" },
+  "Cruise Cover": { icon: Anchor, color: "text-indigo-600 dark:text-indigo-400", bgColor: "bg-indigo-50 dark:bg-indigo-950/50" },
+  "Trip Interruption": { icon: AlertTriangle, color: "text-red-600 dark:text-red-400", bgColor: "bg-red-50 dark:bg-red-950/50" },
+  "Emergency Evac": { icon: Plane, color: "text-sky-600 dark:text-sky-400", bgColor: "bg-sky-50 dark:bg-sky-950/50" },
+  "Pre-existing Conditions": { icon: Heart, color: "text-pink-600 dark:text-pink-400", bgColor: "bg-pink-50 dark:bg-pink-950/50" },
+  "Legal Expenses": { icon: Scale, color: "text-slate-600 dark:text-slate-400", bgColor: "bg-slate-50 dark:bg-slate-950/50" },
+};
+
 function TravelQuotesResultsState({ 
   destination, 
   onClose,
@@ -811,6 +827,10 @@ function TravelQuotesResultsState({
   onClose: () => void;
   onProceedToBuy: (insurerName: string) => void;
 }) {
+  const getFeatureConfig = (feature: string) => {
+    return FEATURE_CONFIG[feature] || { icon: CheckCircle2, color: "text-gray-600 dark:text-gray-400", bgColor: "bg-gray-50 dark:bg-gray-900/50" };
+  };
+
   const renderStars = (rating: number) => {
     const stars = [];
     const fullStars = Math.floor(rating);
@@ -882,63 +902,148 @@ function TravelQuotesResultsState({
                   </div>
                 </div>
 
-                <div className="mt-3 flex items-center gap-2 flex-wrap" data-testid={`rating-travel-${index}`}>
-                  <div className="flex items-center gap-1">
-                    {renderStars(quote.trustpilot_rating)}
-                  </div>
-                  <span className="text-sm font-medium text-foreground">
-                    {quote.trustpilot_rating.toFixed(1)} stars
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    ({quote.trustpilot_reviews.toLocaleString()} reviews)
-                  </span>
-                </div>
               </CardHeader>
 
               <CardContent className="space-y-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    <span className="text-sm font-medium text-foreground">Matching Features</span>
+                {/* Enhanced Features Section */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-xl p-4 border border-green-100 dark:border-green-900">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="bg-green-500 p-1.5 rounded-lg">
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">Coverage Included</span>
+                    <Badge variant="secondary" className="ml-auto text-xs bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                      {quote.features.length} features
+                    </Badge>
                   </div>
-                  <div className="flex flex-wrap gap-2" data-testid={`features-travel-${index}`}>
-                    {quote.features.map((feature, fIndex) => (
-                      <Badge key={fIndex} variant="secondary" className="text-xs" data-testid={`badge-feature-${index}-${fIndex}`}>
-                        {feature}
-                      </Badge>
-                    ))}
+                  <div className="grid grid-cols-2 gap-2" data-testid={`features-travel-${index}`}>
+                    {quote.features.map((feature, fIndex) => {
+                      const config = getFeatureConfig(feature);
+                      const FeatureIcon = config.icon;
+                      return (
+                        <div 
+                          key={fIndex} 
+                          className={`flex items-center gap-2 ${config.bgColor} rounded-lg px-3 py-2 border border-transparent hover:border-current/10 transition-colors`}
+                          data-testid={`badge-feature-${index}-${fIndex}`}
+                        >
+                          <FeatureIcon className={`w-4 h-4 ${config.color} shrink-0`} />
+                          <span className={`text-xs font-medium ${config.color}`}>{feature}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="border-t border-border pt-4 space-y-2">
-                  <div className="flex items-center justify-between gap-4">
-                    <h4 className="text-sm font-semibold text-foreground">
-                      AutoAnnie Score
-                    </h4>
-                    <div className="flex items-center gap-2">
-                      <div className="bg-primary/10 px-3 py-1 rounded-full" data-testid={`score-travel-${index}`}>
-                        <span className="text-lg font-bold text-primary">
-                          {quote.autoannie_score.toFixed(1)}
+                {/* Enhanced Rating Section */}
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 rounded-xl p-4 border border-amber-100 dark:border-amber-900">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="bg-amber-500 p-1.5 rounded-lg">
+                      <Star className="w-4 h-4 text-white fill-white" />
+                    </div>
+                    <span className="text-sm font-semibold text-foreground">TrustPilot Rating</span>
+                  </div>
+                  <div className="flex items-center gap-4" data-testid={`rating-section-${index}`}>
+                    {/* Circular Score Badge */}
+                    <div className="relative">
+                      <svg className="w-16 h-16 transform -rotate-90">
+                        <circle
+                          cx="32"
+                          cy="32"
+                          r="28"
+                          stroke="currentColor"
+                          strokeWidth="6"
+                          fill="none"
+                          className="text-amber-100 dark:text-amber-900"
+                        />
+                        <circle
+                          cx="32"
+                          cy="32"
+                          r="28"
+                          stroke="currentColor"
+                          strokeWidth="6"
+                          fill="none"
+                          strokeDasharray={`${(quote.trustpilot_rating / 5) * 175.9} 175.9`}
+                          strokeLinecap="round"
+                          className="text-amber-500"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-lg font-bold text-amber-600 dark:text-amber-400">{quote.trustpilot_rating.toFixed(1)}</span>
+                      </div>
+                    </div>
+                    {/* Rating Details */}
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-1">
+                        {renderStars(quote.trustpilot_rating)}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <ThumbsUp className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span className="text-xs text-muted-foreground">
+                          <span className="font-semibold text-amber-700 dark:text-amber-300">{quote.trustpilot_reviews.toLocaleString()}</span> verified reviews
                         </span>
-                        <span className="text-sm text-muted-foreground"> / 5</span>
+                      </div>
+                      <div className="w-full">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-muted-foreground">Trust Score</span>
+                          <span className="font-medium text-amber-600 dark:text-amber-400">{((quote.trustpilot_rating / 5) * 100).toFixed(0)}%</span>
+                        </div>
+                        <Progress value={(quote.trustpilot_rating / 5) * 100} className="h-1.5 bg-amber-100 dark:bg-amber-900" />
                       </div>
                     </div>
                   </div>
-
-                  <div className="bg-primary/5 rounded-lg p-3">
-                    <p className="text-sm text-foreground" data-testid={`text-travel-analysis-${index}`}>
-                      {quote.message}
-                    </p>
-                  </div>
-
-                  <Button
-                    className="w-full mt-4"
-                    onClick={() => onProceedToBuy(quote.insurer_name)}
-                    data-testid={`button-proceed-buy-${index}`}
-                  >
-                    Proceed and Buy
-                  </Button>
                 </div>
+
+                {/* Enhanced AutoAnnie Insight Section */}
+                <div className="relative overflow-hidden rounded-xl border border-purple-200 dark:border-purple-800">
+                  <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 px-4 py-2.5 flex items-center gap-2">
+                    <motion.div
+                      animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.1, 1] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                      <Sparkles className="w-4 h-4 text-yellow-300" />
+                    </motion.div>
+                    <span className="text-sm font-semibold text-white">AutoAnnie's Insight</span>
+                    <div className="ml-auto flex items-center gap-1.5 bg-white/20 px-2 py-0.5 rounded-full">
+                      <Shield className="w-3 h-3 text-white" />
+                      <span className="text-xs font-medium text-white" data-testid={`score-travel-${index}`}>
+                        {quote.autoannie_score.toFixed(1)}/5
+                      </span>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-purple-950/50 dark:via-background dark:to-indigo-950/50 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-purple-100 dark:bg-purple-900 p-2 rounded-lg shrink-0">
+                        <Briefcase className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <p className="text-sm text-foreground leading-relaxed" data-testid={`text-travel-analysis-${index}`}>
+                        {quote.message}
+                      </p>
+                    </div>
+                    {/* Coverage Match Indicator */}
+                    <div className="mt-3 pt-3 border-t border-purple-100 dark:border-purple-800">
+                      <div className="flex items-center justify-between text-xs mb-1.5">
+                        <span className="text-muted-foreground">Coverage Match</span>
+                        <span className="font-semibold text-purple-600 dark:text-purple-400">{((quote.autoannie_score / 5) * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="h-2 bg-purple-100 dark:bg-purple-900 rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${(quote.autoannie_score / 5) * 100}%` }}
+                          transition={{ duration: 1, ease: "easeOut" }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  className="w-full"
+                  onClick={() => onProceedToBuy(quote.insurer_name)}
+                  data-testid={`button-proceed-buy-${index}`}
+                >
+                  Proceed and Buy
+                </Button>
               </CardContent>
             </Card>
           ))}
