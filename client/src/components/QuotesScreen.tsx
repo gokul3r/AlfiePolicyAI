@@ -6,6 +6,7 @@ import { ArrowLeft, Shield } from "lucide-react";
 import QuoteCard from "@/components/QuoteCard";
 import PurchasePolicyDialog from "@/components/PurchasePolicyDialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { VehiclePolicy, QuotesApiResponse, QuoteWithInsights } from "@shared/schema";
 
 interface QuotesScreenProps {
@@ -28,6 +29,7 @@ export default function QuotesScreen({
   const [selectedQuote, setSelectedQuote] = useState<QuoteWithInsights | null>(null);
   const [purchaseComplete, setPurchaseComplete] = useState(false);
   const [purchasedPolicyNumber, setPurchasedPolicyNumber] = useState<string | undefined>();
+  const { toast } = useToast();
 
   const purchaseMutation = useMutation({
     mutationFn: async (quote: QuoteWithInsights) => {
@@ -43,12 +45,16 @@ export default function QuotesScreen({
     onSuccess: (data) => {
       setPurchasedPolicyNumber(data.policy_number);
       setPurchaseComplete(true);
-      // Invalidate policies cache so the home screen shows updated data
       queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
     },
     onError: (error) => {
       console.error("Purchase error:", error);
       setPurchaseDialogOpen(false);
+      toast({
+        title: "Purchase Failed",
+        description: "We couldn't complete your policy purchase. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
