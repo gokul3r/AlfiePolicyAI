@@ -240,6 +240,9 @@ export default function ChatDialog({
       
       queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
       const savedData = { ...data, ...response };
+      // CRITICAL: Also update persistentVehicleData to ensure consistency
+      console.log("[ChatDialog] savePolicyToDatabase - setting persistentVehicleData:", savedData);
+      persistentVehicleData = savedData;
       savedVehicleDataRef.current = savedData;
       setSavedVehicleData(savedData);
       setPendingPolicyData(null);
@@ -267,13 +270,15 @@ export default function ChatDialog({
 
   // Search for quotes
   const searchForQuotes = async (vehicleData: any) => {
-    console.log("[ChatDialog] searchForQuotes called with:", vehicleData);
+    console.log("[ChatDialog] searchForQuotes called with:", JSON.stringify(vehicleData, null, 2));
     setIsSearchingQuotes(true);
     setChatQuotes([]);
     
     try {
-      const response = await apiRequest("POST", "/api/search-quotes", {
+      const requestPayload = {
         email_id: userEmail,
+        policy_id: vehicleData.policy_id || "",
+        current_insurance_provider: vehicleData.current_insurance_provider || "Unknown",
         vehicle_registration_number: vehicleData.vehicle_registration_number,
         vehicle_manufacturer_name: vehicleData.vehicle_manufacturer_name,
         vehicle_model: vehicleData.vehicle_model,
@@ -284,7 +289,9 @@ export default function ChatDialog({
         voluntary_excess: vehicleData.voluntary_excess,
         driver_age: vehicleData.driver_age,
         whisper_preferences: vehicleData.whisper_preferences || "",
-      });
+      };
+      console.log("[ChatDialog] Sending quote search request:", JSON.stringify(requestPayload, null, 2));
+      const response = await apiRequest("POST", "/api/search-quotes", requestPayload);
       
       const data = await response.json();
       const quotes = data.quotes || [];
@@ -428,6 +435,30 @@ export default function ChatDialog({
 
       // Store extracted data for potential save
       setPendingPolicyData(extractedData);
+      
+      // CRITICAL: Also set persistentVehicleData so SEARCH_QUOTES can use it immediately
+      // Map extracted data to quote search compatible format
+      const mappedData = {
+        policy_id: "",
+        vehicle_registration_number: extractedData.vehicle_registration_number,
+        vehicle_manufacturer_name: extractedData.vehicle_manufacturer_name,
+        vehicle_model: extractedData.vehicle_model,
+        vehicle_year: extractedData.vehicle_year,
+        type_of_fuel: extractedData.type_of_fuel,
+        type_of_cover_needed: extractedData.type_of_cover_needed,
+        no_claim_bonus_years: extractedData.no_claim_bonus_years || 0,
+        voluntary_excess: extractedData.voluntary_excess || 250,
+        driver_age: extractedData.driver_age || 30,
+        current_insurance_provider: extractedData.current_insurance_provider,
+        policy_number: extractedData.policy_number,
+        policy_start_date: extractedData.policy_start_date,
+        policy_end_date: extractedData.policy_end_date,
+        whisper_preferences: "",
+      };
+      console.log("[ChatDialog] Setting persistentVehicleData from PDF extraction:", mappedData);
+      persistentVehicleData = mappedData;
+      savedVehicleDataRef.current = mappedData;
+      setSavedVehicleData(mappedData);
 
       // Format extracted data as a message for the AI
       const extractedFields = formatExtractedData(extractedData);
