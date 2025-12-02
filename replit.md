@@ -108,6 +108,12 @@ Multi-insurance hybrid architecture with core policies table + type-specific det
 
 **Document Extraction Service**
 - **Google Cloud Run Insurance PDF Extractor**: Serverless API for extracting policy data from PDFs.
+  - **API URL**: `https://insurance-pdf-extractor-hylbdno2wa-nw.a.run.app/extract`
+  - **Extraction Rate**: 15 fields (12 typically extracted, 3 require manual entry)
+  - **Extracted Fields**: email_id, vehicle_registration_number, vehicle_manufacturer_name, vehicle_model, vehicle_year, type_of_fuel, type_of_Cover_needed, No_Claim_bonus_years, Policy_Number, Current_Insurance_Provider, Policy_Start_Date, Policy_End_Date
+  - **Often Missing**: driver_age, Voluntary_Excess, Current_Policy_Cost
+  - **Date Format**: API returns DD/MM/YYYY, converted to YYYY-MM-DD for HTML date inputs
+  - **Fuel Type**: API returns "Electric Vehicle" etc., normalized to "Electric", "Hybrid", "Petrol", "Diesel"
 
 **Insurance Quote Search Service**
 - **Google Cloud Run AutoSage Quote Search API**: Serverless API for finding insurance quotes based on vehicle and user preferences.
