@@ -772,182 +772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Helper: Detect renewal intent from user message
-  function detectRenewalIntent(message: string): boolean {
-    const lowerMessage = message.toLowerCase();
-    const renewalKeywords = [
-      "renew", "renewal", "renew my", "renew insurance",
-      "quote for my car", "get quotes", "insurance quote",
-      "new quote", "find cheaper", "compare prices",
-      "renewal quote", "renew my policy", "renew my car"
-    ];
-    return renewalKeywords.some(keyword => lowerMessage.includes(keyword));
-  }
-
-  // Helper: Parse vehicle selection from user message (1st, 2nd, first, second, yes, etc.)
-  function parseVehicleSelection(message: string, vehicleCount: number = 1): number | null {
-    const lowerMessage = message.toLowerCase().trim();
-    
-    // Direct matches for affirmative responses (default to 1)
-    const affirmativePatterns = ["yes", "yep", "yeah", "ok", "okay", "sure", "that one", "the one", "go ahead", "proceed"];
-    if (affirmativePatterns.some(p => lowerMessage === p || lowerMessage.startsWith(p + " ") || lowerMessage.startsWith(p + ","))) {
-      return 1; // Default to first vehicle for affirmative responses
-    }
-    
-    // Ordinal mappings
-    const ordinalMap: Record<string, number> = {
-      "1": 1, "1st": 1, "first": 1, "one": 1, "the first": 1, "first one": 1, "option 1": 1, "number 1": 1,
-      "2": 2, "2nd": 2, "second": 2, "two": 2, "the second": 2, "second one": 2, "option 2": 2, "number 2": 2,
-      "3": 3, "3rd": 3, "third": 3, "three": 3, "the third": 3, "third one": 3, "option 3": 3, "number 3": 3,
-      "4": 4, "4th": 4, "fourth": 4, "four": 4, "the fourth": 4, "fourth one": 4, "option 4": 4, "number 4": 4,
-      "5": 5, "5th": 5, "fifth": 5, "five": 5, "the fifth": 5, "fifth one": 5, "option 5": 5, "number 5": 5,
-    };
-    
-    // Check exact matches first
-    if (ordinalMap[lowerMessage]) {
-      return ordinalMap[lowerMessage];
-    }
-    
-    // Check for patterns within the message
-    for (const [key, value] of Object.entries(ordinalMap)) {
-      if (lowerMessage.includes(key)) {
-        return value;
-      }
-    }
-    
-    return null;
-  }
-
-  // Helper: Check if any recent assistant message is waiting for vehicle selection (search last 10 messages)
-  function isWaitingForVehicleSelection(chatHistory: any[]): boolean {
-    if (chatHistory.length === 0) return false;
-    
-    // Get recent assistant messages (last 10)
-    const recentAssistantMessages = [...chatHistory]
-      .reverse()
-      .filter(m => m.role === "assistant")
-      .slice(0, 10);
-    
-    // Check if any recent message has the pending marker
-    return recentAssistantMessages.some(m => m.content.includes("[VEHICLE_SELECTION_PENDING]"));
-  }
-
-  // Helper: Extract vehicles list from any recent pending message (search last 10 messages)
-  function extractVehiclesFromPendingMessage(chatHistory: any[]): VehiclePolicyWithDetails[] | null {
-    // Get recent assistant messages
-    const recentAssistantMessages = [...chatHistory]
-      .reverse()
-      .filter(m => m.role === "assistant")
-      .slice(0, 10);
-    
-    // Find the message with vehicle data (using ||| delimiter to avoid JSON bracket issues)
-    for (const msg of recentAssistantMessages) {
-      // Try new delimiter format first
-      let match = msg.content.match(/\[VEHICLES_DATA\|\|\|(.*?)\|\|\|END\]/);
-      if (!match) {
-        // Fallback: try to extract JSON by finding the pattern and parsing
-        const startMarker = "[VEHICLES_DATA:";
-        const startIdx = msg.content.indexOf(startMarker);
-        if (startIdx !== -1) {
-          const jsonStart = startIdx + startMarker.length;
-          // Find matching end by counting brackets
-          let bracketCount = 0;
-          let jsonEnd = jsonStart;
-          for (let i = jsonStart; i < msg.content.length; i++) {
-            if (msg.content[i] === '[') bracketCount++;
-            if (msg.content[i] === ']') {
-              bracketCount--;
-              if (bracketCount === 0) {
-                jsonEnd = i + 1;
-                break;
-              }
-            }
-          }
-          if (jsonEnd > jsonStart) {
-            try {
-              const jsonStr = msg.content.substring(jsonStart, jsonEnd);
-              console.log(`[Chat Renewal] Extracted vehicles JSON (${jsonStr.length} chars)`);
-              return JSON.parse(jsonStr);
-            } catch (e) {
-              console.error("[Chat Renewal] Failed to parse vehicles JSON:", e);
-              continue;
-            }
-          }
-        }
-      } else {
-        try {
-          return JSON.parse(match[1]);
-        } catch (e) {
-          continue;
-        }
-      }
-    }
-    return null;
-  }
-
-  // Helper: Call the renewal quote API
-  async function callRenewalQuoteAPI(vehicle: VehiclePolicyWithDetails, userEmail: string): Promise<any> {
-    const RENEWAL_API_URL = "https://alfie-657860957693.europe-west4.run.app/complete-analysis";
-    
-    const requestBody = {
-      insurance_details: {
-        email_id: userEmail,
-        driver_age: vehicle.details.driver_age,
-        vehicle_registration_number: vehicle.details.vehicle_registration_number,
-        vehicle_manufacturer_name: vehicle.details.vehicle_manufacturer_name,
-        vehicle_model: vehicle.details.vehicle_model,
-        vehicle_year: vehicle.details.vehicle_year,
-        type_of_fuel: vehicle.details.type_of_fuel,
-        type_of_Cover_needed: vehicle.details.type_of_cover_needed,
-        No_Claim_bonus_years: vehicle.details.no_claim_bonus_years,
-        Voluntary_Excess: vehicle.details.voluntary_excess,
-        current_insurance_provider: vehicle.current_insurance_provider,
-        policy_id: vehicle.policy_id,
-        policy_type: "car"
-      },
-      user_preferences: vehicle.whisper_preferences || "",
-      conversation_history: [],
-      trust_pilot_data: null,
-      defacto_ratings: null
-    };
-
-    console.log(`[Chat Renewal] Calling renewal API with:`, JSON.stringify(requestBody, null, 2));
-
-    const response = await fetch(RENEWAL_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[Chat Renewal] API error: ${response.status} - ${errorText}`);
-      throw new Error(`Quote API returned ${response.status}`);
-    }
-
-    return await response.json();
-  }
-
-  // Helper: Format quotes for chat display
-  function formatQuotesForChat(quotes: any[]): string {
-    if (!quotes || quotes.length === 0) {
-      return "I couldn't find any quotes at the moment. Please try again later.";
-    }
-
-    let response = "Great news! I found some renewal quotes for you:\n\n";
-    quotes.slice(0, 5).forEach((quote: any, index: number) => {
-      const price = quote.price || quote.annual_premium || "N/A";
-      const provider = quote.insurer || quote.provider || "Unknown";
-      const score = quote.autoannie_score || quote.score || "N/A";
-      response += `${index + 1}. **${provider}** - £${price}/year`;
-      if (score !== "N/A") response += ` (AutoAnnie Score: ${score})`;
-      response += "\n";
-    });
-    response += "\nWould you like more details on any of these quotes?";
-    return response;
-  }
-
-  // Send message to AI and get response (with agentic renewal capability)
+  // Send message to AI and get response
   app.post("/api/chat/send-message", async (req, res) => {
     try {
       const { email_id, message } = req.body;
@@ -978,110 +803,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: userMessage,
       });
 
-      // Get chat history to check for pending vehicle selection
-      const chatHistory = await storage.getChatHistory(email);
+      // Get AI response using Chat Completions API with vector store
+      const VECTOR_STORE_ID = "vs_6901fa16a5c081918d2ad17626cc303f";
       
       let aiResponse: string;
-
-      // AGENTIC FLOW: Check if we're waiting for vehicle selection
-      if (isWaitingForVehicleSelection(chatHistory)) {
-        const vehicleIndex = parseVehicleSelection(userMessage);
-        
-        if (vehicleIndex !== null) {
-          // User selected a vehicle - fetch and trigger quote search
-          const vehicles = extractVehiclesFromPendingMessage(chatHistory);
-          
-          if (vehicles && vehicleIndex >= 1 && vehicleIndex <= vehicles.length) {
-            const selectedVehicle = vehicles[vehicleIndex - 1];
-            console.log(`[Chat Renewal] User selected vehicle ${vehicleIndex}: ${selectedVehicle.details.vehicle_manufacturer_name} ${selectedVehicle.details.vehicle_model}`);
-            
-            try {
-              aiResponse = `Perfect! I'm searching for renewal quotes for your ${selectedVehicle.details.vehicle_manufacturer_name} ${selectedVehicle.details.vehicle_model} (${selectedVehicle.details.vehicle_registration_number}). This may take a moment...\n\n`;
-              
-              const quoteResult = await callRenewalQuoteAPI(selectedVehicle, email);
-              const quotes = quoteResult.quotes || quoteResult.results || [];
-              aiResponse += formatQuotesForChat(quotes);
-              
-            } catch (quoteError: any) {
-              console.error("[Chat Renewal] Quote API error:", quoteError);
-              aiResponse = `I'm sorry, I couldn't retrieve quotes for your ${selectedVehicle.details.vehicle_manufacturer_name} ${selectedVehicle.details.vehicle_model} right now. Please try again in a moment, or use the Quote Search button on the home screen.`;
-            }
-          } else {
-            aiResponse = `I didn't quite catch that. Please reply with a number (1, 2, 3...) or say "first", "second", "third" to select which vehicle you'd like to renew.`;
-          }
-        } else {
-          // User said something else while we were waiting - reset and use AI
-          const VECTOR_STORE_ID = "vs_6901fa16a5c081918d2ad17626cc303f";
-          try {
-            aiResponse = await sendChatMessage(userMessage, {
-              vectorStoreId: VECTOR_STORE_ID,
-              userEmail: email,
-            });
-          } catch (aiError: any) {
-            console.error("[Chat] AI error:", aiError);
-            aiResponse = "I'm having trouble connecting right now. Please try again in a moment.";
-          }
-        }
-      }
-      // AGENTIC FLOW: Detect renewal intent
-      else if (detectRenewalIntent(userMessage)) {
-        console.log(`[Chat Renewal] Detected renewal intent for ${email}`);
-        
-        // Fetch user's vehicles
-        const vehicles = await storage.getVehiclePoliciesByEmail(email);
-        
-        if (vehicles.length === 0) {
-          aiResponse = "I'd love to help you find renewal quotes, but I don't see any vehicles registered to your account yet.\n\nTo get started, please go to the home screen and tap 'Add Policy' to add your car. Once your vehicle is registered, I can help you find the best renewal quotes!";
-        } else {
-          // Format vehicle list for user selection
-          let vehicleList = "I'd be happy to help you find renewal quotes! Here are your registered vehicles:\n\n";
-          vehicles.forEach((v, index) => {
-            vehicleList += `${index + 1}. **${v.details.vehicle_manufacturer_name} ${v.details.vehicle_model}** (${v.details.vehicle_registration_number})\n`;
-            vehicleList += `   Current provider: ${v.current_insurance_provider || "Not specified"}\n`;
-          });
-          vehicleList += "\nWhich vehicle would you like to get renewal quotes for? Just reply with the number (e.g., \"1\" or \"first\").";
-          
-          // Add hidden marker with vehicle data for state tracking
-          const vehiclesData = JSON.stringify(vehicles);
-          aiResponse = `${vehicleList}\n\n[VEHICLE_SELECTION_PENDING][VEHICLES_DATA:${vehiclesData}]`;
-        }
-      }
-      // REGULAR FLOW: Use AI for general questions
-      else {
-        const VECTOR_STORE_ID = "vs_6901fa16a5c081918d2ad17626cc303f";
-        
-        try {
-          aiResponse = await sendChatMessage(userMessage, {
-            vectorStoreId: VECTOR_STORE_ID,
-            userEmail: email,
-          });
-          console.log(`[Chat] AI response: "${aiResponse}"`);
-        } catch (aiError: any) {
-          console.error("[Chat] AI error:", aiError);
-          aiResponse = "I'm having trouble connecting right now. Please try again in a moment.";
-        }
+      try {
+        aiResponse = await sendChatMessage(userMessage, {
+          vectorStoreId: VECTOR_STORE_ID,
+          userEmail: email,
+        });
+        console.log(`[Chat] AI response: "${aiResponse}"`);
+      } catch (aiError: any) {
+        console.error("[Chat] AI error:", aiError);
+        // Fallback to friendly error message
+        aiResponse = "I'm having trouble connecting right now. Please try again in a moment.";
       }
 
-      // Clean up hidden markers before saving (keep human-readable part only)
-      const cleanedResponse = aiResponse.replace(/\[VEHICLE_SELECTION_PENDING\]\[VEHICLES_DATA:.*?\]/g, "[VEHICLE_SELECTION_PENDING]");
-      
-      // Save assistant response to database (with markers for state tracking)
+      // Save assistant response to database
       const savedAssistantMessage = await storage.saveChatMessage({
         email_id: email,
         role: "assistant",
-        content: aiResponse, // Save full response with data markers
+        content: aiResponse,
       });
-
-      // Return cleaned response to frontend (hide technical markers)
-      const displayResponse = aiResponse.replace(/\[VEHICLE_SELECTION_PENDING\](\[VEHICLES_DATA:.*?\])?/g, "").trim();
 
       // Return both messages
       res.json({
         userMessage: savedUserMessage,
-        assistantMessage: {
-          ...savedAssistantMessage,
-          content: displayResponse // Show clean version to user
-        },
+        assistantMessage: savedAssistantMessage,
       });
     } catch (error) {
       console.error("Error in send-message endpoint:", error);
