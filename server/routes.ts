@@ -796,6 +796,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[Chat] Processing message from ${email}: "${userMessage}"`);
 
+      // Fetch conversation history for context
+      const chatHistory = await storage.getChatHistory(email);
+      const conversationHistory = chatHistory.map(msg => ({
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+      }));
+      console.log(`[Chat] Loaded ${conversationHistory.length} messages from history`);
+
+      // Fetch user's existing vehicle policies for context
+      const userPolicies = await storage.getVehiclePoliciesByEmail(email);
+      const policiesContext = userPolicies.map((p: any) => ({
+        vehicle_registration_number: p.vehicle_registration_number || "",
+        vehicle_manufacturer_name: p.vehicle_manufacturer_name || "",
+        vehicle_model: p.vehicle_model || "",
+        current_insurance_provider: p.current_insurance_provider || "",
+      }));
+      console.log(`[Chat] Loaded ${policiesContext.length} existing policies for context`);
+
       // Save user message to database
       const savedUserMessage = await storage.saveChatMessage({
         email_id: email,
@@ -811,8 +829,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         aiResponse = await sendChatMessage(userMessage, {
           vectorStoreId: VECTOR_STORE_ID,
           userEmail: email,
+          conversationHistory,
+          userPolicies: policiesContext,
         });
-        console.log(`[Chat] AI response: "${aiResponse}"`);
+        console.log(`[Chat] AI response: "${aiResponse.substring(0, 100)}..."`);
       } catch (aiError: any) {
         console.error("[Chat] AI error:", aiError);
         // Fallback to friendly error message
