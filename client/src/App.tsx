@@ -142,11 +142,22 @@ function AppContent() {
     },
     onError: (error: any) => {
       console.error("[createVehiclePolicy] onError called with:", error);
-      toast({
-        title: "Submission Failed",
-        description: "Unable to save vehicle policy. Please try again.",
-        variant: "destructive",
-      });
+      
+      // Check for duplicate policy error (409 Conflict)
+      const errorMessage = error.message || "";
+      if (errorMessage.includes("409")) {
+        toast({
+          title: "Vehicle Already Exists",
+          description: "You already have a policy for this vehicle. Please edit the existing policy instead of creating a new one.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Submission Failed",
+          description: "Unable to save vehicle policy. Please try again.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
