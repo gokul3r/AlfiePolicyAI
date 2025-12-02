@@ -208,7 +208,10 @@ export default function ManualEntryForm({
                         step="0.01"
                         placeholder="e.g., 1200.00"
                         {...field}
-                        className="h-11 rounded-lg"
+                        className={cn(
+                          "h-11 rounded-lg",
+                          (isFieldMissing("Current_Policy_Cost") || isFieldMissing("current_policy_cost")) && "border-destructive border-2"
+                        )}
                         data-testid="input-policy-cost"
                       />
                     </FormControl>

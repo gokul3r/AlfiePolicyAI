@@ -240,15 +240,50 @@ function AppContent() {
   };
 
   const handleExtracted = (extractedFields: any, notExtractedFields: string[]) => {
+    // Helper function to convert DD/MM/YYYY to YYYY-MM-DD format for HTML date inputs
+    const convertDateFormat = (dateStr: string | undefined): string | undefined => {
+      if (!dateStr) return undefined;
+      // Check if date is in DD/MM/YYYY format
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+      return dateStr; // Return as-is if not in expected format
+    };
+
+    // Helper function to normalize fuel type (API returns "Electric Vehicle" but form expects "Electric")
+    const normalizeFuelType = (fuel: string | undefined): string | undefined => {
+      if (!fuel) return undefined;
+      const fuelLower = fuel.toLowerCase();
+      if (fuelLower.includes('electric')) return 'Electric';
+      if (fuelLower.includes('hybrid')) return 'Hybrid';
+      if (fuelLower.includes('petrol')) return 'Petrol';
+      if (fuelLower.includes('diesel')) return 'Diesel';
+      return fuel;
+    };
+
     // Map API field names to form field names (handle casing differences)
     const mappedData: Partial<VehiclePolicyFormData> = {
+      // Vehicle details
       vehicle_registration_number: extractedFields.vehicle_registration_number,
       vehicle_manufacturer_name: extractedFields.vehicle_manufacturer_name,
-      vehicle_model: extractedFields.vehicle_model,
+      vehicle_model: extractedFields.vehicle_model?.replace(/\n/g, ' '), // Clean up newlines in model name
       vehicle_year: extractedFields.vehicle_year,
-      type_of_fuel: extractedFields.type_of_fuel,
+      type_of_fuel: normalizeFuelType(extractedFields.type_of_fuel),
       type_of_cover_needed: extractedFields.type_of_Cover_needed, // Note: different casing in API
       no_claim_bonus_years: extractedFields.No_Claim_bonus_years, // Note: different casing in API
+      
+      // New fields from updated API (5 additional fields)
+      policy_number: extractedFields.Policy_Number,
+      current_insurance_provider: extractedFields.Current_Insurance_Provider,
+      policy_start_date: convertDateFormat(extractedFields.Policy_Start_Date),
+      policy_end_date: convertDateFormat(extractedFields.Policy_End_Date),
+      voluntary_excess: extractedFields.Voluntary_Excess,
+      
+      // Additional fields that might be extracted
+      current_policy_cost: extractedFields.Current_Policy_Cost,
+      driver_age: extractedFields.driver_age,
     };
 
     setExtractedData(mappedData);

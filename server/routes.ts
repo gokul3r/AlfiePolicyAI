@@ -94,9 +94,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const blob = new Blob([req.file.buffer], { type: "application/pdf" });
       formData.append("file", blob, req.file.originalname);
 
-      // Forward request to Google Cloud Run API
+      // Forward request to Google Cloud Run API (Updated to new endpoint with 15 field extraction)
       const response = await fetch(
-        "https://insurance-pdf-extractor-657860957693.europe-west2.run.app/extract",
+        "https://insurance-pdf-extractor-hylbdno2wa-nw.a.run.app/extract",
         {
           method: "POST",
           body: formData,
