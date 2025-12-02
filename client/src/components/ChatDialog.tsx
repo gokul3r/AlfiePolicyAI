@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, X, Upload, FileText, Loader2, ExternalLink } from "lucide-react";
+import { Send, X, Upload, FileText, Loader2, ExternalLink, Search } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +64,7 @@ export default function ChatDialog({
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [purchaseProgress, setPurchaseProgress] = useState<string>("");
   const [savedVehicleData, setSavedVehicleData] = useState<any>(null);
+  const [showSearchQuotesButton, setShowSearchQuotesButton] = useState(false);
   const savedVehicleDataRef = useRef<any>(null); // Ref for immediate access in closures
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -74,6 +75,41 @@ export default function ChatDialog({
     queryKey: ["/api/chat/messages", userEmail],
     enabled: open && !!userEmail,
   });
+
+  // Fetch existing vehicle policies to populate vehicle data for quote search
+  const { data: existingPolicies = [] } = useQuery<any[]>({
+    queryKey: ["/api/vehicle-policies", userEmail],
+    enabled: open && !!userEmail,
+  });
+
+  // Populate persistentVehicleData from existing policies when they load
+  useEffect(() => {
+    if (existingPolicies.length > 0 && !persistentVehicleData) {
+      const policy = existingPolicies[0]; // Use first/most recent policy
+      const details = policy.details || {};
+      const mappedData = {
+        policy_id: policy.policy_id,
+        vehicle_registration_number: details.vehicle_registration_number,
+        vehicle_manufacturer_name: details.vehicle_manufacturer_name,
+        vehicle_model: details.vehicle_model,
+        vehicle_year: details.vehicle_year,
+        type_of_fuel: details.type_of_fuel,
+        type_of_cover_needed: details.type_of_cover_needed,
+        no_claim_bonus_years: details.no_claim_bonus_years || 0,
+        voluntary_excess: details.voluntary_excess || 250,
+        driver_age: details.driver_age || 30,
+        current_insurance_provider: policy.current_insurance_provider,
+        policy_number: policy.policy_number,
+        policy_start_date: policy.policy_start_date,
+        policy_end_date: policy.policy_end_date,
+        whisper_preferences: policy.whisper_preferences || "",
+      };
+      console.log("[ChatDialog] Populated persistentVehicleData from existing policy:", mappedData);
+      persistentVehicleData = mappedData;
+      savedVehicleDataRef.current = mappedData;
+      setSavedVehicleData(mappedData);
+    }
+  }, [existingPolicies]);
 
   // Send message to AI mutation
   const sendMessageMutation = useMutation({
@@ -109,6 +145,25 @@ export default function ChatDialog({
     console.log("[ChatDialog] savedVehicleDataRef:", savedVehicleDataRef.current ? "SET" : "NOT SET");
     console.log("[ChatDialog] persistentVehicleData:", persistentVehicleData ? "SET" : "NOT SET");
     
+    // Check if AI is asking about searching for quotes and we have vehicle data
+    const quoteSearchPhrases = [
+      "would you like me to search",
+      "search for new insurance quotes",
+      "search for quotes",
+      "find quotes",
+      "get quotes",
+      "look for quotes",
+      "insurance quotes for",
+    ];
+    const lowerContent = content.toLowerCase();
+    const mentionsQuoteSearch = quoteSearchPhrases.some(phrase => lowerContent.includes(phrase));
+    const hasVehicleData = persistentVehicleData || savedVehicleDataRef.current || savedVehicleData;
+    
+    if (mentionsQuoteSearch && hasVehicleData && !isSearchingQuotes && chatQuotes.length === 0) {
+      console.log("[ChatDialog] Showing Search Quotes button - AI mentioned quotes and vehicle data is available");
+      setShowSearchQuotesButton(true);
+    }
+    
     if (content.includes("[ACTION:SHOW_UPLOAD]")) {
       setShowUploadButton(true);
     }
@@ -120,6 +175,7 @@ export default function ChatDialog({
     }
     if (content.includes("[ACTION:SEARCH_QUOTES]")) {
       console.log("[ChatDialog] SEARCH_QUOTES detected!");
+      setShowSearchQuotesButton(false); // Hide button when automatic search triggers
       // Try all sources: module-level, ref, then state (in order of reliability)
       const vehicleData = persistentVehicleData || savedVehicleDataRef.current || savedVehicleData;
       if (vehicleData) {
@@ -528,6 +584,7 @@ export default function ChatDialog({
     if (!open) {
       setHasProcessedInitialMessage(false);
       setShowUploadButton(false);
+      setShowSearchQuotesButton(false); // Reset search button visibility
       setPendingPolicyData(null);
       setChatQuotes([]);
       setAllQuotes([]);
@@ -564,6 +621,23 @@ export default function ChatDialog({
     if (onNavigateToQuotes && allQuotes.length > 0) {
       onNavigateToQuotes(allQuotes, savedVehicleData);
       onOpenChange(false);
+    }
+  };
+
+  // Handle Search Quotes button click
+  const handleSearchQuotesClick = async () => {
+    const vehicleData = persistentVehicleData || savedVehicleDataRef.current || savedVehicleData;
+    if (vehicleData) {
+      console.log("[ChatDialog] Search Quotes button clicked, using vehicle data:", vehicleData);
+      setShowSearchQuotesButton(false); // Hide button while searching
+      await searchForQuotes(vehicleData);
+    } else {
+      console.error("[ChatDialog] Search Quotes button clicked but no vehicle data available");
+      toast({
+        title: "Error",
+        description: "Vehicle data not found. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -637,6 +711,20 @@ export default function ChatDialog({
                     </div>
                   </div>
                 ))}
+                
+                {/* Search Quotes button - shown when AI mentions quotes and vehicle data is available */}
+                {showSearchQuotesButton && !isSearchingQuotes && chatQuotes.length === 0 && (
+                  <div className="flex justify-center my-4">
+                    <Button
+                      onClick={handleSearchQuotesClick}
+                      className="gap-2 px-6"
+                      data-testid="button-search-quotes-chat"
+                    >
+                      <Search className="w-4 h-4" />
+                      Search for Quotes
+                    </Button>
+                  </div>
+                )}
                 
                 {/* Quote cards displayed in chat */}
                 {chatQuotes.length > 0 && (
