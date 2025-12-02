@@ -21,9 +21,7 @@ import { calculateFinancialBreakdown } from "./financial-calculator";
 
 // Helper function to flatten policy response for frontend compatibility
 function flattenPolicyResponse(policy: VehiclePolicyWithDetails): any {
-  // Spread detail fields first, then override with policy-level fields
   return {
-    ...policy.details,
     // Use policy_id as vehicle_id for backwards compatibility
     vehicle_id: policy.policy_id,
     policy_id: policy.policy_id,
@@ -38,6 +36,8 @@ function flattenPolicyResponse(policy: VehiclePolicyWithDetails): any {
     status: policy.status,
     created_at: policy.created_at,
     updated_at: policy.updated_at,
+    // Spread detail fields at the top level
+    ...policy.details
   };
 }
 
@@ -124,41 +124,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Quote search request payload:", JSON.stringify(req.body, null, 2));
       
-      // Transform flat request into nested format required by external API
-      // CRITICAL: API requires exact capitalization for some field names
-      const quoteRequestBody = {
-        insurance_details: {
-          email_id: req.body.email_id,
-          current_insurance_provider: req.body.current_insurance_provider || "Unknown",
-          policy_id: req.body.policy_id || "",
-          policy_type: "car",
-          driver_age: req.body.driver_age || 30,
-          vehicle_registration_number: req.body.vehicle_registration_number,
-          vehicle_manufacturer_name: req.body.vehicle_manufacturer_name,
-          vehicle_model: req.body.vehicle_model,
-          vehicle_year: req.body.vehicle_year,
-          type_of_fuel: req.body.type_of_fuel,
-          type_of_Cover_needed: req.body.type_of_cover_needed,  // Capital C required by API
-          No_Claim_bonus_years: req.body.no_claim_bonus_years || 0,  // Capital N and C required by API
-          Voluntary_Excess: req.body.voluntary_excess || 250,  // Capital V and E required by API
-        },
-        user_preferences: req.body.whisper_preferences || "",
-        conversation_history: [],
-        trust_pilot_data: null,
-        defacto_ratings: null,
-      };
-      
-      console.log("Formatted quote request:", JSON.stringify(quoteRequestBody, null, 2));
-      
-      // Forward request to Google Cloud Run Quote Search API (enriched API)
+      // Forward request to Google Cloud Run Quote Search API (OLD URL for home quote search)
       const response = await fetch(
-        "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
+        "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(quoteRequestBody),
+          body: JSON.stringify(req.body),
         }
       );
 
@@ -822,24 +796,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`[Chat] Processing message from ${email}: "${userMessage}"`);
 
-      // Fetch conversation history for context
-      const chatHistory = await storage.getChatHistory(email);
-      const conversationHistory = chatHistory.map(msg => ({
-        role: msg.role as "user" | "assistant",
-        content: msg.content,
-      }));
-      console.log(`[Chat] Loaded ${conversationHistory.length} messages from history`);
-
-      // Fetch user's existing vehicle policies for context
-      const userPolicies = await storage.getVehiclePoliciesByEmail(email);
-      const policiesContext = userPolicies.map((p: any) => ({
-        vehicle_registration_number: p.vehicle_registration_number || "",
-        vehicle_manufacturer_name: p.vehicle_manufacturer_name || "",
-        vehicle_model: p.vehicle_model || "",
-        current_insurance_provider: p.current_insurance_provider || "",
-      }));
-      console.log(`[Chat] Loaded ${policiesContext.length} existing policies for context`);
-
       // Save user message to database
       const savedUserMessage = await storage.saveChatMessage({
         email_id: email,
@@ -855,10 +811,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         aiResponse = await sendChatMessage(userMessage, {
           vectorStoreId: VECTOR_STORE_ID,
           userEmail: email,
-          conversationHistory,
-          userPolicies: policiesContext,
         });
-        console.log(`[Chat] AI response: "${aiResponse.substring(0, 100)}..."`);
+        console.log(`[Chat] AI response: "${aiResponse}"`);
       } catch (aiError: any) {
         console.error("[Chat] AI error:", aiError);
         // Fallback to friendly error message
@@ -883,77 +837,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: "Failed to process message",
         message: error instanceof Error ? error.message : "Unknown error"
       });
-    }
-  });
-
-  // Check if a vehicle registration exists in the database
-  app.post("/api/chat/check-registration", async (req, res) => {
-    try {
-      const { email_id, registration_number } = req.body;
-      
-      if (!email_id || typeof email_id !== "string") {
-        return res.status(400).json({ error: "email_id is required" });
-      }
-      if (!registration_number || typeof registration_number !== "string") {
-        return res.status(400).json({ error: "registration_number is required" });
-      }
-
-      const email = email_id.toLowerCase().trim();
-      const regNumber = registration_number.toUpperCase().replace(/\s/g, "").trim();
-
-      // Verify user exists
-      const user = await storage.getUserByEmail(email);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      console.log(`[Registration Check] Checking ${regNumber} for user ${email}`);
-
-      // Get all vehicle policies for this user
-      const userPolicies = await storage.getVehiclePoliciesByEmail(email);
-      console.log(`[Registration Check] Found ${userPolicies.length} policies for user`);
-      
-      // Find matching vehicle by registration number
-      // Note: vehicle details are nested under .details
-      const matchingVehicle = userPolicies.find((policy: any) => {
-        const policyReg = (policy.details?.vehicle_registration_number || "").toUpperCase().replace(/\s/g, "");
-        console.log(`[Registration Check] Comparing ${policyReg} with ${regNumber}`);
-        return policyReg === regNumber;
-      });
-
-      if (matchingVehicle) {
-        // Access nested details for vehicle-specific fields
-        const d = matchingVehicle.details;
-        console.log(`[Registration Check] Found vehicle: ${d?.vehicle_manufacturer_name} ${d?.vehicle_model}`);
-        res.json({
-          found: true,
-          vehicle: {
-            policy_id: matchingVehicle.policy_id,
-            registration_number: d?.vehicle_registration_number,
-            manufacturer: d?.vehicle_manufacturer_name,
-            model: d?.vehicle_model,
-            year: d?.vehicle_year,
-            fuel_type: d?.type_of_fuel,
-            cover_type: d?.type_of_cover_needed,
-            no_claim_bonus_years: d?.no_claim_bonus_years,
-            voluntary_excess: d?.voluntary_excess,
-            driver_age: d?.driver_age,
-            current_provider: matchingVehicle.current_insurance_provider,
-            policy_number: matchingVehicle.policy_number,
-            policy_start_date: matchingVehicle.policy_start_date,
-            policy_end_date: matchingVehicle.policy_end_date,
-          }
-        });
-      } else {
-        console.log(`[Registration Check] No vehicle found with registration ${regNumber}`);
-        res.json({
-          found: false,
-          registration_number: regNumber
-        });
-      }
-    } catch (error) {
-      console.error("Error checking registration:", error);
-      res.status(500).json({ error: "Failed to check registration" });
     }
   });
 
