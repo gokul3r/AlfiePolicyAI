@@ -21,7 +21,9 @@ import { calculateFinancialBreakdown } from "./financial-calculator";
 
 // Helper function to flatten policy response for frontend compatibility
 function flattenPolicyResponse(policy: VehiclePolicyWithDetails): any {
+  // Spread detail fields first, then override with policy-level fields
   return {
+    ...policy.details,
     // Use policy_id as vehicle_id for backwards compatibility
     vehicle_id: policy.policy_id,
     policy_id: policy.policy_id,
@@ -36,8 +38,6 @@ function flattenPolicyResponse(policy: VehiclePolicyWithDetails): any {
     status: policy.status,
     created_at: policy.created_at,
     updated_at: policy.updated_at,
-    // Spread detail fields at the top level
-    ...policy.details
   };
 }
 
@@ -124,15 +124,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log("Quote search request payload:", JSON.stringify(req.body, null, 2));
       
-      // Forward request to Google Cloud Run Quote Search API (OLD URL for home quote search)
+      // Transform flat request into nested format required by external API
+      // CRITICAL: API requires exact capitalization for some field names
+      const quoteRequestBody = {
+        insurance_details: {
+          email_id: req.body.email_id,
+          current_insurance_provider: req.body.current_insurance_provider || "Unknown",
+          policy_id: req.body.policy_id || "",
+          policy_type: "car",
+          driver_age: req.body.driver_age || 30,
+          vehicle_registration_number: req.body.vehicle_registration_number,
+          vehicle_manufacturer_name: req.body.vehicle_manufacturer_name,
+          vehicle_model: req.body.vehicle_model,
+          vehicle_year: req.body.vehicle_year,
+          type_of_fuel: req.body.type_of_fuel,
+          type_of_Cover_needed: req.body.type_of_cover_needed,  // Capital C required by API
+          No_Claim_bonus_years: req.body.no_claim_bonus_years || 0,  // Capital N and C required by API
+          Voluntary_Excess: req.body.voluntary_excess || 250,  // Capital V and E required by API
+        },
+        user_preferences: req.body.whisper_preferences || "",
+        conversation_history: [],
+        trust_pilot_data: null,
+        defacto_ratings: null,
+      };
+      
+      console.log("Formatted quote request:", JSON.stringify(quoteRequestBody, null, 2));
+      
+      // Forward request to Google Cloud Run Quote Search API (enriched API)
       const response = await fetch(
-        "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis",
+        "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(req.body),
+          body: JSON.stringify(quoteRequestBody),
         }
       );
 
@@ -885,28 +911,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get all vehicle policies for this user
       const userPolicies = await storage.getVehiclePoliciesByEmail(email);
+      console.log(`[Registration Check] Found ${userPolicies.length} policies for user`);
       
       // Find matching vehicle by registration number
+      // Note: vehicle details are nested under .details
       const matchingVehicle = userPolicies.find((policy: any) => {
-        const policyReg = (policy.vehicle_registration_number || "").toUpperCase().replace(/\s/g, "");
+        const policyReg = (policy.details?.vehicle_registration_number || "").toUpperCase().replace(/\s/g, "");
+        console.log(`[Registration Check] Comparing ${policyReg} with ${regNumber}`);
         return policyReg === regNumber;
       });
 
       if (matchingVehicle) {
-        console.log(`[Registration Check] Found vehicle: ${matchingVehicle.vehicle_manufacturer_name} ${matchingVehicle.vehicle_model}`);
+        // Access nested details for vehicle-specific fields
+        const d = matchingVehicle.details;
+        console.log(`[Registration Check] Found vehicle: ${d?.vehicle_manufacturer_name} ${d?.vehicle_model}`);
         res.json({
           found: true,
           vehicle: {
             policy_id: matchingVehicle.policy_id,
-            registration_number: matchingVehicle.vehicle_registration_number,
-            manufacturer: matchingVehicle.vehicle_manufacturer_name,
-            model: matchingVehicle.vehicle_model,
-            year: matchingVehicle.vehicle_year,
-            fuel_type: matchingVehicle.type_of_fuel,
-            cover_type: matchingVehicle.type_of_cover_needed,
-            no_claim_bonus_years: matchingVehicle.no_claim_bonus_years,
-            voluntary_excess: matchingVehicle.voluntary_excess,
-            driver_age: matchingVehicle.driver_age,
+            registration_number: d?.vehicle_registration_number,
+            manufacturer: d?.vehicle_manufacturer_name,
+            model: d?.vehicle_model,
+            year: d?.vehicle_year,
+            fuel_type: d?.type_of_fuel,
+            cover_type: d?.type_of_cover_needed,
+            no_claim_bonus_years: d?.no_claim_bonus_years,
+            voluntary_excess: d?.voluntary_excess,
+            driver_age: d?.driver_age,
             current_provider: matchingVehicle.current_insurance_provider,
             policy_number: matchingVehicle.policy_number,
             policy_start_date: matchingVehicle.policy_start_date,

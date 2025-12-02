@@ -16,6 +16,9 @@ import type { ChatMessage, QuoteWithInsights } from "@shared/schema";
 import { ComingSoonDialog } from "./ComingSoonDialog";
 import QuoteChatCard from "./QuoteChatCard";
 
+// Module-level storage for vehicle data that persists across component re-renders
+let persistentVehicleData: any = null;
+
 interface ChatDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -61,6 +64,7 @@ export default function ChatDialog({
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [purchaseProgress, setPurchaseProgress] = useState<string>("");
   const [savedVehicleData, setSavedVehicleData] = useState<any>(null);
+  const savedVehicleDataRef = useRef<any>(null); // Ref for immediate access in closures
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -82,6 +86,7 @@ export default function ChatDialog({
       return data;
     },
     onSuccess: (data: any) => {
+      console.log("[ChatDialog] Message mutation success, ref value:", savedVehicleDataRef.current ? "SET" : "NOT SET");
       queryClient.invalidateQueries({ queryKey: ["/api/chat/messages", userEmail] });
       
       // Check for action markers in the response
@@ -99,6 +104,11 @@ export default function ChatDialog({
 
   // Handle action markers from AI response
   const handleActionMarkers = async (content: string) => {
+    console.log("[ChatDialog] Checking action markers in:", content.substring(0, 100));
+    console.log("[ChatDialog] savedVehicleData state:", savedVehicleData ? "SET" : "NOT SET");
+    console.log("[ChatDialog] savedVehicleDataRef:", savedVehicleDataRef.current ? "SET" : "NOT SET");
+    console.log("[ChatDialog] persistentVehicleData:", persistentVehicleData ? "SET" : "NOT SET");
+    
     if (content.includes("[ACTION:SHOW_UPLOAD]")) {
       setShowUploadButton(true);
     }
@@ -108,8 +118,16 @@ export default function ChatDialog({
     if (content.includes("[ACTION:SAVE_POLICY]") && pendingPolicyData) {
       await savePolicyToDatabase(pendingPolicyData);
     }
-    if (content.includes("[ACTION:SEARCH_QUOTES]") && savedVehicleData) {
-      await searchForQuotes(savedVehicleData);
+    if (content.includes("[ACTION:SEARCH_QUOTES]")) {
+      console.log("[ChatDialog] SEARCH_QUOTES detected!");
+      // Try all sources: module-level, ref, then state (in order of reliability)
+      const vehicleData = persistentVehicleData || savedVehicleDataRef.current || savedVehicleData;
+      if (vehicleData) {
+        console.log("[ChatDialog] Calling searchForQuotes with:", vehicleData);
+        await searchForQuotes(vehicleData);
+      } else {
+        console.error("[ChatDialog] Cannot search - savedVehicleData is not set!");
+      }
     }
     
     // Handle show quotes action - quotes are already displayed when chatQuotes is set
@@ -168,7 +186,13 @@ export default function ChatDialog({
           policy_start_date: v.policy_start_date,
           policy_end_date: v.policy_end_date,
         };
+        // Set module-level, ref, AND state for maximum reliability
+        console.log("[ChatDialog] BEFORE setting:", persistentVehicleData);
+        persistentVehicleData = mappedVehicleData;
+        savedVehicleDataRef.current = mappedVehicleData;
         setSavedVehicleData(mappedVehicleData);
+        console.log("[ChatDialog] AFTER setting persistentVehicleData:", persistentVehicleData);
+        console.log("[ChatDialog] Set savedVehicleData:", mappedVehicleData);
         
         // Send result back to AI to trigger existing vehicle flow
         const feedbackMessage = `VEHICLE_FOUND: ${v.manufacturer} ${v.model} (${v.registration_number}), Year: ${v.year}, Cover: ${v.cover_type}, Provider: ${v.current_provider}, Policy: ${v.policy_number}`;
@@ -215,7 +239,9 @@ export default function ChatDialog({
       });
       
       queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
-      setSavedVehicleData({ ...data, ...response });
+      const savedData = { ...data, ...response };
+      savedVehicleDataRef.current = savedData;
+      setSavedVehicleData(savedData);
       setPendingPolicyData(null);
       
       toast({
@@ -241,6 +267,7 @@ export default function ChatDialog({
 
   // Search for quotes
   const searchForQuotes = async (vehicleData: any) => {
+    console.log("[ChatDialog] searchForQuotes called with:", vehicleData);
     setIsSearchingQuotes(true);
     setChatQuotes([]);
     
