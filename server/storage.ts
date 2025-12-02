@@ -111,6 +111,23 @@ export class DbStorage implements IStorage {
   async createVehiclePolicy(policyData: InsertVehiclePolicy): Promise<VehiclePolicyWithDetails> {
     const { policy, details } = policyData;
     
+    // Check for existing policy with same email and registration number
+    const existingPolicies = await db
+      .select()
+      .from(policies)
+      .leftJoin(vehiclePolicyDetails, eq(policies.policy_id, vehiclePolicyDetails.policy_id))
+      .where(
+        and(
+          eq(policies.email_id, policy.email_id),
+          eq(policies.policy_type, 'car'),
+          eq(vehiclePolicyDetails.vehicle_registration_number, details.vehicle_registration_number)
+        )
+      );
+    
+    if (existingPolicies.length > 0) {
+      throw new Error(`DUPLICATE_POLICY: A policy for vehicle ${details.vehicle_registration_number} already exists. Please edit the existing policy instead.`);
+    }
+    
     const [createdPolicy] = await db.insert(policies).values(policy).returning();
     
     const [createdDetails] = await db.insert(vehiclePolicyDetails).values({
