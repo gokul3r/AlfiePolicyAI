@@ -636,6 +636,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("[vehicle-policies] Validation error:", JSON.stringify(error.errors));
         return res.status(400).json({ error: "Invalid vehicle policy data", details: error.errors });
       }
+      // Check for duplicate policy error
+      if (error instanceof Error && error.message.startsWith("DUPLICATE_POLICY:")) {
+        console.log("[vehicle-policies] Duplicate policy error:", error.message);
+        return res.status(409).json({ 
+          error: "Duplicate policy", 
+          message: error.message.replace("DUPLICATE_POLICY: ", "")
+        });
+      }
       console.error("[vehicle-policies] Unexpected error:", error);
       res.status(500).json({ error: "Failed to create vehicle policy" });
     }
