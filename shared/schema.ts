@@ -39,6 +39,7 @@ export const policies = pgTable("policies", {
 // Vehicle-specific details (for car and van)
 export const vehiclePolicyDetails = pgTable("vehicle_policy_details", {
   policy_id: text("policy_id").primaryKey().references(() => policies.policy_id, { onDelete: "cascade" }),
+  policy_number: text("policy_number"), // Denormalized for easier querying (synced from policies table)
   driver_age: integer("driver_age").notNull(),
   vehicle_registration_number: text("vehicle_registration_number").notNull(),
   vehicle_manufacturer_name: text("vehicle_manufacturer_name").notNull(),
