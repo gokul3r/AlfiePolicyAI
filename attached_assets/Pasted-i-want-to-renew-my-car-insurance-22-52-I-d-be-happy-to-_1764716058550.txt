@@ -1,0 +1,23 @@
+i want to renew my car insurance
+
+22:52
+
+I'd be happy to help you find renewal quotes! Here are your registered vehicles: 1. **TESLA MODEL 3 STANDARD RANGE PLUS** (LB71UUV) Current provider: Admiral 2. **TESLA MODEL 3 STANDARD RANGE PLUS** (LB71UUV) Current provider: PAXA Which vehicle would you like to get renewal quotes for? Just reply with the number (e.g., "1" or "first"). [VEHICLE_SELECTION_PENDING][VEHICLES_DATA:[{"policy_id":"643ae2e2-56e1-40cb-89e2-ac98e53e190d","email_id":"saran@gmail.com","policy_type":"car","policy_number":"P0119420632","policy_start_date":"2025-12-02","policy_end_date":"2026-12-02","current_policy_cost":388.76,"current_insurance_provider":"Admiral","whisper_preferences":null,"status":"active","created_at":"2025-12-02T13:17:14.083Z","updated_at":"2025-12-02T15:02:04.789Z","details":{"policy_id":"643ae2e2-56e1-40cb-89e2-ac98e53e190d","policy_number":"P0119420632","driver_age":38,"vehicle_registration_number":"LB71UUV","vehicle_manufacturer_name":"TESLA","vehicle_model":"MODEL 3 STANDARD RANGE PLUS","vehicle_year":2021,"type_of_fuel":"Electric","type_of_cover_needed":"comprehensive","no_claim_bonus_years":4,"voluntary_excess":400}},{"policy_id":"2a8d4c0b-1286-459f-b448-bec869112d64","email_id":"saran@gmail.com","policy_type":"car","policy_number":"P2470358951","policy_start_date":"2025-12-02","policy_end_date":"2026-12-02","current_policy_cost":414.47,"current_insurance_provider":"PAXA","whisper_preferences":"I need windshield cover, european cover, legal cover and breakdown cover with maximum budget of £400","status":"active","created_at":"2025-11-24T22:09:41.213Z","updated_at":"2025-12-02T15:03:02.437Z","details":{"policy_id":"2a8d4c0b-1286-459f-b448-bec869112d64","policy_number":"P2470358951","driver_age":40,"vehicle_registration_number":"LB71UUV","vehicle_manufacturer_name":"TESLA","vehicle_model":"MODEL 3 STANDARD\nRANGE PLUS","vehicle_year":2021,"type_of_fuel":"Electric","type_of_cover_needed":"comprehensive","no_claim_bonus_years":4,"voluntary_excess":400}}]]
+
+22:52
+
+yes
+
+22:52
+
+How can I assist you today? If you have questions about your insurance documents, feel free to ask!
+
+22:52
+
+i want to renew my car insurance
+
+22:52
+
+I'd be happy to help you find renewal quotes! Here are your registered vehicles: 1. **TESLA MODEL 3 STANDARD RANGE PLUS** (LB71UUV) Current provider: Admiral 2. **TESLA MODEL 3 STANDARD RANGE PLUS** (LB71UUV) Current provider: PAXA Which vehicle would you like to get renewal quotes for? Just reply with the number (e.g., "1" or "first"). [VEHICLE_SELECTION_PENDING][VEHICLES_DATA:[{"policy_id":"643ae2e2-56e1-40cb-89e2-ac98e53e190d","email_id":"saran@gmail.com","policy_type":"car","policy_number":"P0119420632","policy_start_date":"2025-12-02","policy_end_date":"2026-12-02","current_policy_cost":388.76,"current_insurance_provider":"Admiral","whisper_preferences":null,"status":"active","created_at":"2025-12-02T13:17:14.083Z","updated_at":"2025-12-02T15:02:04.789Z","details":{"policy_id":"643ae2e2-56e1-40cb-89e2-ac98e53e190d","policy_number":"P0119420632","driver_age":38,"vehicle_registration_number":"LB71UUV","vehicle_manufacturer_name":"TESLA","vehicle_model":"MODEL 3 STANDARD RANGE PLUS","vehicle_year":2021,"type_of_fuel":"Electric","type_of_cover_needed":"comprehensive","no_claim_bonus_years":4,"voluntary_excess":400}},{"policy_id":"2a8d4c0b-1286-459f-b448-bec869112d64","email_id":"saran@gmail.com","policy_type":"car","policy_number":"P2470358951","policy_start_date":"2025-12-02","policy_end_date":"2026-12-02","current_policy_cost":414.47,"current_insurance_provider":"PAXA","whisper_preferences":"I need windshield cover, european cover, legal cover and breakdown cover with maximum budget of £400","status":"active","created_at":"2025-11-24T22:09:41.213Z","updated_at":"2025-12-02T15:03:02.437Z","details":{"policy_id":"2a8d4c0b-1286-459f-b448-bec869112d64","policy_number":"P2470358951","driver_age":40,"vehicle_registration_number":"LB71UUV","vehicle_manufacturer_name":"TESLA","vehicle_model":"MODEL 3 STANDARD\nRANGE PLUS","vehicle_year":2021,"type_of_fuel":"Electric","type_of_cover_needed":"comprehensive","no_claim_bonus_years":4,"voluntary_excess":400}}]]
+
+22:52

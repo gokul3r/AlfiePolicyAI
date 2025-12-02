@@ -784,42 +784,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return renewalKeywords.some(keyword => lowerMessage.includes(keyword));
   }
 
-  // Helper: Parse vehicle selection from user message (1st, 2nd, first, second, etc.)
-  function parseVehicleSelection(message: string): number | null {
+  // Helper: Parse vehicle selection from user message (1st, 2nd, first, second, yes, etc.)
+  function parseVehicleSelection(message: string, vehicleCount: number = 1): number | null {
     const lowerMessage = message.toLowerCase().trim();
+    
+    // Direct matches for affirmative responses (default to 1)
+    const affirmativePatterns = ["yes", "yep", "yeah", "ok", "okay", "sure", "that one", "the one", "go ahead", "proceed"];
+    if (affirmativePatterns.some(p => lowerMessage === p || lowerMessage.startsWith(p + " ") || lowerMessage.startsWith(p + ","))) {
+      return 1; // Default to first vehicle for affirmative responses
+    }
+    
+    // Ordinal mappings
     const ordinalMap: Record<string, number> = {
-      "1": 1, "1st": 1, "first": 1, "one": 1, "the first": 1,
-      "2": 2, "2nd": 2, "second": 2, "two": 2, "the second": 2,
-      "3": 3, "3rd": 3, "third": 3, "three": 3, "the third": 3,
-      "4": 4, "4th": 4, "fourth": 4, "four": 4, "the fourth": 4,
-      "5": 5, "5th": 5, "fifth": 5, "five": 5, "the fifth": 5,
+      "1": 1, "1st": 1, "first": 1, "one": 1, "the first": 1, "first one": 1, "option 1": 1, "number 1": 1,
+      "2": 2, "2nd": 2, "second": 2, "two": 2, "the second": 2, "second one": 2, "option 2": 2, "number 2": 2,
+      "3": 3, "3rd": 3, "third": 3, "three": 3, "the third": 3, "third one": 3, "option 3": 3, "number 3": 3,
+      "4": 4, "4th": 4, "fourth": 4, "four": 4, "the fourth": 4, "fourth one": 4, "option 4": 4, "number 4": 4,
+      "5": 5, "5th": 5, "fifth": 5, "five": 5, "the fifth": 5, "fifth one": 5, "option 5": 5, "number 5": 5,
     };
+    
+    // Check exact matches first
+    if (ordinalMap[lowerMessage]) {
+      return ordinalMap[lowerMessage];
+    }
+    
+    // Check for patterns within the message
     for (const [key, value] of Object.entries(ordinalMap)) {
-      if (lowerMessage === key || lowerMessage.includes(key + " ") || lowerMessage.includes(key + ".") || lowerMessage.endsWith(key)) {
+      if (lowerMessage.includes(key)) {
         return value;
       }
     }
+    
     return null;
   }
 
-  // Helper: Check if the last assistant message was asking for vehicle selection
+  // Helper: Check if any recent assistant message is waiting for vehicle selection (search last 10 messages)
   function isWaitingForVehicleSelection(chatHistory: any[]): boolean {
     if (chatHistory.length === 0) return false;
-    const lastAssistantMessage = [...chatHistory].reverse().find(m => m.role === "assistant");
-    if (!lastAssistantMessage) return false;
-    return lastAssistantMessage.content.includes("[VEHICLE_SELECTION_PENDING]");
+    
+    // Get recent assistant messages (last 10)
+    const recentAssistantMessages = [...chatHistory]
+      .reverse()
+      .filter(m => m.role === "assistant")
+      .slice(0, 10);
+    
+    // Check if any recent message has the pending marker
+    return recentAssistantMessages.some(m => m.content.includes("[VEHICLE_SELECTION_PENDING]"));
   }
 
-  // Helper: Extract vehicles list from the pending message
+  // Helper: Extract vehicles list from any recent pending message (search last 10 messages)
   function extractVehiclesFromPendingMessage(chatHistory: any[]): VehiclePolicyWithDetails[] | null {
-    const lastAssistantMessage = [...chatHistory].reverse().find(m => m.role === "assistant");
-    if (!lastAssistantMessage) return null;
-    const match = lastAssistantMessage.content.match(/\[VEHICLES_DATA:(.*?)\]/);
-    if (match) {
-      try {
-        return JSON.parse(match[1]);
-      } catch (e) {
-        return null;
+    // Get recent assistant messages
+    const recentAssistantMessages = [...chatHistory]
+      .reverse()
+      .filter(m => m.role === "assistant")
+      .slice(0, 10);
+    
+    // Find the message with vehicle data (using ||| delimiter to avoid JSON bracket issues)
+    for (const msg of recentAssistantMessages) {
+      // Try new delimiter format first
+      let match = msg.content.match(/\[VEHICLES_DATA\|\|\|(.*?)\|\|\|END\]/);
+      if (!match) {
+        // Fallback: try to extract JSON by finding the pattern and parsing
+        const startMarker = "[VEHICLES_DATA:";
+        const startIdx = msg.content.indexOf(startMarker);
+        if (startIdx !== -1) {
+          const jsonStart = startIdx + startMarker.length;
+          // Find matching end by counting brackets
+          let bracketCount = 0;
+          let jsonEnd = jsonStart;
+          for (let i = jsonStart; i < msg.content.length; i++) {
+            if (msg.content[i] === '[') bracketCount++;
+            if (msg.content[i] === ']') {
+              bracketCount--;
+              if (bracketCount === 0) {
+                jsonEnd = i + 1;
+                break;
+              }
+            }
+          }
+          if (jsonEnd > jsonStart) {
+            try {
+              const jsonStr = msg.content.substring(jsonStart, jsonEnd);
+              console.log(`[Chat Renewal] Extracted vehicles JSON (${jsonStr.length} chars)`);
+              return JSON.parse(jsonStr);
+            } catch (e) {
+              console.error("[Chat Renewal] Failed to parse vehicles JSON:", e);
+              continue;
+            }
+          }
+        }
+      } else {
+        try {
+          return JSON.parse(match[1]);
+        } catch (e) {
+          continue;
+        }
       }
     }
     return null;

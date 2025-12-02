@@ -21,6 +21,39 @@ interface ChatDialogProps {
   initialMessage?: string;
 }
 
+// Helper: Strip internal markers from message content for display
+function cleanMessageContent(content: string): string {
+  let cleaned = content;
+  
+  // Remove [VEHICLE_SELECTION_PENDING] marker
+  cleaned = cleaned.replace(/\[VEHICLE_SELECTION_PENDING\]/g, "");
+  
+  // Remove [VEHICLES_DATA:...] marker (with JSON that may contain brackets)
+  const startMarker = "[VEHICLES_DATA:";
+  const startIdx = cleaned.indexOf(startMarker);
+  if (startIdx !== -1) {
+    // Find the matching end bracket by counting
+    let bracketCount = 0;
+    let endIdx = startIdx + startMarker.length;
+    for (let i = endIdx; i < cleaned.length; i++) {
+      if (cleaned[i] === '[') bracketCount++;
+      if (cleaned[i] === ']') {
+        bracketCount--;
+        if (bracketCount < 0) {
+          endIdx = i + 1; // Include the closing bracket
+          break;
+        }
+      }
+    }
+    cleaned = cleaned.substring(0, startIdx) + cleaned.substring(endIdx);
+  }
+  
+  // Also handle new delimiter format if used
+  cleaned = cleaned.replace(/\[VEHICLES_DATA\|\|\|.*?\|\|\|END\]/g, "");
+  
+  return cleaned.trim();
+}
+
 export default function ChatDialog({ open, onOpenChange, userEmail, initialMessage }: ChatDialogProps) {
   const [messageInput, setMessageInput] = useState("");
   const [hasProcessedInitialMessage, setHasProcessedInitialMessage] = useState(false);
@@ -149,7 +182,7 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
                         : "bg-muted text-foreground"
                     }`}
                   >
-                    <p className="text-sm break-words">{message.content}</p>
+                    <p className="text-sm break-words whitespace-pre-wrap">{cleanMessageContent(message.content)}</p>
                     <p className="text-xs mt-1 opacity-70">
                       {new Date(message.created_at).toLocaleTimeString("en-GB", {
                         hour: "2-digit",
