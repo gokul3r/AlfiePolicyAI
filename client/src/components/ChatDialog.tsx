@@ -112,6 +112,14 @@ export default function ChatDialog({
       await searchForQuotes(savedVehicleData);
     }
     
+    // Handle show quotes action - quotes are already displayed when chatQuotes is set
+    // This marker confirms the AI wants to display them
+    if (content.includes("[ACTION:SHOW_QUOTES]")) {
+      // Quotes are already being displayed from chatQuotes state
+      // This is just a confirmation marker
+      console.log("[ChatDialog] SHOW_QUOTES action received - quotes should be visible");
+    }
+    
     // Handle registration check action
     const regMatch = content.match(/\[ACTION:CHECK_REGISTRATION:([^\]]+)\]/);
     if (regMatch) {
@@ -259,14 +267,18 @@ export default function ChatDialog({
       const top3 = quotes.slice(0, 3);
       setChatQuotes(top3);
       
-      // Send summary message to chat
+      // Send quote results as system feedback to AI
       if (quotes.length > 0) {
+        const topQuoteSummary = top3.map((q: QuoteWithInsights, i: number) => 
+          `${i + 1}. ${q.insurer_name}: £${q.original_quote?.output?.policy_cost?.toFixed(2) || 'N/A'}/year (Score: ${q.alfie_touch_score || 'N/A'})`
+        ).join(", ");
+        
         await sendMessageMutation.mutateAsync(
-          `Great news! I found ${quotes.length} insurance quotes for your ${vehicleData.vehicle_manufacturer_name} ${vehicleData.vehicle_model}. Here are the top 3 options based on your preferences.`
+          `QUOTE_RESULTS: Found ${quotes.length} quotes for ${vehicleData.vehicle_manufacturer_name} ${vehicleData.vehicle_model}. Top 3: ${topQuoteSummary}`
         );
       } else {
         await sendMessageMutation.mutateAsync(
-          "I couldn't find any quotes matching your criteria. Would you like to try adjusting your preferences?"
+          "QUOTE_RESULTS: No quotes found for this vehicle."
         );
       }
     } catch (error: any) {
