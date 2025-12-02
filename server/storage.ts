@@ -107,6 +107,7 @@ export class DbStorage implements IStorage {
     
     const [createdDetails] = await db.insert(vehiclePolicyDetails).values({
       policy_id: createdPolicy.policy_id,
+      policy_number: createdPolicy.policy_number, // Sync policy_number to details table
       ...details
     }).returning();
     
@@ -141,6 +142,11 @@ export class DbStorage implements IStorage {
       const detailUpdates = Object.fromEntries(
         Object.entries(details).filter(([_, value]) => value !== undefined)
       );
+      
+      // Also sync policy_number if it was updated in the policy
+      if (policy.policy_number) {
+        detailUpdates.policy_number = policy.policy_number;
+      }
       
       if (Object.keys(detailUpdates).length > 0) {
         await db.update(vehiclePolicyDetails)
