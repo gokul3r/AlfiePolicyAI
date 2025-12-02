@@ -1,19 +1,21 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Star, Info, CheckCircle2, XCircle, Shield, StarHalf } from "lucide-react";
+import { Star, Info, CheckCircle2, XCircle, Shield, StarHalf, ArrowRight } from "lucide-react";
 import type { QuoteWithInsights } from "@shared/schema";
 
 interface QuoteCardProps {
   quote: QuoteWithInsights;
   index: number;
+  onProceed?: (quote: QuoteWithInsights) => void;
 }
 
-export default function QuoteCard({ quote, index }: QuoteCardProps) {
+export default function QuoteCard({ quote, index, onProceed }: QuoteCardProps) {
   const {
     insurer_name,
     trust_pilot_context,
@@ -237,6 +239,21 @@ export default function QuoteCard({ quote, index }: QuoteCardProps) {
             </div>
           )}
         </div>
+
+        {/* Proceed Button */}
+        {onProceed && (
+          <div className="border-t border-border pt-4">
+            <Button
+              onClick={() => onProceed(quote)}
+              className="w-full"
+              size="lg"
+              data-testid={`button-proceed-quote-${index}`}
+            >
+              Proceed with {insurer_name}
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

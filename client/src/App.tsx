@@ -466,11 +466,13 @@ function AppContent() {
         />
       )}
 
-      {appState === "quotes" && selectedVehicleForQuotes && quotesData && (
+      {appState === "quotes" && selectedVehicleForQuotes && quotesData && currentUser && (
         <QuotesScreen
           vehicle={selectedVehicleForQuotes}
           quotesData={quotesData}
+          userEmail={currentUser.email_id}
           onBack={handleBackFromQuotes}
+          onPurchaseComplete={() => setAppState("welcome")}
         />
       )}
 

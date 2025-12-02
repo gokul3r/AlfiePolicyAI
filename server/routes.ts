@@ -701,6 +701,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Purchase a policy (update existing policy with new insurer and dates)
+  app.post("/api/purchase-policy", async (req, res) => {
+    try {
+      // Validate request body
+      const purchasePolicySchema = z.object({
+        email_id: z.string().email("Valid email is required").toLowerCase().trim(),
+        vehicle_registration_number: z.string().min(1, "Vehicle registration is required"),
+        insurer_name: z.string().min(1, "Insurer name is required"),
+        policy_cost: z.number().min(0, "Policy cost must be positive"),
+      });
+      
+      const validatedData = purchasePolicySchema.parse(req.body);
+      
+      // Check if user exists
+      const user = await storage.getUserByEmail(validatedData.email_id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Purchase the policy (update or create based on vehicle registration)
+      const purchasedPolicy = await storage.purchasePolicy(validatedData);
+      
+      // Flatten policy for frontend compatibility
+      res.status(200).json(flattenPolicyResponse(purchasedPolicy));
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request data", details: error.errors });
+      }
+      if (error instanceof Error && error.message.includes("No existing policy found")) {
+        return res.status(404).json({ error: error.message });
+      }
+      console.error("Error purchasing policy:", error);
+      res.status(500).json({ error: "Failed to purchase policy" });
+    }
+  });
+
   // Get chat history for a user
   app.get("/api/chat/messages/:email", async (req, res) => {
     try {

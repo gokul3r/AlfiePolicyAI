@@ -27,6 +27,13 @@ import {
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
+export interface PurchasePolicyData {
+  email_id: string;
+  vehicle_registration_number: string;
+  insurer_name: string;
+  policy_cost: number;
+}
+
 export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
@@ -35,6 +42,7 @@ export interface IStorage {
   createVehiclePolicy(policy: InsertVehiclePolicy): Promise<VehiclePolicyWithDetails>;
   updateVehiclePolicy(policyId: string, email: string, updates: UpdateVehiclePolicy): Promise<VehiclePolicyWithDetails>;
   deletePolicy(policyId: string, email: string): Promise<string>;
+  purchasePolicy(data: PurchasePolicyData): Promise<VehiclePolicyWithDetails>;
   getChatHistory(email: string): Promise<ChatMessage[]>;
   saveChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   getPersonalization(email: string): Promise<Personalization | undefined>;
@@ -190,6 +198,63 @@ export class DbStorage implements IStorage {
       );
     
     return policyNumber;
+  }
+
+  async purchasePolicy(data: PurchasePolicyData): Promise<VehiclePolicyWithDetails> {
+    const { email_id, vehicle_registration_number, insurer_name, policy_cost } = data;
+    
+    // Generate new policy number: P + 10 random digits
+    const policyNumber = 'P' + Math.floor(Math.random() * 10000000000).toString().padStart(10, '0');
+    
+    // Calculate dates: start = today, end = today + 1 year
+    const today = new Date();
+    const oneYearFromNow = new Date(today);
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+    
+    const policyStartDate = today.toISOString().split('T')[0];
+    const policyEndDate = oneYearFromNow.toISOString().split('T')[0];
+    
+    // Check if policy exists for this vehicle registration
+    const existingPolicies = await db
+      .select()
+      .from(policies)
+      .leftJoin(vehiclePolicyDetails, eq(policies.policy_id, vehiclePolicyDetails.policy_id))
+      .where(
+        and(
+          eq(policies.email_id, email_id),
+          eq(vehiclePolicyDetails.vehicle_registration_number, vehicle_registration_number)
+        )
+      );
+    
+    if (existingPolicies.length > 0 && existingPolicies[0].policies) {
+      // Update existing policy
+      const existingPolicy = existingPolicies[0].policies;
+      
+      await db.update(policies)
+        .set({
+          policy_number: policyNumber,
+          policy_start_date: policyStartDate,
+          policy_end_date: policyEndDate,
+          current_insurance_provider: insurer_name,
+          current_policy_cost: policy_cost,
+          status: 'active',
+          updated_at: new Date(),
+        })
+        .where(eq(policies.policy_id, existingPolicy.policy_id));
+      
+      // Also update policy_number in vehicle_policy_details
+      await db.update(vehiclePolicyDetails)
+        .set({ policy_number: policyNumber })
+        .where(eq(vehiclePolicyDetails.policy_id, existingPolicy.policy_id));
+      
+      const updated = await this.getVehiclePolicy(existingPolicy.policy_id, email_id);
+      if (!updated) {
+        throw new Error("Policy not found after purchase update");
+      }
+      return updated;
+    } else {
+      throw new Error("No existing policy found for this vehicle. Please add the vehicle first.");
+    }
   }
 
   async getChatHistory(email: string): Promise<ChatMessage[]> {
