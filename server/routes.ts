@@ -860,6 +860,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check if a vehicle registration exists in the database
+  app.post("/api/chat/check-registration", async (req, res) => {
+    try {
+      const { email_id, registration_number } = req.body;
+      
+      if (!email_id || typeof email_id !== "string") {
+        return res.status(400).json({ error: "email_id is required" });
+      }
+      if (!registration_number || typeof registration_number !== "string") {
+        return res.status(400).json({ error: "registration_number is required" });
+      }
+
+      const email = email_id.toLowerCase().trim();
+      const regNumber = registration_number.toUpperCase().replace(/\s/g, "").trim();
+
+      // Verify user exists
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      console.log(`[Registration Check] Checking ${regNumber} for user ${email}`);
+
+      // Get all vehicle policies for this user
+      const userPolicies = await storage.getVehiclePoliciesByEmail(email);
+      
+      // Find matching vehicle by registration number
+      const matchingVehicle = userPolicies.find((policy: any) => {
+        const policyReg = (policy.vehicle_registration_number || "").toUpperCase().replace(/\s/g, "");
+        return policyReg === regNumber;
+      });
+
+      if (matchingVehicle) {
+        console.log(`[Registration Check] Found vehicle: ${matchingVehicle.vehicle_manufacturer_name} ${matchingVehicle.vehicle_model}`);
+        res.json({
+          found: true,
+          vehicle: {
+            policy_id: matchingVehicle.policy_id,
+            registration_number: matchingVehicle.vehicle_registration_number,
+            manufacturer: matchingVehicle.vehicle_manufacturer_name,
+            model: matchingVehicle.vehicle_model,
+            year: matchingVehicle.vehicle_year,
+            fuel_type: matchingVehicle.type_of_fuel,
+            cover_type: matchingVehicle.type_of_cover_needed,
+            no_claim_bonus_years: matchingVehicle.no_claim_bonus_years,
+            voluntary_excess: matchingVehicle.voluntary_excess,
+            driver_age: matchingVehicle.driver_age,
+            current_provider: matchingVehicle.current_insurance_provider,
+            policy_number: matchingVehicle.policy_number,
+            policy_start_date: matchingVehicle.policy_start_date,
+            policy_end_date: matchingVehicle.policy_end_date,
+          }
+        });
+      } else {
+        console.log(`[Registration Check] No vehicle found with registration ${regNumber}`);
+        res.json({
+          found: false,
+          registration_number: regNumber
+        });
+      }
+    } catch (error) {
+      console.error("Error checking registration:", error);
+      res.status(500).json({ error: "Failed to check registration" });
+    }
+  });
+
   // Gmail OAuth routes for personalization
   app.get("/api/personalization/gmail/authorize", handleGmailAuthorize);
   app.get("/api/personalization/gmail/callback", handleGmailCallback);

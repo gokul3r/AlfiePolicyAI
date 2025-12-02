@@ -112,6 +112,13 @@ export default function ChatDialog({
       await searchForQuotes(savedVehicleData);
     }
     
+    // Handle registration check action
+    const regMatch = content.match(/\[ACTION:CHECK_REGISTRATION:([^\]]+)\]/);
+    if (regMatch) {
+      const registrationNumber = regMatch[1];
+      await checkRegistration(registrationNumber);
+    }
+    
     // Handle purchase action
     const purchaseMatch = content.match(/\[ACTION:PURCHASE_POLICY:([^\]]+)\]/);
     if (purchaseMatch) {
@@ -122,6 +129,54 @@ export default function ChatDialog({
       if (selectedQuote) {
         await handlePurchase(selectedQuote);
       }
+    }
+  };
+
+  // Check if registration exists in database and send result back to AI
+  const checkRegistration = async (registrationNumber: string) => {
+    try {
+      const response = await apiRequest("POST", "/api/chat/check-registration", {
+        email_id: userEmail,
+        registration_number: registrationNumber,
+      });
+      const data = await response.json();
+      
+      if (data.found) {
+        // Vehicle found - map to quote search compatible format
+        const v = data.vehicle;
+        const mappedVehicleData = {
+          policy_id: v.policy_id,
+          vehicle_registration_number: v.registration_number,
+          vehicle_manufacturer_name: v.manufacturer,
+          vehicle_model: v.model,
+          vehicle_year: v.year,
+          type_of_fuel: v.fuel_type,
+          type_of_cover_needed: v.cover_type,
+          no_claim_bonus_years: v.no_claim_bonus_years || 0,
+          voluntary_excess: v.voluntary_excess || 250,
+          driver_age: v.driver_age || 30,
+          current_insurance_provider: v.current_provider,
+          policy_number: v.policy_number,
+          policy_start_date: v.policy_start_date,
+          policy_end_date: v.policy_end_date,
+        };
+        setSavedVehicleData(mappedVehicleData);
+        
+        // Send result back to AI to trigger existing vehicle flow
+        const feedbackMessage = `VEHICLE_FOUND: ${v.manufacturer} ${v.model} (${v.registration_number}), Year: ${v.year}, Cover: ${v.cover_type}, Provider: ${v.current_provider}, Policy: ${v.policy_number}`;
+        sendMessageMutation.mutate(feedbackMessage);
+      } else {
+        // Vehicle not found - send feedback to AI to trigger new vehicle flow
+        const feedbackMessage = `VEHICLE_NOT_FOUND: No vehicle with registration ${registrationNumber} found in your account.`;
+        sendMessageMutation.mutate(feedbackMessage);
+      }
+    } catch (error) {
+      console.error("Error checking registration:", error);
+      toast({
+        title: "Error",
+        description: "Failed to check registration. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
