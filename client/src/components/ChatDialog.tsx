@@ -344,15 +344,23 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
         if (isQuoteSearchIntent(initialMessage)) {
           setAgentStatus("Auto Annie looking for quotes...");
           
+          // Start API call in background
           const apiPromise = sendMessageMutation.mutateAsync(initialMessage);
           
-          const statusTimeout = setTimeout(() => {
-            setAgentStatus("Auto Annie analysing the quotes...");
-          }, 2000);
+          // Step 1: Show "looking for quotes" for 2 seconds
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
+          // Step 2: Show "Receiving quotes from insurers" for 2 seconds
+          setAgentStatus("Receiving quotes from insurers...");
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Step 3: Show "AutoAnnie's AI analysing quotes" for 2.5 seconds
+          setAgentStatus("AutoAnnie's AI analysing quotes...");
+          await new Promise(resolve => setTimeout(resolve, 2500));
+          
+          // Wait for API if still pending
           await apiPromise;
           
-          clearTimeout(statusTimeout);
           setAgentStatus(null);
         } else {
           sendMessageMutation.mutate(initialMessage);
@@ -433,19 +441,23 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
     if (isQuoteSearchIntent(trimmedMessage)) {
       setAgentStatus("Auto Annie looking for quotes...");
       
-      // Create a promise that resolves when API completes
+      // Start API call in background
       const apiPromise = sendMessageMutation.mutateAsync(trimmedMessage);
       
-      // Show "analysing" status after 2 seconds
-      const statusTimeout = setTimeout(() => {
-        setAgentStatus("Auto Annie analysing the quotes...");
-      }, 2000);
+      // Step 1: Show "looking for quotes" for 2 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Wait for API to complete
+      // Step 2: Show "Receiving quotes from insurers" for 2 seconds
+      setAgentStatus("Receiving quotes from insurers...");
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Step 3: Show "AutoAnnie's AI analysing quotes" for 2.5 seconds
+      setAgentStatus("AutoAnnie's AI analysing quotes...");
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      
+      // Wait for API if still pending
       await apiPromise;
       
-      // Clear timeout and status
-      clearTimeout(statusTimeout);
       setAgentStatus(null);
     } else {
       // Regular message - no animated status
