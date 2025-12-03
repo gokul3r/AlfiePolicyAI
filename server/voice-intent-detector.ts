@@ -35,21 +35,32 @@ export async function detectVoiceIntent(transcript: string): Promise<VoiceIntent
       messages: [
         {
           role: "system",
-          content: `You are an intent classifier for a UK car insurance voice assistant. Analyze the user's speech and classify it into one of these intents:
+          content: `You are an intent classifier for a UK car insurance voice assistant. The user is speaking to get car insurance quotes. Speech recognition may mishear words.
 
-1. "quote_search" - User wants to find/search/get insurance quotes for their car (e.g., "I want to insure my car", "get me quotes", "find insurance", "search for car insurance", "I need a quote")
+IMPORTANT: Be LENIENT with quote_search detection. This is a car insurance app so users are likely asking about insurance/quotes.
 
-2. "insurer_selection" - User is choosing/selecting a specific insurer from the available options. KNOWN INSURERS: ${KNOWN_INSURERS.join(", ")}
-   Examples: "go with Admiral", "I'll take Paxa", "choose Baviva", "I want Admiral"
-   Extract the insurer name if this intent is detected.
+Classify into these intents:
 
-3. "confirmation" - User is confirming/agreeing to proceed with a purchase that was just offered.
-   Examples: "yes", "go ahead", "proceed", "do it", "sure", "okay", "confirm", "yes please", "absolutely", "let's do it", "yes I want to proceed"
+1. "quote_search" - User wants insurance quotes. Be VERY lenient - assume quote intent if:
+   - They mention: quote, coat, code, insure, insurance, cover, policy, price, cost, premium, compare, search, find, get, need, want, looking for
+   - They mention their car brand (Tesla, BMW, Ford, etc.)
+   - They say things like: "I want to...", "can you find...", "help me get...", "I need..."
+   - EVEN IF words are slightly wrong (e.g., "coat" = "quote", "code" = "quote", "ensure" = "insure")
+   Examples: "I want a quote", "get me a coat for my Tesla", "insure my car", "find me insurance", "I want to get a code", "insurance for my Tesla"
 
-4. "cancellation" - User wants to cancel/abort/stop the current action.
-   Examples: "cancel", "stop", "no", "never mind", "forget it", "don't do it"
+2. "insurer_selection" - User picks a specific insurer. KNOWN INSURERS: ${KNOWN_INSURERS.join(", ")}
+   Examples: "go with Admiral", "I'll take Paxa", "choose the first one", "that one", "Admiral please"
 
-5. "general_chat" - Any other conversation that doesn't fit the above intents.
+3. "confirmation" - User confirms/agrees to proceed.
+   Examples: "yes", "yeah", "yep", "go ahead", "proceed", "do it", "sure", "okay", "confirm", "let's do it", "absolutely"
+
+4. "cancellation" - User wants to stop/cancel.
+   Examples: "cancel", "stop", "no", "never mind", "forget it"
+
+5. "general_chat" - ONLY use this if clearly NOT about quotes/insurance/purchasing.
+   Examples: "what time is it?", "tell me a joke", "who are you?"
+
+DEFAULT TO "quote_search" if the user seems to want anything insurance-related.
 
 Respond with JSON only:
 {
@@ -60,7 +71,7 @@ Respond with JSON only:
         },
         {
           role: "user",
-          content: `Classify this speech: "${transcript}"`
+          content: `Classify this speech from a user in a car insurance app: "${transcript}"`
         }
       ],
       response_format: { type: "json_object" }
@@ -83,47 +94,56 @@ Respond with JSON only:
 
 /**
  * Fallback keyword-based intent detection when LLM fails
+ * This is VERY lenient because we're in a car insurance app
  */
 function fallbackIntentDetection(transcript: string): VoiceIntent {
   const lower = transcript.toLowerCase().trim();
   
-  // Quote search keywords
+  // Quote search keywords - be VERY lenient, include common mishearings
   const quoteKeywords = [
-    "quote", "insure", "insurance", "search", "find", "get me",
-    "compare", "looking for", "need a policy", "new policy"
+    "quote", "coat", "code", "cold", // Common mishearings of "quote"
+    "insure", "insurance", "ensure", // Insurance terms
+    "search", "find", "get", "need", "want", "looking",
+    "compare", "policy", "policies", "price", "cost", "premium",
+    "tesla", "bmw", "ford", "audi", "mercedes", "car", "vehicle", // Car mentions
+    "my car", "my vehicle", "for my"
   ];
   if (quoteKeywords.some(kw => lower.includes(kw))) {
-    return { type: "quote_search", confidence: 0.7, rawTranscript: transcript };
+    return { type: "quote_search", confidence: 0.8, rawTranscript: transcript };
   }
   
-  // Confirmation keywords
+  // Confirmation keywords - check first if very short
   const confirmKeywords = [
     "yes", "yeah", "yep", "sure", "okay", "ok", "confirm", "proceed",
-    "go ahead", "do it", "absolutely", "definitely", "let's go"
+    "go ahead", "do it", "absolutely", "definitely", "let's go", "lets go",
+    "that's fine", "sounds good", "please", "go on"
   ];
-  if (confirmKeywords.some(kw => lower === kw || lower.startsWith(kw + " "))) {
+  if (confirmKeywords.some(kw => lower === kw || lower.startsWith(kw + " ") || lower.includes(kw))) {
     return { type: "confirmation", confidence: 0.8, rawTranscript: transcript };
   }
   
   // Cancellation keywords
-  const cancelKeywords = ["cancel", "stop", "no", "never mind", "forget", "abort"];
+  const cancelKeywords = ["cancel", "stop", "no thank", "never mind", "forget", "abort", "don't"];
   if (cancelKeywords.some(kw => lower.includes(kw))) {
     return { type: "cancellation", confidence: 0.8, rawTranscript: transcript };
   }
   
-  // Insurer selection
-  const purchaseKeywords = ["go with", "choose", "select", "take", "want", "pick"];
-  if (purchaseKeywords.some(kw => lower.includes(kw))) {
-    for (const insurer of KNOWN_INSURERS) {
-      if (lower.includes(insurer.toLowerCase())) {
-        return { 
-          type: "insurer_selection", 
-          confidence: 0.8, 
-          insurerName: insurer,
-          rawTranscript: transcript 
-        };
-      }
+  // Insurer selection - check for any mention of known insurers
+  for (const insurer of KNOWN_INSURERS) {
+    if (lower.includes(insurer.toLowerCase())) {
+      return { 
+        type: "insurer_selection", 
+        confidence: 0.8, 
+        insurerName: insurer,
+        rawTranscript: transcript 
+      };
     }
+  }
+  
+  // Also check for "first one", "second one", "cheapest", "best"
+  const selectionKeywords = ["first", "second", "third", "cheapest", "best", "top", "that one"];
+  if (selectionKeywords.some(kw => lower.includes(kw))) {
+    return { type: "insurer_selection", confidence: 0.6, rawTranscript: transcript };
   }
   
   return { type: "general_chat", confidence: 0.5, rawTranscript: transcript };

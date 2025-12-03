@@ -313,21 +313,33 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
         break;
 
       case "quotes_ready":
-        if (intent.type === "insurer_selection" && intent.insurerName) {
-          // User selected an insurer - use flexible matching
-          const targetInsurer = intent.insurerName!.toLowerCase().trim();
+        if (intent.type === "insurer_selection") {
+          let selectedQuote = null;
           
-          // Find matching quote with flexible matching (exact, partial, or fuzzy)
-          const selectedQuote = sessionState.quotes?.find(q => {
-            const quoteInsurer = q.insurer.toLowerCase().trim();
-            // Exact match
-            if (quoteInsurer === targetInsurer) return true;
-            // Partial match (insurer name contains the spoken name or vice versa)
-            if (quoteInsurer.includes(targetInsurer) || targetInsurer.includes(quoteInsurer)) return true;
-            // Starts with match
-            if (quoteInsurer.startsWith(targetInsurer) || targetInsurer.startsWith(quoteInsurer)) return true;
-            return false;
-          });
+          // Check if user said positional selection like "first one", "cheapest", "best"
+          const lowerTranscript = transcript.toLowerCase();
+          if (lowerTranscript.includes("first") || lowerTranscript.includes("top") || lowerTranscript.includes("best") || lowerTranscript.includes("cheapest")) {
+            selectedQuote = sessionState.quotes?.[0]; // First/best quote
+          } else if (lowerTranscript.includes("second")) {
+            selectedQuote = sessionState.quotes?.[1];
+          } else if (lowerTranscript.includes("third")) {
+            selectedQuote = sessionState.quotes?.[2];
+          } else if (intent.insurerName) {
+            // User mentioned specific insurer - use flexible matching
+            const targetInsurer = intent.insurerName!.toLowerCase().trim();
+            
+            // Find matching quote with flexible matching (exact, partial, or fuzzy)
+            selectedQuote = sessionState.quotes?.find(q => {
+              const quoteInsurer = q.insurer.toLowerCase().trim();
+              // Exact match
+              if (quoteInsurer === targetInsurer) return true;
+              // Partial match (insurer name contains the spoken name or vice versa)
+              if (quoteInsurer.includes(targetInsurer) || targetInsurer.includes(quoteInsurer)) return true;
+              // Starts with match
+              if (quoteInsurer.startsWith(targetInsurer) || targetInsurer.startsWith(quoteInsurer)) return true;
+              return false;
+            });
+          }
           
           if (selectedQuote) {
             sessionState.selectedInsurer = {
@@ -417,33 +429,27 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
     console.log("[VoiceChat] Connected to OpenAI Realtime API");
 
     // Initialize session with AutoAnnie personality + policy context
+    // IMPORTANT: Disable auto-response so we can process intents first
     const sessionConfig = {
       type: "session.update",
       session: {
         modalities: ["text", "audio"],
-        instructions: `You are AutoAnnie, a friendly and calm UK car insurance assistant. You help users understand their policies, answer insurance questions, and assist with finding new quotes.
+        instructions: `You are AutoAnnie, a friendly and calm UK car insurance assistant. You ONLY answer general insurance questions. You do NOT search for quotes or make up quote prices - that is handled by another system.
 
 PERSONALITY:
 - Warm, polite, and trustworthy
 - Speak calmly and clearly
 - Use everyday language (avoid jargon)
-- Keep responses VERY brief: 1-3 sentences maximum
-- Never include citations or disclaimers
-- Be conversational and helpful
-
-CAPABILITIES:
-- You can search for car insurance quotes when users ask
-- You can help users purchase insurance from quotes they've seen
-- You know about the user's current policies
+- Keep responses VERY brief: 1-2 sentences maximum
+- Never mention specific prices or insurers unless directly asked about a policy
 
 POLICY CONTEXT:
 ${policyContext}
 
 IMPORTANT:
-- When users want to search for quotes, let them know you're looking
-- When they select an insurer, confirm naturally: "Do you want to proceed with this?"
-- Be supportive and reassuring throughout the purchase process
-- For general questions, use your knowledge of UK insurance`,
+- For general insurance questions, provide helpful answers
+- Do NOT make up quote prices or insurer names
+- Do NOT say you're searching for quotes - the system handles that separately`,
         voice: "alloy",
         input_audio_format: "pcm16",
         output_audio_format: "pcm16",
@@ -454,7 +460,8 @@ IMPORTANT:
           type: "server_vad",
           threshold: 0.5,
           prefix_padding_ms: 300,
-          silence_duration_ms: 500,
+          silence_duration_ms: 600,
+          create_response: false, // CRITICAL: Don't auto-respond, we handle intent first
         },
       },
     };
@@ -475,7 +482,7 @@ IMPORTANT:
         }));
       }
 
-      // Capture user transcription and process intent
+      // Capture user transcription and process intent BEFORE OpenAI responds
       if (event.type === "conversation.item.input_audio_transcription.completed") {
         transcriptionBuffer.userTranscript = event.transcript || "";
         console.log(`[VoiceChat] User said: ${transcriptionBuffer.userTranscript}`);
@@ -486,15 +493,17 @@ IMPORTANT:
           transcript: transcriptionBuffer.userTranscript,
         }));
 
-        // Process intent - if handled, we'll generate our own response
+        // Process intent FIRST - we control when responses happen
         const handled = await processUserIntent(transcriptionBuffer.userTranscript);
         
-        if (handled) {
-          // Cancel any pending OpenAI response since we're handling it
+        if (!handled) {
+          // Intent not handled by our flow - let OpenAI respond for general chat
+          console.log("[VoiceChat] Intent not handled, triggering OpenAI response");
           openaiWs.send(JSON.stringify({
-            type: "response.cancel"
+            type: "response.create"
           }));
         }
+        // If handled, our processUserIntent already sent voice messages via sendVoiceMessage()
       }
 
       // Capture assistant transcription
