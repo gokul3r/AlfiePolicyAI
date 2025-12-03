@@ -149,6 +149,12 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
   
   // Flag to track when WE are sending a voice message (vs OpenAI auto-responding)
   let ourResponseInProgress = false;
+  
+  // Track the exact text we asked OpenAI to read - used to detect divergence
+  let lastScriptedText = "";
+  
+  // Flag to track if we already cancelled divergent speech for this response
+  let divergenceCancelled = false;
 
   // Helper to send TTS message through OpenAI Realtime (or text-only when disabled)
   const sendVoiceMessage = (text: string) => {
@@ -168,8 +174,10 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
     }
     
     if (openaiWs.readyState === WebSocket.OPEN) {
-      // Mark that we're sending our own response
+      // Mark that we're sending our own response and track the text
       ourResponseInProgress = true;
+      lastScriptedText = text;
+      divergenceCancelled = false;
       
       // Create a text response that OpenAI will convert to speech
       openaiWs.send(JSON.stringify({
@@ -633,9 +641,26 @@ You are NOT a chatbot. You are ONLY a voice reader. When given text, read it alo
         // If handled, processUserIntent already called sendVoiceMessage which sets the flag
       }
 
-      // Capture assistant transcription
+      // Capture assistant transcription - with divergence detection
       if (event.type === "response.audio_transcript.delta") {
         transcriptionBuffer.assistantTranscript += event.delta || "";
+        
+        // DIVERGENCE DETECTION: If OpenAI is speaking text we didn't script, cancel it
+        if (ourResponseInProgress && lastScriptedText && !divergenceCancelled) {
+          const currentTranscript = transcriptionBuffer.assistantTranscript.trim().toLowerCase();
+          const scriptedStart = lastScriptedText.trim().toLowerCase().substring(0, currentTranscript.length);
+          
+          // Allow small variations (punctuation, minor word differences) but catch major divergence
+          // If the current text is longer than our script OR doesn't match the start, it's diverging
+          if (currentTranscript.length > lastScriptedText.length + 20 || 
+              (currentTranscript.length > 30 && !lastScriptedText.toLowerCase().includes(currentTranscript.substring(0, 25)))) {
+            console.log(`[VoiceChat] DIVERGENCE DETECTED! Cancelling extra speech`);
+            console.log(`[VoiceChat]   Scripted: "${lastScriptedText.substring(0, 50)}..."`);
+            console.log(`[VoiceChat]   Got: "${currentTranscript.substring(0, 50)}..."`);
+            openaiWs.send(JSON.stringify({ type: "response.cancel" }));
+            divergenceCancelled = true;
+          }
+        }
       }
 
       // Save transcriptions when response is complete
@@ -698,10 +723,18 @@ You are NOT a chatbot. You are ONLY a voice reader. When given text, read it alo
         }
       }
       
-      // Reset flag when response is done
+      // Reset flag when response is done - also cancel any continuation
       if (event.type === "response.done") {
-        console.log("[VoiceChat] Response completed, resetting flag");
+        console.log("[VoiceChat] Response completed, resetting flags");
+        
+        // Safety cancel: prevent OpenAI from generating a follow-up response
+        if (lastScriptedText) {
+          openaiWs.send(JSON.stringify({ type: "response.cancel" }));
+        }
+        
         ourResponseInProgress = false;
+        lastScriptedText = "";
+        divergenceCancelled = false;
       }
 
       // Log errors and reset flag to avoid stuck state
