@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, X, Loader2 } from "lucide-react";
+import { Send, X, Loader2, History } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -186,6 +186,8 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
   const [pendingPurchase, setPendingPurchase] = useState<PendingPurchaseData | null>(null); // Quote data awaiting confirmation
   const [lastQuotes, setLastQuotes] = useState<ChatQuote[]>([]); // Store quotes from last search
   const [purchaseInProgress, setPurchaseInProgress] = useState(false);
+  const [showChatHistory, setShowChatHistory] = useState(false); // Toggle for showing chat history
+  const [sessionStartMessageId, setSessionStartMessageId] = useState<number | null>(null); // Track when session started
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -377,8 +379,24 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
       setPendingPurchase(null);
       setPurchaseInProgress(false);
       setLastQuotes([]);
+      setShowChatHistory(false);
+      setSessionStartMessageId(null);
     }
   }, [open, initialMessage, hasProcessedInitialMessage, isLoading]);
+
+  // Set session start point when dialog opens (record the last message ID at that time)
+  useEffect(() => {
+    if (open && messages.length > 0 && sessionStartMessageId === null) {
+      // Mark the session start as the ID of the last message when dialog opened
+      const lastMessageId = messages[messages.length - 1]?.id ?? 0;
+      setSessionStartMessageId(lastMessageId);
+    }
+  }, [open, messages, sessionStartMessageId]);
+
+  // Filter messages based on showChatHistory toggle
+  const displayMessages = showChatHistory 
+    ? messages 
+    : messages.filter(m => sessionStartMessageId === null || m.id > sessionStartMessageId);
 
   const handleSendMessage = async () => {
     const trimmedMessage = messageInput.trim();
@@ -503,20 +521,24 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
             <div className="flex items-center justify-center h-full">
               <p className="text-sm text-muted-foreground">Loading chat history...</p>
             </div>
-          ) : messages.length === 0 ? (
+          ) : displayMessages.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center space-y-2">
                 <p className="text-base font-medium text-foreground">
-                  Welcome to AutoAnnie Chat
+                  {messages.length > 0 && !showChatHistory 
+                    ? "Start a new conversation" 
+                    : "Welcome to AutoAnnie Chat"}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Ask me anything about UK insurance or your policy
+                  {messages.length > 0 && !showChatHistory 
+                    ? "Your previous chat is hidden. Toggle 'Show chat history' below to view it." 
+                    : "Ask me anything about UK insurance or your policy"}
                 </p>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
-              {messages.map((message) => {
+              {displayMessages.map((message) => {
                 const parsed = message.role === "assistant" 
                   ? parseQuoteCards(message.content) 
                   : { isQuoteCards: false, plainText: message.content };
@@ -594,7 +616,23 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
           )}
         </ScrollArea>
 
-        <div className="px-6 py-4 border-t shrink-0">
+        <div className="px-6 py-4 border-t shrink-0 space-y-3">
+          {/* Show chat history toggle - only show if there is past history */}
+          {messages.length > 0 && sessionStartMessageId !== null && (
+            <button
+              onClick={() => setShowChatHistory(!showChatHistory)}
+              className={`flex items-center gap-2 text-sm transition-colors ${
+                showChatHistory 
+                  ? "text-primary font-medium" 
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="button-toggle-chat-history"
+            >
+              <History className="w-4 h-4" />
+              <span>{showChatHistory ? "Hide chat history" : "Show chat history"}</span>
+            </button>
+          )}
+          
           <div className="flex items-center gap-2">
             <Input
               value={messageInput}
