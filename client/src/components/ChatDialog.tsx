@@ -188,6 +188,8 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
   const [purchaseInProgress, setPurchaseInProgress] = useState(false);
   const [showChatHistory, setShowChatHistory] = useState(false); // Toggle for showing chat history
   const [sessionStartMessageId, setSessionStartMessageId] = useState<number | null>(null); // Track when session started
+  const [quoteSearchInProgress, setQuoteSearchInProgress] = useState(false); // Track when quote search animation is running
+  const [lastMessageIdBeforeSearch, setLastMessageIdBeforeSearch] = useState<number | null>(null); // Last message ID before search started
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -344,6 +346,11 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
         
         // Check if initial message is a quote search
         if (isQuoteSearchIntent(initialMessage)) {
+          // Record the last message ID before search starts, then start search mode
+          // Use a high ID so all new messages (user + assistant) will be > this value
+          const lastId = messages.length > 0 ? messages[messages.length - 1].id : 0;
+          setLastMessageIdBeforeSearch(lastId);
+          setQuoteSearchInProgress(true);
           setAgentStatus("Auto Annie looking for quotes...");
           
           // Create minimum 5.5 second delay promise
@@ -366,6 +373,8 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
           // Wait for BOTH minimum delay AND API to complete
           await Promise.all([minimumDelayPromise, apiPromise]);
           
+          // End search mode - reveal all messages including quotes
+          setQuoteSearchInProgress(false);
           setAgentStatus(null);
         } else {
           sendMessageMutation.mutate(initialMessage);
@@ -384,6 +393,8 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
       setLastQuotes([]);
       setShowChatHistory(false);
       setSessionStartMessageId(null);
+      setQuoteSearchInProgress(false);
+      setMessageCountBeforeSearch(0);
     }
   }, [open, initialMessage, hasProcessedInitialMessage, isLoading]);
 
@@ -396,10 +407,21 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
     }
   }, [open, messages, sessionStartMessageId]);
 
-  // Filter messages based on showChatHistory toggle
-  const displayMessages = showChatHistory 
-    ? messages 
-    : messages.filter(m => sessionStartMessageId === null || m.id > sessionStartMessageId);
+  // Filter messages based on showChatHistory toggle AND quote search in progress
+  // When quote search is in progress, hide messages that arrived after search started
+  const displayMessages = (() => {
+    let filtered = showChatHistory 
+      ? messages 
+      : messages.filter(m => sessionStartMessageId === null || m.id > sessionStartMessageId);
+    
+    // During quote search, only show messages up to the count before search started
+    if (quoteSearchInProgress && messageCountBeforeSearch > 0) {
+      // Take only the first messageCountBeforeSearch messages (hide new ones)
+      filtered = filtered.slice(0, messageCountBeforeSearch);
+    }
+    
+    return filtered;
+  })();
 
   const handleSendMessage = async () => {
     const trimmedMessage = messageInput.trim();
@@ -460,6 +482,10 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
 
     // Check if this is a quote search - show animated status messages
     if (isQuoteSearchIntent(trimmedMessage)) {
+      // Record the last message ID before search starts, then start search mode
+      const lastId = messages.length > 0 ? messages[messages.length - 1].id : 0;
+      setLastMessageIdBeforeSearch(lastId);
+      setQuoteSearchInProgress(true);
       setAgentStatus("Auto Annie looking for quotes...");
       
       // Create minimum 5.5 second delay promise
@@ -482,6 +508,8 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
       // Wait for BOTH minimum delay AND API to complete
       await Promise.all([minimumDelayPromise, apiPromise]);
       
+      // End search mode - reveal all messages including quotes
+      setQuoteSearchInProgress(false);
       setAgentStatus(null);
     } else {
       // Regular message - no animated status
