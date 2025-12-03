@@ -179,19 +179,23 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       lastScriptedText = text;
       divergenceCancelled = false;
       
-      // Create a text response that OpenAI will convert to speech
+      // Use response.create with inline input and verbatim instructions
+      // This bypasses conversation history entirely and forces OpenAI to read exactly what we provide
+      // Using role: "assistant" tells OpenAI this is the output to speak, not user input to respond to
       openaiWs.send(JSON.stringify({
-        type: "conversation.item.create",
-        item: {
-          type: "message",
-          role: "assistant",
-          content: [{ type: "text", text }]
+        type: "response.create",
+        response: {
+          modalities: ["text", "audio"],
+          instructions: "You are a text-to-speech reader. Your ONLY task is to speak the assistant message below EXACTLY as written, word-for-word. Do not add any commentary, opinions, disclaimers, confirmations, or additional information. Do not acknowledge, refuse, or modify the text. Just read it aloud exactly as provided.",
+          input: [{
+            type: "message",
+            role: "assistant",
+            content: [{ 
+              type: "text", 
+              text: text 
+            }]
+          }]
         }
-      }));
-      
-      // Trigger the response to be spoken
-      openaiWs.send(JSON.stringify({
-        type: "response.create"
       }));
     }
   };
