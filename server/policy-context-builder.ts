@@ -1,4 +1,4 @@
-import type { VehiclePolicy } from "@shared/schema";
+import type { VehiclePolicy, VehiclePolicyWithDetails } from "@shared/schema";
 
 const ADMIRAL_POLICY_CONTEXT = `Motor Policy Schedule
 This policy schedule provides important details about your policy. It must be read along with Your Car Insurance Guide, which
@@ -71,26 +71,34 @@ Includes cover to drive other cars on a third party basis only`;
 /**
  * Builds a combined context string for gpt-realtime-mini sessions
  * Combines user's database policy details + Admiral policy document text
+ * Supports both VehiclePolicy (flat) and VehiclePolicyWithDetails (nested) formats
  */
-export function buildPolicyContext(userEmail: string, policies: VehiclePolicy[]): string {
+export function buildPolicyContext(userEmail: string, policies: (VehiclePolicy | VehiclePolicyWithDetails)[]): string {
   // Build database policy summary
   let dbPolicySummary = "";
   if (policies.length > 0) {
     dbPolicySummary = "\n\nUser's Vehicle Policies from Database:\n";
     policies.forEach((policy, index) => {
-      dbPolicySummary += `\nVehicle ${index + 1}:
-- Registration: ${policy.vehicle_registration_number}
-- Manufacturer: ${policy.vehicle_manufacturer_name}
-- Model: ${policy.vehicle_model}
-- Year: ${policy.vehicle_year}
-- Fuel Type: ${policy.type_of_fuel}
-- Cover Type: ${policy.type_of_cover_needed}
-- Driver Age: ${policy.driver_age}
-- No Claims Bonus: ${policy.no_claim_bonus_years} years
-- Voluntary Excess: £${policy.voluntary_excess}`;
+      // Handle both flat VehiclePolicy and nested VehiclePolicyWithDetails
+      const details = 'details' in policy ? policy.details : policy;
+      // Whisper preferences only exists on the top-level policy object in nested format, or on flat VehiclePolicy
+      const whisperPrefs = 'whisper_preferences' in policy ? (policy as any).whisper_preferences : null;
       
-      if (policy.whisper_preferences) {
-        dbPolicySummary += `\n- User Preferences: ${policy.whisper_preferences}`;
+      if (details) {
+        dbPolicySummary += `\nVehicle ${index + 1}:
+- Registration: ${details.vehicle_registration_number}
+- Manufacturer: ${details.vehicle_manufacturer_name}
+- Model: ${details.vehicle_model}
+- Year: ${details.vehicle_year}
+- Fuel Type: ${details.type_of_fuel}
+- Cover Type: ${details.type_of_cover_needed}
+- Driver Age: ${details.driver_age}
+- No Claims Bonus: ${details.no_claim_bonus_years} years
+- Voluntary Excess: £${details.voluntary_excess}`;
+        
+        if (whisperPrefs) {
+          dbPolicySummary += `\n- User Preferences: ${whisperPrefs}`;
+        }
       }
     });
   }

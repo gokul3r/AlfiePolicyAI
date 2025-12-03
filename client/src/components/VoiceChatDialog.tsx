@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Mic, MicOff, X } from "lucide-react";
+import { Mic, MicOff, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,6 +10,11 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
+import ChatQuoteCard, { type ChatQuote } from "./ChatQuoteCard";
+import PaymentSection from "./PaymentSection";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 interface Message {
   role: "user" | "assistant";
@@ -23,6 +28,20 @@ interface VoiceChatDialogProps {
   userEmail: string;
 }
 
+// Map backend quote format to ChatQuote format
+function mapToQuoteCard(quote: any): ChatQuote {
+  return {
+    insurer_name: quote.insurer || quote.insurer_name,
+    alfie_touch_score: quote.autoAnnieScore || quote.alfie_touch_score || 4.0,
+    alfie_message: quote.aiSummary || quote.alfie_message || "A competitive insurance option.",
+    isTopMatch: false,
+    quote_price: quote.annualCost || quote.quote_price,
+    available_features: quote.available_features || [],
+    features_matched: quote.features_matched || [],
+    features_missing: quote.features_missing || []
+  };
+}
+
 export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDialogProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -30,6 +49,14 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
   const [currentUserTranscript, setCurrentUserTranscript] = useState("");
   const [currentAssistantTranscript, setCurrentAssistantTranscript] = useState("");
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  
+  // Voice flow states
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [quotes, setQuotes] = useState<ChatQuote[]>([]);
+  const [selectedInsurer, setSelectedInsurer] = useState<{ name: string; price: number } | null>(null);
+  const [purchaseComplete, setPurchaseComplete] = useState(false);
+  
+  const { toast } = useToast();
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -53,7 +80,7 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         scrollContainer.scrollTop = scrollContainer.scrollHeight;
       }
     }
-  }, [messages, currentUserTranscript, currentAssistantTranscript]);
+  }, [messages, currentUserTranscript, currentAssistantTranscript, quotes, statusMessage]);
 
   // Initialize WebSocket connection when dialog opens
   useEffect(() => {
@@ -109,6 +136,52 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
       if (data.type === "audio" && data.audio) {
         // Play audio response
         await playAudioChunk(data.audio);
+      }
+      
+      // Handle status updates from voice flow
+      if (data.type === "status_update") {
+        setStatusMessage(data.status);
+      }
+      
+      // Handle quotes received
+      if (data.type === "quotes_received") {
+        console.log("[VoiceChat] Received quotes:", data.quotes);
+        const mappedQuotes = data.quotes.map(mapToQuoteCard);
+        setQuotes(mappedQuotes);
+        setStatusMessage(null);
+      }
+      
+      // Handle insurer selection
+      if (data.type === "insurer_selected") {
+        console.log("[VoiceChat] Insurer selected:", data.insurer, data.price);
+        setSelectedInsurer({ name: data.insurer, price: data.price });
+      }
+      
+      // Handle selection cancelled
+      if (data.type === "selection_cancelled") {
+        setSelectedInsurer(null);
+      }
+      
+      // Handle purchase complete
+      if (data.type === "purchase_complete") {
+        console.log("[VoiceChat] Purchase complete:", data.insurer);
+        setSelectedInsurer(null);
+        setPurchaseComplete(true);
+        setStatusMessage(null);
+        
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
+        
+        toast({
+          title: "Policy Purchased!",
+          description: `Your new ${data.insurer} policy is now active.`,
+        });
+        
+        // Reset quotes after successful purchase
+        setTimeout(() => {
+          setQuotes([]);
+          setPurchaseComplete(false);
+        }, 5000);
       }
 
       if (data.type === "error") {
@@ -255,6 +328,12 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
     setCurrentAssistantTranscript("");
     userTranscriptRef.current = "";
     assistantTranscriptRef.current = "";
+    
+    // Reset voice flow states
+    setStatusMessage(null);
+    setQuotes([]);
+    setSelectedInsurer(null);
+    setPurchaseComplete(false);
 
     // Close WebSocket connection (any state except already CLOSED)
     if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
@@ -332,8 +411,11 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl h-[80vh] flex flex-col p-0">
-        <DialogHeader className="px-6 py-4 border-b">
+      <DialogContent 
+        className="sm:max-w-2xl h-[85vh] flex flex-col p-0"
+        data-testid="dialog-voice-chat"
+      >
+        <DialogHeader className="px-6 py-4 border-b shrink-0">
           <div className="flex items-center justify-between">
             <DialogTitle>Talk with AutoAnnie</DialogTitle>
             <Button
@@ -349,6 +431,7 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
 
         <ScrollArea className="flex-1 px-6" ref={scrollAreaRef}>
           <div className="space-y-4 py-4">
+            {/* Conversation messages */}
             {messages.map((msg, idx) => (
               <div
                 key={idx}
@@ -399,10 +482,80 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
                 </div>
               </div>
             )}
+            
+            {/* Status message indicator */}
+            <AnimatePresence mode="wait">
+              {statusMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex justify-start"
+                >
+                  <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-lg px-4 py-3 max-w-[85%]">
+                    <div className="flex items-center gap-3">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                      >
+                        <Loader2 className="w-4 h-4 text-primary" />
+                      </motion.div>
+                      <span className="text-sm font-medium text-foreground">
+                        {statusMessage}
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            {/* Quote cards display */}
+            {quotes.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-3 my-4"
+              >
+                <p className="text-sm text-muted-foreground mb-2">
+                  Here are your insurance quotes:
+                </p>
+                {quotes.map((quote, idx) => (
+                  <ChatQuoteCard 
+                    key={`voice-quote-${idx}`} 
+                    quote={quote} 
+                    index={idx}
+                  />
+                ))}
+              </motion.div>
+            )}
+            
+            {/* Payment section - shown when insurer is selected */}
+            <AnimatePresence>
+              {selectedInsurer && !purchaseComplete && (
+                <PaymentSection 
+                  totalAmount={selectedInsurer.price} 
+                  insurerName={selectedInsurer.name}
+                />
+              )}
+            </AnimatePresence>
+            
+            {/* Purchase success indicator */}
+            {purchaseComplete && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4 text-center"
+              >
+                <p className="text-green-700 dark:text-green-300 font-medium">
+                  Policy purchased successfully!
+                </p>
+              </motion.div>
+            )}
           </div>
         </ScrollArea>
 
-        <div className="px-6 py-4 border-t">
+        <div className="px-6 py-4 border-t shrink-0">
           {permissionError ? (
             <div className="space-y-4">
               <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
@@ -458,6 +611,18 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
                   ? "Listening... Tap to stop"
                   : "Tap to speak"}
               </p>
+              
+              {/* Voice flow hints */}
+              {quotes.length > 0 && !selectedInsurer && (
+                <p className="text-center text-xs text-muted-foreground mt-2">
+                  Say an insurer name like "Go with Admiral" to select
+                </p>
+              )}
+              {selectedInsurer && (
+                <p className="text-center text-xs text-muted-foreground mt-2">
+                  Say "Yes" or "Proceed" to confirm the purchase
+                </p>
+              )}
             </>
           )}
         </div>
