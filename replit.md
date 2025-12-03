@@ -16,7 +16,8 @@ Key UI components include:
 - **`WhisperDialog`**: Interface for recording and editing user insurance preferences with stable recommendation system.
 - **`QuoteSearchDialog`**: Initiates insurance quote searches with retry logic and loading indicators.
 - **`QuotesScreen`**: Displays up to 10 insurance quotes with insurer info, Trustpilot rating, AutoAnnie Score, and AI analysis.
-- **`ChatDialog`**: Text-based AI assistant with message history, real-time updates, and intent detection for quote searches and policy purchases. Supports real purchase flow via `POST /api/purchase-policy`.
+- **`ChatDialog`**: Text-based AI assistant with message history, real-time updates, and intent detection for quote searches and policy purchases. **Real Purchase Flow with Payment UI**: When user says "Go with [insurer]", shows PaymentSection component with GPay, orange card (•••• 9878), payment icons, and terms. User confirms with natural language ("proceed", "go on", "pay", etc.). Animated status flow: "Processing payment..." (2 sec) → "Verifying details..." → "Contacting [Insurer]..." → success. Real database update via `POST /api/purchase-policy`.
+- **`PaymentSection`**: Inline payment checkout UI shown during purchase confirmation. Displays total cost, GPay logo with orange card (•••• 9878), Visa/Mastercard/PayPal icons, and terms text. Creates realistic checkout experience.
 - **`VoiceChatDialog`**: Voice-based AI assistant with WebSocket audio streaming and real-time transcription.
 - **`CancelPolicyDialog`**: Allows cancellation of policies grouped by insurance type.
 - **`InsuranceTypeSelectorDialog`**: Bento-style grid for selecting insurance type when adding a policy, with active 'Car' and inactive placeholders for 'Van', 'Home', 'Pet', 'Travel', 'Business'.
