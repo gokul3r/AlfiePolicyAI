@@ -556,28 +556,20 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
   openaiWs.on("open", () => {
     console.log("[VoiceChat] Connected to OpenAI Realtime API");
 
-    // Initialize session with AutoAnnie personality + policy context
-    // IMPORTANT: Disable auto-response so we can process intents first
+    // Initialize session - TTS ONLY mode
+    // OpenAI should ONLY read text we provide, never generate its own responses
     const sessionConfig = {
       type: "session.update",
       session: {
         modalities: ["text", "audio"],
-        instructions: `You are AutoAnnie, a friendly and calm UK car insurance assistant. You ONLY answer general insurance questions. You do NOT search for quotes or make up quote prices - that is handled by another system.
+        instructions: `You are a voice assistant. Your ONLY job is to read aloud the exact text provided to you.
 
-PERSONALITY:
-- Warm, polite, and trustworthy
-- Speak calmly and clearly
-- Use everyday language (avoid jargon)
-- Keep responses VERY brief: 1-2 sentences maximum
-- Never mention specific prices or insurers unless directly asked about a policy
-
-POLICY CONTEXT:
-${policyContext}
-
-IMPORTANT:
-- For general insurance questions, provide helpful answers
-- Do NOT make up quote prices or insurer names
-- Do NOT say you're searching for quotes - the system handles that separately`,
+RULES:
+- Read text exactly as given - do not add, change, or interpret anything
+- Use a warm, friendly British female voice tone
+- Speak clearly and at a moderate pace
+- Never generate your own responses or opinions
+- Never refuse to read provided text`,
         voice: "alloy",
         input_audio_format: "pcm16",
         output_audio_format: "pcm16",
@@ -632,12 +624,9 @@ IMPORTANT:
         const handled = await processUserIntent(transcriptionBuffer.userTranscript);
         
         if (!handled) {
-          // Intent not handled by our flow - let OpenAI respond for general chat
-          console.log("[VoiceChat] Intent not handled, triggering OpenAI response");
-          ourResponseInProgress = true; // Mark that this is an allowed response
-          openaiWs.send(JSON.stringify({
-            type: "response.create"
-          }));
+          // Intent not handled - provide a helpful fallback (don't let OpenAI think for itself)
+          console.log("[VoiceChat] Intent not handled, sending fallback response");
+          sendVoiceMessage("I'm here to help you find car insurance quotes. Just say something like 'find me quotes' or 'get me car insurance' to get started.");
         }
         // If handled, processUserIntent already called sendVoiceMessage which sets the flag
       }
@@ -768,10 +757,9 @@ IMPORTANT:
       }
 
       if (message.type === "response.create") {
-        // Trigger AI response
-        openaiWs.send(JSON.stringify({
-          type: "response.create",
-        }));
+        // BLOCKED: Client should NOT trigger AI responses directly
+        // All responses must go through sendVoiceMessage to maintain flow control
+        console.log("[VoiceChat] Blocked client response.create - use sendVoiceMessage instead");
       }
 
     } catch (error) {
