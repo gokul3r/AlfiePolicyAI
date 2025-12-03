@@ -772,6 +772,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Save user message only (for frontend-controlled flows)
+  app.post("/api/chat/save-user-message", async (req, res) => {
+    try {
+      const { email_id, message } = req.body;
+      if (!email_id || !message) {
+        return res.status(400).json({ error: "email_id and message are required" });
+      }
+      const savedMessage = await storage.saveChatMessage({
+        email_id: email_id.toLowerCase().trim(),
+        role: "user",
+        content: message,
+      });
+      res.status(201).json(savedMessage);
+    } catch (error) {
+      console.error("Error saving user message:", error);
+      res.status(500).json({ error: "Failed to save user message" });
+    }
+  });
+
+  // Save assistant message only (for frontend-controlled flows like purchase simulation)
+  app.post("/api/chat/save-assistant-message", async (req, res) => {
+    try {
+      const { email_id, message } = req.body;
+      if (!email_id || !message) {
+        return res.status(400).json({ error: "email_id and message are required" });
+      }
+      const savedMessage = await storage.saveChatMessage({
+        email_id: email_id.toLowerCase().trim(),
+        role: "assistant",
+        content: message,
+      });
+      res.status(201).json(savedMessage);
+    } catch (error) {
+      console.error("Error saving assistant message:", error);
+      res.status(500).json({ error: "Failed to save assistant message" });
+    }
+  });
+
   // Helper: Detect if user message is a quote search request
   function isQuoteSearchIntent(message: string): boolean {
     const lowerMessage = message.toLowerCase();
