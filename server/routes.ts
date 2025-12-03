@@ -817,22 +817,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }));
   }
 
-  // Helper: Format top 3 quotes as a chat response
+  // Helper: Format top 3 quotes as a structured chat response with embedded JSON
   function formatQuotesForChat(top3: any[]): string {
     if (top3.length === 0) {
       return "I couldn't find any quotes at this time. Please try again later.";
     }
     
-    let response = "Great news! I found some insurance quotes for you. Here are the top 3 options:\n\n";
+    // Mark the first quote as the top match
+    const quotesWithTopMatch = top3.map((quote, index) => ({
+      ...quote,
+      isTopMatch: index === 0
+    }));
     
-    top3.forEach((quote, index) => {
-      response += `**${index + 1}. ${quote.insurer_name}**\n`;
-      response += `Auto Annie Score: ${quote.alfie_touch_score}/5\n`;
-      response += `${quote.alfie_message}\n\n`;
-    });
+    // Return structured format that frontend can parse and render as cards
+    const quoteData = {
+      type: "quote_cards",
+      intro: "Great news! I found some insurance quotes for you. Here are the top 3 options:",
+      quotes: quotesWithTopMatch,
+      outro: "Tap any card to select that quote!"
+    };
     
-    response += "Would you like more details about any of these options?";
-    return response;
+    return `[QUOTE_CARDS]${JSON.stringify(quoteData)}[/QUOTE_CARDS]`;
   }
 
   // Send message to AI and get response

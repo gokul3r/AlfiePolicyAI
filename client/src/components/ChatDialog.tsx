@@ -13,12 +13,39 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { ChatMessage } from "@shared/schema";
+import ChatQuoteCard, { type ChatQuote } from "./ChatQuoteCard";
+
+interface QuoteCardsData {
+  type: "quote_cards";
+  intro: string;
+  quotes: ChatQuote[];
+  outro: string;
+}
 
 interface ChatDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userEmail: string;
   initialMessage?: string;
+}
+
+// Helper to parse quote cards from message content
+function parseQuoteCards(content: string): { isQuoteCards: boolean; data?: QuoteCardsData; plainText?: string } {
+  const startTag = "[QUOTE_CARDS]";
+  const endTag = "[/QUOTE_CARDS]";
+  const startIndex = content.indexOf(startTag);
+  const endIndex = content.indexOf(endTag);
+  
+  if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+    try {
+      const jsonContent = content.substring(startIndex + startTag.length, endIndex);
+      const data = JSON.parse(jsonContent) as QuoteCardsData;
+      return { isQuoteCards: true, data };
+    } catch (e) {
+      return { isQuoteCards: false, plainText: content };
+    }
+  }
+  return { isQuoteCards: false, plainText: content };
 }
 
 export default function ChatDialog({ open, onOpenChange, userEmail, initialMessage }: ChatDialogProps) {
@@ -136,29 +163,63 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
             </div>
           ) : (
             <div className="space-y-4">
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                  data-testid={`message-${message.role}-${message.id}`}
-                >
+              {messages.map((message) => {
+                const parsed = message.role === "assistant" 
+                  ? parseQuoteCards(message.content) 
+                  : { isQuoteCards: false, plainText: message.content };
+
+                return (
                   <div
-                    className={`max-w-[75%] rounded-lg px-4 py-3 ${
-                      message.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-foreground"
-                    }`}
+                    key={message.id}
+                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                    data-testid={`message-${message.role}-${message.id}`}
                   >
-                    <p className="text-sm break-words">{message.content}</p>
-                    <p className="text-xs mt-1 opacity-70">
-                      {new Date(message.created_at).toLocaleTimeString("en-GB", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
+                    {parsed.isQuoteCards && parsed.data ? (
+                      <div className="w-full max-w-[90%] space-y-4">
+                        <div className="bg-muted text-foreground rounded-lg px-4 py-3">
+                          <p className="text-sm font-medium">{parsed.data.intro}</p>
+                          <p className="text-xs mt-1 opacity-70">
+                            {new Date(message.created_at).toLocaleTimeString("en-GB", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-4 pt-2">
+                          {parsed.data.quotes.map((quote, index) => (
+                            <ChatQuoteCard
+                              key={`${quote.insurer_name}-${index}`}
+                              quote={quote}
+                              index={index}
+                            />
+                          ))}
+                        </div>
+
+                        <div className="bg-muted/50 text-foreground rounded-lg px-4 py-2">
+                          <p className="text-sm text-muted-foreground">{parsed.data.outro}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className={`max-w-[75%] rounded-lg px-4 py-3 ${
+                          message.role === "user"
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-foreground"
+                        }`}
+                      >
+                        <p className="text-sm break-words">{message.content}</p>
+                        <p className="text-xs mt-1 opacity-70">
+                          {new Date(message.created_at).toLocaleTimeString("en-GB", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </ScrollArea>
