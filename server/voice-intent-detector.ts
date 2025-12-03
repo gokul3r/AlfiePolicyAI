@@ -53,9 +53,11 @@ Classify into these intents:
 
 3. "confirmation" - User confirms/agrees to proceed.
    Examples: "yes", "yeah", "yep", "go ahead", "proceed", "do it", "sure", "okay", "confirm", "let's do it", "absolutely"
+   IMPORTANT: "No, please proceed" or "No, go ahead" or "No, just proceed" are CONFIRMATIONS (the "no" is denying alternatives, followed by positive action)
 
-4. "cancellation" - User wants to stop/cancel.
-   Examples: "cancel", "stop", "no", "never mind", "forget it"
+4. "cancellation" - User wants to stop/cancel. ONLY when no positive action follows.
+   Examples: "cancel", "stop", "no thanks", "never mind", "forget it", "no, I don't want that"
+   IMPORTANT: If "no" is followed by "proceed", "go ahead", "continue", "do it" etc., that is a CONFIRMATION not cancellation!
 
 5. "general_chat" - ONLY use this if clearly NOT about quotes/insurance/purchasing.
    Examples: "what time is it?", "tell me a joke", "who are you?"
@@ -112,19 +114,29 @@ function fallbackIntentDetection(transcript: string): VoiceIntent {
     return { type: "quote_search", confidence: 0.8, rawTranscript: transcript };
   }
   
+  // Positive action keywords that indicate confirmation even if preceded by "no"
+  const positiveActions = ["proceed", "go ahead", "continue", "do it", "go on", "confirm"];
+  
+  // Check for "No, [positive action]" pattern - this is CONFIRMATION not cancellation
+  if (lower.startsWith("no") && positiveActions.some(pa => lower.includes(pa))) {
+    return { type: "confirmation", confidence: 0.9, rawTranscript: transcript };
+  }
+  
   // Confirmation keywords - check first if very short
   const confirmKeywords = [
     "yes", "yeah", "yep", "sure", "okay", "ok", "confirm", "proceed",
     "go ahead", "do it", "absolutely", "definitely", "let's go", "lets go",
-    "that's fine", "sounds good", "please", "go on"
+    "that's fine", "sounds good", "please proceed", "go on"
   ];
   if (confirmKeywords.some(kw => lower === kw || lower.startsWith(kw + " ") || lower.includes(kw))) {
     return { type: "confirmation", confidence: 0.8, rawTranscript: transcript };
   }
   
-  // Cancellation keywords
-  const cancelKeywords = ["cancel", "stop", "no thank", "never mind", "forget", "abort", "don't"];
-  if (cancelKeywords.some(kw => lower.includes(kw))) {
+  // Cancellation keywords - but NOT if followed by positive action
+  const cancelKeywords = ["cancel", "stop", "no thank", "never mind", "forget", "abort", "don't want"];
+  const hasCancelKeyword = cancelKeywords.some(kw => lower.includes(kw));
+  const hasPositiveAction = positiveActions.some(pa => lower.includes(pa));
+  if (hasCancelKeyword && !hasPositiveAction) {
     return { type: "cancellation", confidence: 0.8, rawTranscript: transcript };
   }
   

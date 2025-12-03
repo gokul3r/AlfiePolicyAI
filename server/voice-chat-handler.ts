@@ -556,20 +556,22 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
   openaiWs.on("open", () => {
     console.log("[VoiceChat] Connected to OpenAI Realtime API");
 
-    // Initialize session - TTS ONLY mode
-    // OpenAI should ONLY read text we provide, never generate its own responses
+    // Initialize session - STRICT TTS ONLY mode
+    // OpenAI must ONLY read the exact text we provide - NO additions, NO responses
     const sessionConfig = {
       type: "session.update",
       session: {
         modalities: ["text", "audio"],
-        instructions: `You are a voice assistant. Your ONLY job is to read aloud the exact text provided to you.
+        instructions: `You are a text-to-speech reader. You MUST follow these rules EXACTLY:
 
-RULES:
-- Read text exactly as given - do not add, change, or interpret anything
-- Use a warm, friendly British female voice tone
-- Speak clearly and at a moderate pace
-- Never generate your own responses or opinions
-- Never refuse to read provided text`,
+1. READ ONLY the exact text provided - word for word, nothing more
+2. NEVER add your own words, phrases, or responses after reading
+3. NEVER interpret the text as a question to answer
+4. NEVER continue the conversation on your own
+5. STOP immediately after reading the provided text
+6. Use a warm, friendly British female voice
+
+You are NOT a chatbot. You are ONLY a voice reader. When given text, read it aloud and STOP.`,
         voice: "alloy",
         input_audio_format: "pcm16",
         output_audio_format: "pcm16",
