@@ -150,18 +150,26 @@ function AgentStatusBubble({ status }: { status: string }) {
   );
 }
 
+// Data needed for purchasing a policy
+interface PendingPurchaseData {
+  insurerName: string;
+  quotePrice: number;
+}
+
 export default function ChatDialog({ open, onOpenChange, userEmail, initialMessage }: ChatDialogProps) {
   const [messageInput, setMessageInput] = useState("");
   const [hasProcessedInitialMessage, setHasProcessedInitialMessage] = useState(false);
   const [agentStatus, setAgentStatus] = useState<string | null>(null);
-  const [pendingPurchase, setPendingPurchase] = useState<string | null>(null); // Insurer name awaiting confirmation
+  const [pendingPurchase, setPendingPurchase] = useState<PendingPurchaseData | null>(null); // Quote data awaiting confirmation
+  const [lastQuotes, setLastQuotes] = useState<ChatQuote[]>([]); // Store quotes from last search
   const [purchaseInProgress, setPurchaseInProgress] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Simulate the purchase flow with animated status messages
-  const runPurchaseSimulation = async (insurerName: string) => {
+  // Execute the real purchase flow with animated status messages
+  const runPurchaseSimulation = async (purchaseData: PendingPurchaseData) => {
     setPurchaseInProgress(true);
+    const { insurerName, quotePrice } = purchaseData;
     
     const steps = [
       { status: "Auto Annie verifying the details...", delay: 1500 },
@@ -171,22 +179,79 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
       { status: "Cancelling existing policy...", delay: 1500 },
     ];
     
-    for (const step of steps) {
-      setAgentStatus(step.status);
-      await new Promise(resolve => setTimeout(resolve, step.delay));
+    try {
+      // Show first status while getting vehicle registration
+      setAgentStatus(steps[0].status);
+      
+      // Get the user's first vehicle policy to get registration number
+      const policiesResponse = await fetch(`/api/vehicle-policies/${encodeURIComponent(userEmail)}`);
+      if (!policiesResponse.ok) throw new Error("Failed to fetch vehicle policies");
+      const policies = await policiesResponse.json();
+      
+      if (!policies || policies.length === 0) {
+        throw new Error("No vehicle policy found");
+      }
+      
+      // API returns flattened response - vehicle_registration_number is at top level
+      const vehicleRegistration = policies[0].vehicle_registration_number;
+      if (!vehicleRegistration) {
+        throw new Error("Vehicle registration not found");
+      }
+      
+      // Continue with animated steps
+      for (let i = 1; i < steps.length; i++) {
+        await new Promise(resolve => setTimeout(resolve, steps[i-1].delay));
+        setAgentStatus(steps[i].status);
+      }
+      
+      // Make the real API call to update the policy
+      await apiRequest("POST", "/api/purchase-policy", {
+        email_id: userEmail,
+        vehicle_registration_number: vehicleRegistration,
+        insurer_name: insurerName,
+        policy_cost: quotePrice,
+      });
+      
+      // Wait for final step
+      await new Promise(resolve => setTimeout(resolve, steps[steps.length - 1].delay));
+      
+      // Clear status and mark purchase complete
+      setAgentStatus(null);
+      setPurchaseInProgress(false);
+      
+      // Add success message to chat
+      await apiRequest("POST", "/api/chat/save-assistant-message", {
+        email_id: userEmail,
+        message: `Congratulations! You are now protected with ${insurerName}. Your new policy is active at £${quotePrice.toFixed(2)}/year and your previous policy has been cancelled. You'll receive confirmation details via email shortly.`,
+      });
+      
+      // Invalidate all relevant caches so the new policy shows everywhere
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/messages", userEmail] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
+      
+      toast({
+        title: "Policy Purchased!",
+        description: `Your new ${insurerName} policy is now active.`,
+      });
+      
+    } catch (error: any) {
+      setAgentStatus(null);
+      setPurchaseInProgress(false);
+      
+      // Add error message to chat
+      await apiRequest("POST", "/api/chat/save-assistant-message", {
+        email_id: userEmail,
+        message: `I'm sorry, there was an issue completing the purchase: ${error.message}. Please try again or contact support.`,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/messages", userEmail] });
+      
+      toast({
+        title: "Purchase Failed",
+        description: error.message || "Failed to complete the purchase",
+        variant: "destructive",
+      });
     }
-    
-    // Final success message
-    setAgentStatus(null);
-    setPurchaseInProgress(false);
-    
-    // Add success message to chat directly
-    await apiRequest("POST", "/api/chat/save-assistant-message", {
-      email_id: userEmail,
-      message: `Congratulations! You are now protected with ${insurerName}. Your new policy is active and your previous policy has been cancelled. You'll receive confirmation details via email shortly.`,
-    });
-    
-    queryClient.invalidateQueries({ queryKey: ["/api/chat/messages", userEmail] });
   };
 
   // Fetch chat history
@@ -225,6 +290,22 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
     }
   }, [messages, agentStatus]);
 
+  // Extract quotes from messages when they arrive (for purchase flow)
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Look at the last assistant message for quote cards
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === "assistant") {
+          const parsed = parseQuoteCards(messages[i].content);
+          if (parsed.isQuoteCards && parsed.data?.quotes) {
+            setLastQuotes(parsed.data.quotes);
+            break;
+          }
+        }
+      }
+    }
+  }, [messages]);
+
   // Auto-send initial message when dialog opens
   useEffect(() => {
     const handleInitialMessage = async () => {
@@ -259,6 +340,7 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
       setAgentStatus(null);
       setPendingPurchase(null);
       setPurchaseInProgress(false);
+      setLastQuotes([]);
     }
   }, [open, initialMessage, hasProcessedInitialMessage, isLoading]);
 
@@ -280,11 +362,11 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
       });
       queryClient.invalidateQueries({ queryKey: ["/api/chat/messages", userEmail] });
       
-      const insurerName = pendingPurchase;
+      const purchaseData = pendingPurchase;
       setPendingPurchase(null);
       
-      // Run the purchase simulation
-      await runPurchaseSimulation(insurerName);
+      // Run the real purchase flow
+      await runPurchaseSimulation(purchaseData);
       return;
     }
 
@@ -297,13 +379,23 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
       });
       queryClient.invalidateQueries({ queryKey: ["/api/chat/messages", userEmail] });
       
-      // Set pending purchase and show confirmation
-      setPendingPurchase(purchaseIntent.insurerName);
+      // Find the quote price from last shown quotes
+      const matchingQuote = lastQuotes.find(
+        q => q.insurer_name.toLowerCase() === purchaseIntent.insurerName!.toLowerCase()
+      );
+      const quotePrice = matchingQuote?.quote_price ?? 0;
       
-      // Add confirmation message to chat
+      // Set pending purchase with full data
+      setPendingPurchase({
+        insurerName: purchaseIntent.insurerName,
+        quotePrice: quotePrice,
+      });
+      
+      // Add confirmation message to chat with price
+      const priceText = quotePrice > 0 ? ` at £${quotePrice.toFixed(2)}/year` : "";
       await apiRequest("POST", "/api/chat/save-assistant-message", {
         email_id: userEmail,
-        message: `Do you want to proceed with the quote from ${purchaseIntent.insurerName}? Reply "Yes" to confirm.`,
+        message: `Do you want to proceed with the quote from ${purchaseIntent.insurerName}${priceText}? Reply "Yes" to confirm.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/chat/messages", userEmail] });
       return;
