@@ -1,0 +1,21 @@
+{
+  "insurance_details": {
+    "email_id": "sam@example.com",
+    "driver_age": 34,
+    "vehicle_registration_number": "AB12CDE",
+    "vehicle_manufacturer_name": "Toyota",
+    "vehicle_model": "Corolla",
+    "vehicle_year": 2019,
+    "type_of_fuel": "Hybrid",
+    "type_of_Cover_needed": "comprehensive",
+    "No_Claim_bonus_years": 5,
+    "Voluntary_Excess": 250,
+    "current_insurance_provider": "Admiral",
+    "policy_id": "POL-9001",
+    "policy_type": "car"
+  },
+  "user_preferences": "I need courtesy car and legal cover with maximum budget £500.",
+  "conversation_history": [],
+  "trust_pilot_data": null,
+  "defacto_ratings": null
+}
