@@ -8,9 +8,9 @@ const OPENAI_REALTIME_URL = "wss://api.openai.com/v1/realtime?model=gpt-realtime
 // Use the same API endpoint as the text chat (alfie-agent complete-analysis)
 const QUOTE_SEARCH_API = "https://alfie-657860957693.europe-west4.run.app/complete-analysis";
 
-// TEMPORARY: Set to true to disable OpenAI Realtime TTS and use text-only responses
-// This helps isolate quote flow testing from OpenAI auto-response issues
-const DISABLE_REALTIME_TTS = true;
+// Set to false to enable OpenAI Realtime TTS voice responses
+// Set to true to disable voice and use text-only mode for debugging
+const DISABLE_REALTIME_TTS = false;
 
 interface TranscriptionBuffer {
   userTranscript: string;
