@@ -897,6 +897,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const policy = vehiclePolicies[0];
           console.log(`[Chat] Found vehicle policy: ${policy.details.vehicle_manufacturer_name} ${policy.details.vehicle_model}`);
           
+          // Get whisper_preferences from the policy (same as home quote search)
+          const whisperPreferences = policy.whisper_preferences || "";
+          console.log(`[Chat] Using whisper_preferences: "${whisperPreferences}"`);
+          
           // Build quote search request with case-sensitive field names
           const quoteRequestBody = {
             insurance_details: {
@@ -914,7 +918,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               policy_id: policy.policy_id,
               policy_type: policy.policy_type
             },
-            user_preferences: userMessage,
+            user_preferences: whisperPreferences,
             conversation_history: [],
             trust_pilot_data: null,
             defacto_ratings: null
