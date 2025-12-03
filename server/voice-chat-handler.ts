@@ -74,11 +74,17 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
     userTranscript: "",
     assistantTranscript: "",
   };
+  
+  // Flag to track when WE are sending a voice message (vs OpenAI auto-responding)
+  let ourResponseInProgress = false;
 
   // Helper to send TTS message through OpenAI Realtime
   const sendVoiceMessage = (text: string) => {
     if (openaiWs.readyState === WebSocket.OPEN) {
       console.log(`[VoiceChat] Sending TTS: "${text}"`);
+      
+      // Mark that we're sending our own response
+      ourResponseInProgress = true;
       
       // Create a text response that OpenAI will convert to speech
       openaiWs.send(JSON.stringify({
@@ -189,18 +195,29 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       const data = await response.json();
       console.log(`[VoiceChat] Quote API returned ${data.quotes_with_insights?.length || 0} quotes`);
       
+      // Log raw API response for debugging
+      console.log(`[VoiceChat] Raw API response sample:`, JSON.stringify(data.quotes_with_insights?.[0], null, 2));
+      
       // Transform API response to our QuoteResult format
-      const quotes: QuoteResult[] = (data.quotes_with_insights || []).slice(0, 10).map((q: any) => ({
-        insurer: q.insurer_name || q.insurer || "Unknown",
-        trustpilotRating: q.trust_pilot_score || q.trustpilotRating || 4.0,
-        defaqtoRating: q.defaqto_score || q.defaqtoRating || 4,
-        annualCost: q.annual_cost || q.annualCost || 0,
-        monthlyCost: q.monthly_cost || q.monthlyCost || Math.round((q.annual_cost || 0) / 12),
-        excessVoluntary: q.voluntary_excess || q.excessVoluntary || 250,
-        excessCompulsory: q.compulsory_excess || q.excessCompulsory || 250,
-        autoAnnieScore: q.auto_annie_score || q.autoAnnieScore || 85,
-        aiSummary: q.ai_summary || q.aiSummary || "Good value policy with comprehensive cover."
-      }));
+      const quotes: QuoteResult[] = (data.quotes_with_insights || []).slice(0, 10).map((q: any) => {
+        // Get annual cost - try multiple field names
+        const rawAnnualCost = q.annual_cost || q.annualCost || q.quote_price || q.price || 0;
+        // Get AutoAnnie score - normalize from 0-100 to 0-5 scale
+        const rawScore = q.auto_annie_score || q.autoAnnieScore || q.alfie_touch_score || 80;
+        const normalizedScore = rawScore > 10 ? Math.round((rawScore / 100) * 5 * 10) / 10 : rawScore;
+        
+        return {
+          insurer: q.insurer_name || q.insurer || "Unknown",
+          trustpilotRating: q.trust_pilot_score || q.trustpilotRating || 4.0,
+          defaqtoRating: q.defaqto_score || q.defaqtoRating || 4,
+          annualCost: rawAnnualCost,
+          monthlyCost: q.monthly_cost || q.monthlyCost || Math.round(rawAnnualCost / 12),
+          excessVoluntary: q.voluntary_excess || q.excessVoluntary || 250,
+          excessCompulsory: q.compulsory_excess || q.excessCompulsory || 250,
+          autoAnnieScore: normalizedScore,  // Now normalized to 0-5 scale
+          aiSummary: q.ai_summary || q.aiSummary || "Good value policy with comprehensive cover."
+        };
+      });
       
       console.log(`[VoiceChat] Transformed ${quotes.length} quotes for display`);
       return quotes;
@@ -487,23 +504,31 @@ IMPORTANT:
         transcriptionBuffer.userTranscript = event.transcript || "";
         console.log(`[VoiceChat] User said: ${transcriptionBuffer.userTranscript}`);
         
+        // Cancel any EXISTING OpenAI auto-response before we process
+        // Note: our flag will be set by sendVoiceMessage when WE want to speak
+        if (!ourResponseInProgress) {
+          openaiWs.send(JSON.stringify({ type: "response.cancel" }));
+          console.log("[VoiceChat] Cancelled any pending OpenAI auto-response");
+        }
+        
         // Send to client for UI display
         clientWs.send(JSON.stringify({
           type: "user_transcript",
           transcript: transcriptionBuffer.userTranscript,
         }));
 
-        // Process intent FIRST - we control when responses happen
+        // Process intent - this may call sendVoiceMessage which sets ourResponseInProgress
         const handled = await processUserIntent(transcriptionBuffer.userTranscript);
         
         if (!handled) {
           // Intent not handled by our flow - let OpenAI respond for general chat
           console.log("[VoiceChat] Intent not handled, triggering OpenAI response");
+          ourResponseInProgress = true; // Mark that this is an allowed response
           openaiWs.send(JSON.stringify({
             type: "response.create"
           }));
         }
-        // If handled, our processUserIntent already sent voice messages via sendVoiceMessage()
+        // If handled, processUserIntent already called sendVoiceMessage which sets the flag
       }
 
       // Capture assistant transcription
@@ -551,14 +576,46 @@ IMPORTANT:
           type: "session_ready",
         }));
       }
+      
+      // Intercept speech stopped event - cancel any auto-response UNLESS we triggered it
+      if (event.type === "input_audio_buffer.speech_stopped") {
+        if (!ourResponseInProgress) {
+          console.log("[VoiceChat] Speech stopped, cancelling any OpenAI auto-response");
+          openaiWs.send(JSON.stringify({ type: "response.cancel" }));
+        }
+      }
+      
+      // Cancel ONLY unwanted OpenAI auto-responses, not our own TTS
+      if (event.type === "response.created") {
+        if (!ourResponseInProgress) {
+          // This is OpenAI auto-responding - cancel it!
+          console.log("[VoiceChat] OpenAI auto-started response, cancelling...");
+          openaiWs.send(JSON.stringify({ type: "response.cancel" }));
+        } else {
+          console.log("[VoiceChat] Our TTS response started (not cancelling)");
+        }
+      }
+      
+      // Reset flag when response is done
+      if (event.type === "response.done") {
+        console.log("[VoiceChat] Response completed, resetting flag");
+        ourResponseInProgress = false;
+      }
 
-      // Log errors
+      // Log errors and reset flag to avoid stuck state
       if (event.type === "error") {
         console.error("[VoiceChat] OpenAI error:", event.error);
+        ourResponseInProgress = false; // Reset flag on error
         clientWs.send(JSON.stringify({
           type: "error",
           message: event.error?.message || "Unknown error",
         }));
+      }
+      
+      // Reset flag on response.cancel as well
+      if (event.type === "response.cancelled") {
+        console.log("[VoiceChat] Response was cancelled, resetting flag");
+        ourResponseInProgress = false;
       }
 
     } catch (error) {
