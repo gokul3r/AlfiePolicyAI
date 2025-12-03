@@ -8,6 +8,10 @@ const OPENAI_REALTIME_URL = "wss://api.openai.com/v1/realtime?model=gpt-realtime
 // Use the same API endpoint as the text chat (alfie-agent complete-analysis)
 const QUOTE_SEARCH_API = "https://alfie-657860957693.europe-west4.run.app/complete-analysis";
 
+// TEMPORARY: Set to true to disable OpenAI Realtime TTS and use text-only responses
+// This helps isolate quote flow testing from OpenAI auto-response issues
+const DISABLE_REALTIME_TTS = true;
+
 interface TranscriptionBuffer {
   userTranscript: string;
   assistantTranscript: string;
@@ -40,6 +44,74 @@ interface QuoteResult {
   excessCompulsory: number;
   autoAnnieScore: number;
   aiSummary: string;
+}
+
+// Parsed quote structure from API (matching Python get_top_3_quotes output)
+interface ParsedQuote {
+  insurer_name: string;
+  alfie_touch_score: number;
+  trustpilot_rating: number | null;
+  policy_cost: any;  // Nested structure from original_quote.output.policy_cost
+  alfie_message: string;
+  features: {
+    features_matched: string[];
+    features_missing: string[];
+    available_features: string[];
+  };
+}
+
+/**
+ * Extract top 3 quotes from API response - TypeScript equivalent of Python get_top_3_quotes()
+ * This is the CRITICAL helper that properly traverses the nested API response structure
+ */
+function getTop3Quotes(data: any): { top_3_quotes: ParsedQuote[] } {
+  // Extract list of quotes
+  const quotes = data?.quotes_with_insights || [];
+  
+  console.log(`[getTop3Quotes] Processing ${quotes.length} quotes from API`);
+  
+  // Sort by alfie_touch_score (descending)
+  const quotesSorted = [...quotes].sort((a: any, b: any) => {
+    return (b.alfie_touch_score ?? 0) - (a.alfie_touch_score ?? 0);
+  });
+  
+  // Pick top 3
+  const top3 = quotesSorted.slice(0, 3);
+  
+  // Build output structure - EXACTLY matching Python helper
+  const output: { top_3_quotes: ParsedQuote[] } = { top_3_quotes: [] };
+  
+  for (const q of top3) {
+    // THE KEY FIX: Extract policy_cost from nested paths (matching text chat logic)
+    // Try: price_analysis.quote_price || original_quote.output.policy_cost
+    const policyCost = q?.price_analysis?.quote_price || q?.original_quote?.output?.policy_cost;
+    
+    console.log(`[getTop3Quotes] Quote ${q.insurer_name}:`, {
+      alfie_touch_score: q.alfie_touch_score,
+      price_analysis_quote_price: q?.price_analysis?.quote_price,
+      original_quote_output_policy_cost: q?.original_quote?.output?.policy_cost,
+      final_policy_cost: policyCost,
+      raw_policy_cost_type: typeof policyCost
+    });
+    
+    const entry: ParsedQuote = {
+      insurer_name: q.insurer_name,
+      alfie_touch_score: q.alfie_touch_score ?? 0,
+      trustpilot_rating: q.trust_pilot_context?.rating ?? null,
+      policy_cost: policyCost,
+      alfie_message: q.alfie_message ?? "",
+      features: {
+        features_matched: q.features_matching_requirements?.matched_required ?? [],
+        features_missing: q.features_matching_requirements?.missing_required ?? [],
+        available_features: q.available_features ?? []
+      }
+    };
+    
+    output.top_3_quotes.push(entry);
+  }
+  
+  console.log(`[getTop3Quotes] Extracted ${output.top_3_quotes.length} top quotes`);
+  return output;
 }
 
 /**
@@ -78,11 +150,24 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
   // Flag to track when WE are sending a voice message (vs OpenAI auto-responding)
   let ourResponseInProgress = false;
 
-  // Helper to send TTS message through OpenAI Realtime
+  // Helper to send TTS message through OpenAI Realtime (or text-only when disabled)
   const sendVoiceMessage = (text: string) => {
+    console.log(`[VoiceChat] Sending message: "${text}" (Realtime TTS: ${!DISABLE_REALTIME_TTS})`);
+    
+    // Always send text transcript to client for display
+    clientWs.send(JSON.stringify({
+      type: "assistant_transcript",
+      transcript: text,
+    }));
+    
+    if (DISABLE_REALTIME_TTS) {
+      // Skip OpenAI TTS - just use text responses
+      // This isolates quote flow testing from Realtime issues
+      console.log(`[VoiceChat] Realtime TTS disabled, text-only mode`);
+      return;
+    }
+    
     if (openaiWs.readyState === WebSocket.OPEN) {
-      console.log(`[VoiceChat] Sending TTS: "${text}"`);
-      
       // Mark that we're sending our own response
       ourResponseInProgress = true;
       
@@ -195,27 +280,53 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       const data = await response.json();
       console.log(`[VoiceChat] Quote API returned ${data.quotes_with_insights?.length || 0} quotes`);
       
-      // Log raw API response for debugging
-      console.log(`[VoiceChat] Raw API response sample:`, JSON.stringify(data.quotes_with_insights?.[0], null, 2));
+      // Log raw API response structure for debugging
+      if (data.quotes_with_insights?.[0]) {
+        const sample = data.quotes_with_insights[0];
+        console.log(`[VoiceChat] Raw API response structure:`, {
+          insurer_name: sample.insurer_name,
+          alfie_touch_score: sample.alfie_touch_score,
+          has_original_quote: !!sample.original_quote,
+          has_output: !!sample.original_quote?.output,
+          policy_cost: sample.original_quote?.output?.policy_cost
+        });
+      }
       
-      // Transform API response to our QuoteResult format
-      const quotes: QuoteResult[] = (data.quotes_with_insights || []).slice(0, 10).map((q: any) => {
-        // Get annual cost - try multiple field names
-        const rawAnnualCost = q.annual_cost || q.annualCost || q.quote_price || q.price || 0;
-        // Get AutoAnnie score - normalize from 0-100 to 0-5 scale
-        const rawScore = q.auto_annie_score || q.autoAnnieScore || q.alfie_touch_score || 80;
+      // USE THE PROPER HELPER - just like text chat does!
+      const parsed = getTop3Quotes(data);
+      console.log(`[VoiceChat] getTop3Quotes extracted ${parsed.top_3_quotes.length} quotes`);
+      
+      // Transform parsed quotes to QuoteResult format for voice UI
+      const quotes: QuoteResult[] = parsed.top_3_quotes.map((q) => {
+        // Extract annual cost from policy_cost (could be a string like "£450.00" or number)
+        let annualCost = 0;
+        if (q.policy_cost) {
+          if (typeof q.policy_cost === 'number') {
+            annualCost = q.policy_cost;
+          } else if (typeof q.policy_cost === 'string') {
+            // Parse "£450.00" format
+            annualCost = parseFloat(q.policy_cost.replace(/[£$,]/g, '')) || 0;
+          } else if (typeof q.policy_cost === 'object' && q.policy_cost.annual) {
+            annualCost = parseFloat(String(q.policy_cost.annual).replace(/[£$,]/g, '')) || 0;
+          }
+        }
+        
+        // Normalize AutoAnnie score from 0-100 to 0-5 scale
+        const rawScore = q.alfie_touch_score || 80;
         const normalizedScore = rawScore > 10 ? Math.round((rawScore / 100) * 5 * 10) / 10 : rawScore;
         
+        console.log(`[VoiceChat] Quote ${q.insurer_name}: annualCost=${annualCost}, rawScore=${rawScore}, normalized=${normalizedScore}`);
+        
         return {
-          insurer: q.insurer_name || q.insurer || "Unknown",
-          trustpilotRating: q.trust_pilot_score || q.trustpilotRating || 4.0,
-          defaqtoRating: q.defaqto_score || q.defaqtoRating || 4,
-          annualCost: rawAnnualCost,
-          monthlyCost: q.monthly_cost || q.monthlyCost || Math.round(rawAnnualCost / 12),
-          excessVoluntary: q.voluntary_excess || q.excessVoluntary || 250,
-          excessCompulsory: q.compulsory_excess || q.excessCompulsory || 250,
-          autoAnnieScore: normalizedScore,  // Now normalized to 0-5 scale
-          aiSummary: q.ai_summary || q.aiSummary || "Good value policy with comprehensive cover."
+          insurer: q.insurer_name || "Unknown",
+          trustpilotRating: q.trustpilot_rating ?? 4.0,
+          defaqtoRating: 4,  // Not in parsed structure
+          annualCost: annualCost,
+          monthlyCost: Math.round(annualCost / 12),
+          excessVoluntary: 250,  // Default
+          excessCompulsory: 250,  // Default
+          autoAnnieScore: normalizedScore,
+          aiSummary: q.alfie_message || "Good value policy with comprehensive cover."
         };
       });
       
