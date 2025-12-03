@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Star, Trophy, ChevronDown, ChevronUp } from "lucide-react";
+import { Star, Trophy, ChevronDown, ChevronUp, Check, X, List } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
 
 export interface ChatQuote {
   insurer_name: string;
   alfie_touch_score: number;
   alfie_message: string;
   isTopMatch?: boolean;
+  quote_price?: number | null;
+  available_features?: string[];
+  features_matched?: string[];
+  features_missing?: string[];
 }
 
 interface ChatQuoteCardProps {
@@ -20,13 +23,9 @@ interface ChatQuoteCardProps {
 
 export default function ChatQuoteCard({ quote, index }: ChatQuoteCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { toast } = useToast();
 
   const handleCardClick = () => {
-    toast({
-      title: "Feature in Progress",
-      description: `Purchasing ${quote.insurer_name} policy will be available soon!`,
-    });
+    setIsExpanded(!isExpanded);
   };
 
   const handleExpandClick = (e: React.MouseEvent) => {
@@ -45,6 +44,21 @@ export default function ChatQuoteCard({ quote, index }: ChatQuoteCardProps) {
     if (score >= 3.0) return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
     return "bg-gray-500/10 text-gray-700 dark:text-gray-400";
   };
+
+  const formatPrice = (price: number | null | undefined) => {
+    if (price === null || price === undefined) return "N/A";
+    return `£${price.toFixed(2)}`;
+  };
+
+  const formatFeatureName = (feature: string) => {
+    return feature
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  const featuresMatched = quote.features_matched || [];
+  const featuresMissing = quote.features_missing || [];
+  const allFeatures = quote.available_features || [];
 
   return (
     <motion.div
@@ -73,31 +87,98 @@ export default function ChatQuoteCard({ quote, index }: ChatQuoteCardProps) {
         )}
         
         <div className={`p-4 ${quote.isTopMatch ? 'pt-5' : ''}`}>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-lg text-foreground">
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <h3 className="font-bold text-lg text-foreground flex-shrink-0">
               {quote.insurer_name}
             </h3>
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${getScoreBgColor(quote.alfie_touch_score)}`}>
-              <Star className="w-4 h-4 fill-current" />
-              <span className="font-semibold text-sm">
-                {quote.alfie_touch_score.toFixed(1)}/5
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="font-bold text-primary text-lg">
+                {formatPrice(quote.quote_price)}
               </span>
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${getScoreBgColor(quote.alfie_touch_score)}`}>
+                <Star className="w-4 h-4 fill-current" />
+                <span className="font-semibold text-sm">
+                  {quote.alfie_touch_score.toFixed(1)}
+                </span>
+              </div>
             </div>
           </div>
 
           <div className="relative">
             <AnimatePresence mode="wait">
               {isExpanded ? (
-                <motion.p
+                <motion.div
                   key="expanded"
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="text-sm text-muted-foreground leading-relaxed pr-8"
+                  className="space-y-3"
                 >
-                  "{quote.alfie_message}"
-                </motion.p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    "{quote.alfie_message}"
+                  </p>
+
+                  {featuresMatched.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                        <Check className="w-3 h-3" />
+                        <span>Matched ({featuresMatched.length})</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {featuresMatched.map((feature, i) => (
+                          <Badge 
+                            key={i} 
+                            variant="outline" 
+                            className="text-xs px-1.5 py-0 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800"
+                          >
+                            {formatFeatureName(feature)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {featuresMissing.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400">
+                        <X className="w-3 h-3" />
+                        <span>Missing ({featuresMissing.length})</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {featuresMissing.map((feature, i) => (
+                          <Badge 
+                            key={i} 
+                            variant="outline" 
+                            className="text-xs px-1.5 py-0 bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800"
+                          >
+                            {formatFeatureName(feature)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {allFeatures.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                        <List className="w-3 h-3" />
+                        <span>All Features ({allFeatures.length})</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {allFeatures.map((feature, i) => (
+                          <Badge 
+                            key={i} 
+                            variant="outline" 
+                            className="text-xs px-1.5 py-0"
+                          >
+                            {formatFeatureName(feature)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
               ) : (
                 <motion.p
                   key="collapsed"

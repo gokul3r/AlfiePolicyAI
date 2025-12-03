@@ -810,11 +810,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const sortedQuotes = [...quotes].sort(
       (a, b) => (b.alfie_touch_score || 0) - (a.alfie_touch_score || 0)
     );
-    return sortedQuotes.slice(0, 3).map(q => ({
-      insurer_name: q.insurer_name,
-      alfie_touch_score: q.alfie_touch_score,
-      alfie_message: q.alfie_message
-    }));
+    return sortedQuotes.slice(0, 3).map(q => {
+      const result = {
+        insurer_name: q.insurer_name,
+        alfie_touch_score: q.alfie_touch_score,
+        alfie_message: q.alfie_message,
+        quote_price: q.price_analysis?.quote_price || q.original_quote?.output?.policy_cost || null,
+        available_features: q.available_features || [],
+        features_matched: q.features_matching_requirements?.matched_required || [],
+        features_missing: q.features_matching_requirements?.missing_required || []
+      };
+      console.log(`[Chat] Quote ${q.insurer_name}: price=${result.quote_price}, features=${result.available_features.length}, matched=${result.features_matched.length}, missing=${result.features_missing.length}`);
+      return result;
+    });
   }
 
   // Helper: Format top 3 quotes as a structured chat response with embedded JSON
