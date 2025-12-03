@@ -5,7 +5,8 @@ import { detectVoiceIntent, generateVoiceResponse, type VoiceIntent } from "./vo
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_REALTIME_URL = "wss://api.openai.com/v1/realtime?model=gpt-realtime-mini";
-const QUOTE_SEARCH_API = "https://quote-search-api-773622993408.europe-west2.run.app";
+// Use the same API endpoint as the text chat (alfie-agent complete-analysis)
+const QUOTE_SEARCH_API = "https://alfie-657860957693.europe-west4.run.app/complete-analysis";
 
 interface TranscriptionBuffer {
   userTranscript: string;
@@ -104,10 +105,10 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
     }));
   };
 
-  // Search for quotes using the external API
+  // Search for quotes using the external API (same format as text chat)
   const searchQuotes = async (): Promise<QuoteResult[]> => {
     try {
-      // Get vehicle registration - handle both flat and nested policy formats
+      // Get policy details - handle both flat and nested policy formats
       const policy = policies[0];
       if (!policy) {
         console.error("[VoiceChat] No policy found");
@@ -119,27 +120,95 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       const vehicleReg = (details as any)?.vehicle_registration_number;
       
       if (!vehicleReg) {
-        console.error("[VoiceChat] No vehicle registration found");
+        console.error("[VoiceChat] No vehicle registration found in policy");
+        return [];
+      }
+      
+      // Validate required fields exist before calling API
+      const driverAge = (details as any)?.driver_age;
+      const vehicleYear = (details as any)?.vehicle_year;
+      if (!driverAge || !vehicleYear) {
+        console.error("[VoiceChat] Missing required policy details (driver_age or vehicle_year)");
         return [];
       }
 
       console.log(`[VoiceChat] Searching quotes for vehicle: ${vehicleReg}`);
+      console.log(`[VoiceChat] Policy details:`, {
+        vehicleReg,
+        make: (details as any)?.vehicle_manufacturer_name,
+        model: (details as any)?.vehicle_model,
+        year: vehicleYear,
+        driverAge
+      });
       
-      const response = await fetch(`${QUOTE_SEARCH_API}/search`, {
+      // Build the full request body EXACTLY matching text chat format from routes.ts
+      // All field names and casing must match the API requirements
+      const quoteRequestBody = {
+        insurance_details: {
+          email_id: policy.email_id,
+          driver_age: driverAge,
+          vehicle_registration_number: vehicleReg,
+          vehicle_manufacturer_name: (details as any)?.vehicle_manufacturer_name,
+          vehicle_model: (details as any)?.vehicle_model,
+          vehicle_year: vehicleYear,
+          type_of_fuel: (details as any)?.type_of_fuel,
+          type_of_Cover_needed: (details as any)?.type_of_cover_needed,  // Capital C required by API
+          No_Claim_bonus_years: (details as any)?.no_claim_bonus_years,  // Capital N and C required by API
+          Voluntary_Excess: (details as any)?.voluntary_excess,  // Capital V and E required by API
+          current_insurance_provider: policy.current_insurance_provider,
+          policy_id: policy.policy_id,
+          policy_type: policy.policy_type
+        },
+        user_preferences: policy.whisper_preferences || "",
+        conversation_history: [],
+        trust_pilot_data: null,
+        defacto_ratings: null
+      };
+      
+      console.log(`[VoiceChat] Calling Quote Search API with body:`, JSON.stringify(quoteRequestBody, null, 2));
+      
+      // Use timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
+      const response = await fetch(QUOTE_SEARCH_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vehicle_registration: vehicleReg })
+        body: JSON.stringify(quoteRequestBody),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
+        const errorText = await response.text().catch(() => "Unknown error");
+        console.error(`[VoiceChat] Quote API error (${response.status}):`, errorText);
         throw new Error(`Quote search failed: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log(`[VoiceChat] Found ${data.quotes?.length || 0} quotes`);
-      return data.quotes || [];
-    } catch (error) {
-      console.error("[VoiceChat] Quote search error:", error);
+      console.log(`[VoiceChat] Quote API returned ${data.quotes_with_insights?.length || 0} quotes`);
+      
+      // Transform API response to our QuoteResult format
+      const quotes: QuoteResult[] = (data.quotes_with_insights || []).slice(0, 10).map((q: any) => ({
+        insurer: q.insurer_name || q.insurer || "Unknown",
+        trustpilotRating: q.trust_pilot_score || q.trustpilotRating || 4.0,
+        defaqtoRating: q.defaqto_score || q.defaqtoRating || 4,
+        annualCost: q.annual_cost || q.annualCost || 0,
+        monthlyCost: q.monthly_cost || q.monthlyCost || Math.round((q.annual_cost || 0) / 12),
+        excessVoluntary: q.voluntary_excess || q.excessVoluntary || 250,
+        excessCompulsory: q.compulsory_excess || q.excessCompulsory || 250,
+        autoAnnieScore: q.auto_annie_score || q.autoAnnieScore || 85,
+        aiSummary: q.ai_summary || q.aiSummary || "Good value policy with comprehensive cover."
+      }));
+      
+      console.log(`[VoiceChat] Transformed ${quotes.length} quotes for display`);
+      return quotes;
+    } catch (error: any) {
+      console.error("[VoiceChat] Quote search error:", error.name, error.message);
+      if (error.name === 'AbortError') {
+        console.error("[VoiceChat] Quote search timed out after 30 seconds");
+      }
       return [];
     }
   };
