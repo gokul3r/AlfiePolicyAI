@@ -395,7 +395,7 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
       const priceText = quotePrice > 0 ? ` at £${quotePrice.toFixed(2)}/year` : "";
       await apiRequest("POST", "/api/chat/save-assistant-message", {
         email_id: userEmail,
-        message: `Do you want to proceed with the quote from ${purchaseIntent.insurerName}${priceText}? Reply "Yes" to confirm.`,
+        message: `Do you want to proceed with the quote from ${purchaseIntent.insurerName}${priceText}?`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/chat/messages", userEmail] });
       return;
