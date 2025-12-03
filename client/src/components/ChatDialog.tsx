@@ -14,6 +14,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { ChatMessage } from "@shared/schema";
 import ChatQuoteCard, { type ChatQuote } from "./ChatQuoteCard";
+import PaymentSection from "./PaymentSection";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface QuoteCardsData {
@@ -111,11 +112,33 @@ function detectPurchaseIntent(message: string): { isPurchase: boolean; insurerNa
   return { isPurchase: false };
 }
 
-// Check if message is confirming a purchase
+// Check if message is confirming a purchase (natural language detection)
 function isConfirmingPurchase(message: string): boolean {
   const lowerMessage = message.toLowerCase().trim();
-  const confirmations = ["yes", "yeah", "yep", "sure", "ok", "okay", "confirm", "confirmed", "proceed", "go ahead", "do it", "yes please"];
-  return confirmations.some(c => lowerMessage === c || lowerMessage.startsWith(c + " ") || lowerMessage.startsWith(c + ","));
+  
+  // Direct confirmations
+  const directConfirmations = [
+    "yes", "yeah", "yep", "sure", "ok", "okay", "confirm", "confirmed", 
+    "proceed", "go ahead", "do it", "yes please", "absolutely", "definitely",
+    "go on", "pay", "pay now", "let's do it", "let's go", "sounds good",
+    "perfect", "great", "fine", "alright", "yup", "aye", "affirmative",
+    "continue", "make it happen", "book it", "get it", "buy it", "purchase",
+    "i want it", "i'll take it", "sign me up", "let's proceed", "go for it"
+  ];
+  
+  // Check for exact matches or starts with
+  if (directConfirmations.some(c => lowerMessage === c || lowerMessage.startsWith(c + " ") || lowerMessage.startsWith(c + ","))) {
+    return true;
+  }
+  
+  // Check for phrases that indicate confirmation
+  const confirmPhrases = [
+    "yes i want", "yes please", "yes go", "yes proceed",
+    "i confirm", "please proceed", "go with it", "make the payment",
+    "process the payment", "complete the purchase", "finalize it"
+  ];
+  
+  return confirmPhrases.some(phrase => lowerMessage.includes(phrase));
 }
 
 // Animated Agent Status Component
@@ -172,6 +195,7 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
     const { insurerName, quotePrice } = purchaseData;
     
     const steps = [
+      { status: "Processing payment...", delay: 2000 },
       { status: "Auto Annie verifying the details...", delay: 1500 },
       { status: `Contacting ${insurerName}...`, delay: 2000 },
       { status: "Buying the policy...", delay: 2000 },
@@ -180,8 +204,12 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
     ];
     
     try {
-      // Show first status while getting vehicle registration
+      // Show first status (Processing payment...) for 2 seconds
       setAgentStatus(steps[0].status);
+      await new Promise(resolve => setTimeout(resolve, steps[0].delay));
+      
+      // Show second status while getting vehicle registration
+      setAgentStatus(steps[1].status);
       
       // Get the user's first vehicle policy to get registration number
       const policiesResponse = await fetch(`/api/vehicle-policies/${encodeURIComponent(userEmail)}`);
@@ -198,8 +226,8 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
         throw new Error("Vehicle registration not found");
       }
       
-      // Continue with animated steps
-      for (let i = 1; i < steps.length; i++) {
+      // Continue with remaining animated steps (starting from index 2)
+      for (let i = 2; i < steps.length; i++) {
         await new Promise(resolve => setTimeout(resolve, steps[i-1].delay));
         setAgentStatus(steps[i].status);
       }
@@ -533,6 +561,16 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
                   </div>
                 );
               })}
+              
+              {/* Payment Section - shown when awaiting purchase confirmation */}
+              <AnimatePresence>
+                {pendingPurchase && !purchaseInProgress && (
+                  <PaymentSection 
+                    totalAmount={pendingPurchase.quotePrice} 
+                    insurerName={pendingPurchase.insurerName}
+                  />
+                )}
+              </AnimatePresence>
               
               {/* Animated Agent Status */}
               <AnimatePresence mode="wait">
