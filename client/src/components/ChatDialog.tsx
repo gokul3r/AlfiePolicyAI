@@ -346,22 +346,25 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
         if (isQuoteSearchIntent(initialMessage)) {
           setAgentStatus("Auto Annie looking for quotes...");
           
-          // Start API call in background
+          // Create minimum 5.5 second delay promise
+          const minimumDelayPromise = (async () => {
+            // Step 1: Show "looking for quotes" for 1.8 seconds
+            await new Promise(resolve => setTimeout(resolve, 1800));
+            
+            // Step 2: Show "Receiving quotes from insurers" for 1.8 seconds
+            setAgentStatus("Receiving quotes from insurers...");
+            await new Promise(resolve => setTimeout(resolve, 1800));
+            
+            // Step 3: Show "AutoAnnie's AI analysing quotes" for 1.9 seconds
+            setAgentStatus("AutoAnnie's AI analysing quotes...");
+            await new Promise(resolve => setTimeout(resolve, 1900));
+          })();
+          
+          // Start API call in background (don't await yet to prevent early cache update)
           const apiPromise = sendMessageMutation.mutateAsync(initialMessage);
           
-          // Step 1: Show "looking for quotes" for 2 seconds
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Step 2: Show "Receiving quotes from insurers" for 2 seconds
-          setAgentStatus("Receiving quotes from insurers...");
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Step 3: Show "AutoAnnie's AI analysing quotes" for 2.5 seconds
-          setAgentStatus("AutoAnnie's AI analysing quotes...");
-          await new Promise(resolve => setTimeout(resolve, 2500));
-          
-          // Wait for API if still pending
-          await apiPromise;
+          // Wait for BOTH minimum delay AND API to complete
+          await Promise.all([minimumDelayPromise, apiPromise]);
           
           setAgentStatus(null);
         } else {
@@ -459,22 +462,25 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
     if (isQuoteSearchIntent(trimmedMessage)) {
       setAgentStatus("Auto Annie looking for quotes...");
       
-      // Start API call in background
+      // Create minimum 5.5 second delay promise
+      const minimumDelayPromise = (async () => {
+        // Step 1: Show "looking for quotes" for 1.8 seconds
+        await new Promise(resolve => setTimeout(resolve, 1800));
+        
+        // Step 2: Show "Receiving quotes from insurers" for 1.8 seconds
+        setAgentStatus("Receiving quotes from insurers...");
+        await new Promise(resolve => setTimeout(resolve, 1800));
+        
+        // Step 3: Show "AutoAnnie's AI analysing quotes" for 1.9 seconds
+        setAgentStatus("AutoAnnie's AI analysing quotes...");
+        await new Promise(resolve => setTimeout(resolve, 1900));
+      })();
+      
+      // Start API call in background (don't await yet to prevent early cache update)
       const apiPromise = sendMessageMutation.mutateAsync(trimmedMessage);
       
-      // Step 1: Show "looking for quotes" for 2 seconds
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Step 2: Show "Receiving quotes from insurers" for 2 seconds
-      setAgentStatus("Receiving quotes from insurers...");
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Step 3: Show "AutoAnnie's AI analysing quotes" for 2.5 seconds
-      setAgentStatus("AutoAnnie's AI analysing quotes...");
-      await new Promise(resolve => setTimeout(resolve, 2500));
-      
-      // Wait for API if still pending
-      await apiPromise;
+      // Wait for BOTH minimum delay AND API to complete
+      await Promise.all([minimumDelayPromise, apiPromise]);
       
       setAgentStatus(null);
     } else {
