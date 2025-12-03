@@ -772,6 +772,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper: Detect if user message is a quote search request
+  function isQuoteSearchIntent(message: string): boolean {
+    const lowerMessage = message.toLowerCase();
+    const quoteSearchPhrases = [
+      "search for",
+      "search quote",
+      "find quote",
+      "get quote",
+      "insurance quote",
+      "buy a policy",
+      "buy policy",
+      "insure my",
+      "get insurance",
+      "find insurance",
+      "search insurance",
+      "compare quotes",
+      "compare insurance",
+      "new quote",
+      "quote search",
+      "want to insure",
+      "need insurance",
+      "looking for insurance",
+      "looking for quote",
+      "find me quote",
+      "get me quote"
+    ];
+    // Check if any phrase matches and the message relates to quotes/insurance
+    const hasQuotePhrase = quoteSearchPhrases.some(phrase => lowerMessage.includes(phrase));
+    const hasQuoteWord = lowerMessage.includes("quote") || lowerMessage.includes("insurance") || lowerMessage.includes("insure") || lowerMessage.includes("policy");
+    return hasQuotePhrase && hasQuoteWord;
+  }
+
+  // Helper: Get top 3 quotes sorted by alfie_touch_score
+  function getTop3Quotes(data: any): any[] {
+    const quotes = data.quotes_with_insights || [];
+    const sortedQuotes = [...quotes].sort(
+      (a, b) => (b.alfie_touch_score || 0) - (a.alfie_touch_score || 0)
+    );
+    return sortedQuotes.slice(0, 3).map(q => ({
+      insurer_name: q.insurer_name,
+      alfie_touch_score: q.alfie_touch_score,
+      alfie_message: q.alfie_message
+    }));
+  }
+
+  // Helper: Format top 3 quotes as a chat response
+  function formatQuotesForChat(top3: any[]): string {
+    if (top3.length === 0) {
+      return "I couldn't find any quotes at this time. Please try again later.";
+    }
+    
+    let response = "Great news! I found some insurance quotes for you. Here are the top 3 options:\n\n";
+    
+    top3.forEach((quote, index) => {
+      response += `**${index + 1}. ${quote.insurer_name}**\n`;
+      response += `Auto Annie Score: ${quote.alfie_touch_score}/5\n`;
+      response += `${quote.alfie_message}\n\n`;
+    });
+    
+    response += "Would you like more details about any of these options?";
+    return response;
+  }
+
   // Send message to AI and get response
   app.post("/api/chat/send-message", async (req, res) => {
     try {
@@ -803,20 +866,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: userMessage,
       });
 
-      // Get AI response using Chat Completions API with vector store
-      const VECTOR_STORE_ID = "vs_6901fa16a5c081918d2ad17626cc303f";
-      
       let aiResponse: string;
-      try {
-        aiResponse = await sendChatMessage(userMessage, {
-          vectorStoreId: VECTOR_STORE_ID,
-          userEmail: email,
-        });
-        console.log(`[Chat] AI response: "${aiResponse}"`);
-      } catch (aiError: any) {
-        console.error("[Chat] AI error:", aiError);
-        // Fallback to friendly error message
-        aiResponse = "I'm having trouble connecting right now. Please try again in a moment.";
+
+      // Check if this is a quote search request
+      if (isQuoteSearchIntent(userMessage)) {
+        console.log(`[Chat] Detected quote search intent from: "${userMessage}"`);
+        
+        // Get user's vehicle policies
+        const vehiclePolicies = await storage.getVehiclePoliciesByEmail(email);
+        
+        if (!vehiclePolicies || vehiclePolicies.length === 0) {
+          // No vehicle - guide user to add a policy first
+          aiResponse = "Please onboard via home -> Add policy before searching for quotes.";
+          console.log(`[Chat] No vehicle policies found for ${email}, returning guidance message`);
+        } else {
+          // Use the first vehicle policy for the quote search
+          const policy = vehiclePolicies[0];
+          console.log(`[Chat] Found vehicle policy: ${policy.details.vehicle_manufacturer_name} ${policy.details.vehicle_model}`);
+          
+          // Build quote search request with case-sensitive field names
+          const quoteRequestBody = {
+            insurance_details: {
+              email_id: policy.email_id,
+              driver_age: policy.details.driver_age,
+              vehicle_registration_number: policy.details.vehicle_registration_number,
+              vehicle_manufacturer_name: policy.details.vehicle_manufacturer_name,
+              vehicle_model: policy.details.vehicle_model,
+              vehicle_year: policy.details.vehicle_year,
+              type_of_fuel: policy.details.type_of_fuel,
+              type_of_Cover_needed: policy.details.type_of_cover_needed,  // Capital C required by API
+              No_Claim_bonus_years: policy.details.no_claim_bonus_years,  // Capital N and C required by API
+              Voluntary_Excess: policy.details.voluntary_excess,  // Capital V and E required by API
+              current_insurance_provider: policy.current_insurance_provider,
+              policy_id: policy.policy_id,
+              policy_type: policy.policy_type
+            },
+            user_preferences: userMessage,
+            conversation_history: [],
+            trust_pilot_data: null,
+            defacto_ratings: null
+          };
+          
+          console.log(`[Chat] Calling Quote Search API...`);
+          console.log(`[Chat] Request body:`, JSON.stringify(quoteRequestBody, null, 2));
+          
+          try {
+            // Call the Quote Search API with 30-second timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+            
+            const quoteResponse = await fetch(
+              "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(quoteRequestBody),
+                signal: controller.signal,
+              }
+            );
+            
+            clearTimeout(timeoutId);
+            
+            if (!quoteResponse.ok) {
+              const errorText = await quoteResponse.text().catch(() => "Unknown error");
+              console.error(`[Chat] Quote API error (${quoteResponse.status}):`, errorText);
+              aiResponse = "I had trouble searching for quotes. Please try again or use the Quote Search button on the home screen.";
+            } else {
+              const quoteData = await quoteResponse.json();
+              console.log(`[Chat] Quote API returned ${quoteData.quotes_with_insights?.length || 0} quotes`);
+              
+              // Get top 3 quotes
+              const top3 = getTop3Quotes(quoteData);
+              console.log(`[Chat] Top 3 quotes:`, top3.map(q => q.insurer_name));
+              
+              // Format response for chat
+              aiResponse = formatQuotesForChat(top3);
+            }
+          } catch (quoteError: any) {
+            console.error("[Chat] Quote search error:", quoteError.name, quoteError.message);
+            if (quoteError.name === 'AbortError') {
+              aiResponse = "The quote search is taking too long. Please try again or use the Quote Search button on the home screen.";
+            } else {
+              aiResponse = "I couldn't connect to the quote search service. Please try again later.";
+            }
+          }
+        }
+      } else {
+        // Regular chat - use OpenAI Responses API with vector store
+        const VECTOR_STORE_ID = "vs_6901fa16a5c081918d2ad17626cc303f";
+        
+        try {
+          aiResponse = await sendChatMessage(userMessage, {
+            vectorStoreId: VECTOR_STORE_ID,
+            userEmail: email,
+          });
+          console.log(`[Chat] AI response: "${aiResponse}"`);
+        } catch (aiError: any) {
+          console.error("[Chat] AI error:", aiError);
+          // Fallback to friendly error message
+          aiResponse = "I'm having trouble connecting right now. Please try again in a moment.";
+        }
       }
 
       // Save assistant response to database
