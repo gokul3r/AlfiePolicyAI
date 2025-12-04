@@ -718,7 +718,7 @@ function MatchFoundState({
             {hasMoreMatchesThisMonth 
               ? "Show next match" 
               : canSearchMoreMonths 
-                ? `Search next ${frequency === "weekly" ? "week" : "month"}` 
+                ? "Continue searching" 
                 : "End of policy period"}
           </Button>
         </div>
