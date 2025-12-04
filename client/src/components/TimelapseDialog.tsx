@@ -336,7 +336,9 @@ export function TimelapseDialog({
             totalMatches={currentWeekMatches.length}
             onConfirmPurchase={handleConfirmPurchase}
             onKeepSearching={handleKeepSearching}
-            hasMoreMatches={currentMatchIndex + 1 < currentWeekMatches.length}
+            hasMoreMatchesThisMonth={currentMatchIndex + 1 < currentWeekMatches.length}
+            canSearchMoreMonths={policyEndDate ? calculateNextDate(new Date(currentDate), frequency) <= policyEndDate : false}
+            frequency={frequency}
           />
         )}
 
@@ -389,14 +391,18 @@ function MatchFoundState({
   totalMatches,
   onConfirmPurchase,
   onKeepSearching,
-  hasMoreMatches,
+  hasMoreMatchesThisMonth,
+  canSearchMoreMonths,
+  frequency,
 }: {
   matchData: MatchData;
   matchNumber: number;
   totalMatches: number;
   onConfirmPurchase: () => void;
   onKeepSearching: () => void;
-  hasMoreMatches: boolean;
+  hasMoreMatchesThisMonth: boolean;
+  canSearchMoreMonths: boolean;
+  frequency: "weekly" | "monthly";
 }) {
   const { insurer, price, ai_insight, financial_breakdown } = matchData;
 
