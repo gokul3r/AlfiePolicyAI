@@ -32,6 +32,7 @@ interface MatchData {
     cancellation_fee: number;
     pro_rata_refund: number;
     days_remaining: number;
+    pro_rated_new_price: number;
     upfront_impact: number;
     annual_premium_delta: number;
   };
@@ -486,6 +487,29 @@ function MatchFoundState({
             </span>
           </div>
 
+          {/* Upfront Impact Calculation Breakdown */}
+          <div className="bg-muted/50 rounded-lg px-4 py-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-medium text-foreground mb-2">How this is calculated:</p>
+            <div className="flex justify-between">
+              <span>Pro-rata refund from old policy</span>
+              <span className="text-green-600 dark:text-green-400">+ £{financial_breakdown.pro_rata_refund.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Cancellation fee</span>
+              <span className="text-red-600 dark:text-red-400">- £{financial_breakdown.cancellation_fee.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>New policy cost (pro-rated for {financial_breakdown.days_remaining} days)</span>
+              <span className="text-red-600 dark:text-red-400">- £{financial_breakdown.pro_rated_new_price.toFixed(2)}</span>
+            </div>
+            <div className="border-t border-border pt-2 mt-2 flex justify-between font-medium text-foreground">
+              <span>Net upfront impact</span>
+              <span className={financial_breakdown.upfront_impact > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                = £{financial_breakdown.upfront_impact.toFixed(2)}
+              </span>
+            </div>
+          </div>
+
           <div className="flex justify-between items-center py-3 bg-primary/10 rounded-lg px-4">
             <span className="font-semibold">Annual premium delta</span>
             <span className={`text-xl font-bold ${
@@ -494,6 +518,25 @@ function MatchFoundState({
               {financial_breakdown.annual_premium_delta > 0 ? "Saving " : "Paying "}
               £{Math.abs(financial_breakdown.annual_premium_delta).toFixed(2)} per year
             </span>
+          </div>
+
+          {/* Annual Premium Delta Calculation Breakdown */}
+          <div className="bg-muted/50 rounded-lg px-4 py-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-medium text-foreground mb-2">How this is calculated:</p>
+            <div className="flex justify-between">
+              <span>Current annual premium</span>
+              <span>£{financial_breakdown.current_cost.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>New annual premium</span>
+              <span>£{financial_breakdown.new_quote_price.toFixed(2)}</span>
+            </div>
+            <div className="border-t border-border pt-2 mt-2 flex justify-between font-medium text-foreground">
+              <span>Annual {financial_breakdown.annual_premium_delta > 0 ? "savings" : "increase"}</span>
+              <span className={financial_breakdown.annual_premium_delta > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                = £{Math.abs(financial_breakdown.annual_premium_delta).toFixed(2)}
+              </span>
+            </div>
           </div>
         </div>
 

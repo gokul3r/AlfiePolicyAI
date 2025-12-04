@@ -9,6 +9,7 @@ export interface FinancialBreakdown {
   cancellation_fee: number;
   pro_rata_refund: number;
   days_remaining: number;
+  pro_rated_new_price: number; // New quote price adjusted for remaining days
   upfront_impact: number; // Positive = receive back, Negative = pay extra
   annual_premium_delta: number; // Positive = saving, Negative = paying more
 }
@@ -57,6 +58,13 @@ export function calculateFinancialBreakdown(
   cancellationFee: number = 20, // Default £20
   switchDate: Date = new Date()
 ): FinancialBreakdown {
+  // Calculate total policy days (same as in refund calculation)
+  const startDate = new Date(policyStartDate);
+  const endDate = new Date(policyEndDate);
+  const totalDays = Math.ceil(
+    (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  
   // Calculate pro-rata refund
   const { refund, daysRemaining } = calculateProRataRefund(
     currentPolicyCost,
@@ -65,10 +73,14 @@ export function calculateFinancialBreakdown(
     switchDate
   );
   
-  // Upfront impact = refund - cancellation_fee - new_quote_price
+  // Pro-rate the new quote price for remaining days only
+  // Uses the same totalDays base as the refund calculation for consistency
+  const proRatedNewPrice = (newQuotePrice / totalDays) * daysRemaining;
+  
+  // Upfront impact = refund - cancellation_fee - pro_rated_new_price
   // Positive = receive money back
   // Negative = pay money upfront
-  const upfront_impact = refund - cancellationFee - newQuotePrice;
+  const upfront_impact = refund - cancellationFee - proRatedNewPrice;
   
   // Annual premium delta = current_cost - new_quote_price
   // Positive = saving
@@ -82,6 +94,7 @@ export function calculateFinancialBreakdown(
     cancellation_fee: Math.round(cancellationFee * 100) / 100,
     pro_rata_refund: Math.round(refund * 100) / 100,
     days_remaining: daysRemaining,
+    pro_rated_new_price: Math.round(proRatedNewPrice * 100) / 100,
     upfront_impact: Math.round(upfront_impact * 100) / 100,
     annual_premium_delta: Math.round(annual_premium_delta * 100) / 100,
   };
