@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, X, Loader2, History } from "lucide-react";
+import { Send, X, Loader2, History, CheckCircle2, Shield, PartyPopper } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -191,6 +191,8 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
   const [quoteSearchInProgress, setQuoteSearchInProgress] = useState(false); // Track when quote search animation is running
   const [lastMessageIdBeforeSearch, setLastMessageIdBeforeSearch] = useState<number | null>(null); // Last message ID before search started
   const [messageCountBeforeSearch, setMessageCountBeforeSearch] = useState(0); // Track message count before search started
+  const [showCelebration, setShowCelebration] = useState(false); // Show celebration dialog after purchase
+  const [purchasedProvider, setPurchasedProvider] = useState<string>(""); // Track purchased provider name
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -262,10 +264,9 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
       queryClient.invalidateQueries({ queryKey: ["/api/chat/messages", userEmail] });
       queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
       
-      toast({
-        title: "Policy Purchased!",
-        description: `Your new ${insurerName} policy is now active.`,
-      });
+      // Show celebration dialog instead of toast
+      setPurchasedProvider(insurerName);
+      setShowCelebration(true);
       
     } catch (error: any) {
       setAgentStatus(null);
@@ -397,6 +398,8 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
       setSessionStartMessageId(null);
       setQuoteSearchInProgress(false);
       setMessageCountBeforeSearch(0);
+      setShowCelebration(false);
+      setPurchasedProvider("");
     }
   }, [open, initialMessage, hasProcessedInitialMessage, isLoading]);
 
@@ -691,6 +694,89 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
           </div>
         </div>
       </DialogContent>
+
+      {/* Celebration Dialog - shown after successful purchase */}
+      <Dialog 
+        open={showCelebration} 
+        onOpenChange={(isOpen) => {
+          setShowCelebration(isOpen);
+          if (!isOpen) {
+            onOpenChange(false); // Also close chat dialog and go home
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md" data-testid="dialog-celebration">
+          <div className="flex flex-col items-center justify-center py-8 space-y-6">
+            {/* Animated celebration icon */}
+            <motion.div
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 200, damping: 15 }}
+              className="relative"
+            >
+              <div className="w-24 h-24 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                <Shield className="w-12 h-12 text-green-600 dark:text-green-400" />
+              </div>
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.3 }}
+                className="absolute -top-2 -right-2"
+              >
+                <PartyPopper className="w-8 h-8 text-amber-500" />
+              </motion.div>
+            </motion.div>
+
+            {/* Celebration text */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="text-center space-y-2"
+            >
+              <h2 className="text-2xl font-bold text-foreground">
+                Congratulations!
+              </h2>
+              <p className="text-lg text-muted-foreground">
+                You are covered with
+              </p>
+              <p className="text-2xl font-bold text-primary">
+                {purchasedProvider}
+              </p>
+            </motion.div>
+
+            {/* Checkmark animation */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="flex items-center gap-2 text-green-600 dark:text-green-400"
+            >
+              <CheckCircle2 className="w-5 h-5" />
+              <span className="text-sm font-medium">Policy activated successfully</span>
+            </motion.div>
+
+            {/* OK Button */}
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="w-full pt-4"
+            >
+              <Button
+                onClick={() => {
+                  setShowCelebration(false);
+                  onOpenChange(false); // Close the chat dialog and go to home
+                }}
+                className="w-full py-6 text-lg"
+                data-testid="button-celebration-ok"
+              >
+                OK
+              </Button>
+            </motion.div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
