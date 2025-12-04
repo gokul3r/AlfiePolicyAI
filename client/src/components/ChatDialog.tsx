@@ -190,6 +190,7 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
   const [sessionStartMessageId, setSessionStartMessageId] = useState<number | null>(null); // Track when session started
   const [quoteSearchInProgress, setQuoteSearchInProgress] = useState(false); // Track when quote search animation is running
   const [lastMessageIdBeforeSearch, setLastMessageIdBeforeSearch] = useState<number | null>(null); // Last message ID before search started
+  const [messageCountBeforeSearch, setMessageCountBeforeSearch] = useState(0); // Track message count before search started
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -346,10 +347,11 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
         
         // Check if initial message is a quote search
         if (isQuoteSearchIntent(initialMessage)) {
-          // Record the last message ID before search starts, then start search mode
+          // Record the last message ID and count before search starts, then start search mode
           // Use a high ID so all new messages (user + assistant) will be > this value
           const lastId = messages.length > 0 ? messages[messages.length - 1].id : 0;
           setLastMessageIdBeforeSearch(lastId);
+          setMessageCountBeforeSearch(messages.length);
           setQuoteSearchInProgress(true);
           setAgentStatus("Auto Annie looking for quotes...");
           
@@ -482,9 +484,10 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
 
     // Check if this is a quote search - show animated status messages
     if (isQuoteSearchIntent(trimmedMessage)) {
-      // Record the last message ID before search starts, then start search mode
+      // Record the last message ID and count before search starts, then start search mode
       const lastId = messages.length > 0 ? messages[messages.length - 1].id : 0;
       setLastMessageIdBeforeSearch(lastId);
+      setMessageCountBeforeSearch(messages.length);
       setQuoteSearchInProgress(true);
       setAgentStatus("Auto Annie looking for quotes...");
       
