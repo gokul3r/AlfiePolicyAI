@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -13,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
-import { Shield, Plus, Car, MessageCircle, Search, MessageSquare, Bell, Menu, Mic, SearchCheck, Bot, Calendar, Send, Sparkles, FileEdit, XCircle } from "lucide-react";
+import { Shield, Plus, Car, MessageCircle, Search, MessageSquare, Bell, Menu, Mic, SearchCheck, Bot, Calendar, Send, Sparkles, FileEdit, XCircle, CalendarClock } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
 import ChatDialog from "./ChatDialog";
 import { VoiceChatDialog } from "./VoiceChatDialog";
@@ -158,13 +159,6 @@ export default function WelcomeScreen({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem 
-                onClick={() => setShowScheduleDialog(true)}
-                data-testid="menu-item-schedule-search"
-                disabled={!hasPolicies}
-              >
-                Schedule Quote Search
-              </DropdownMenuItem>
-              <DropdownMenuItem 
                 onClick={() => setShowPersonalize(true)}
                 data-testid="menu-item-personalize"
               >
@@ -288,6 +282,27 @@ export default function WelcomeScreen({
             testId="button-cancel-policy"
           />
         </div>
+
+        {/* Schedule Quote Search - Full Width Button */}
+        <motion.button
+          type="button"
+          onClick={() => setShowScheduleDialog(true)}
+          disabled={!hasPolicies || isLoading}
+          className="w-full bg-card border border-border rounded-md px-4 py-2 flex items-center justify-center gap-3 hover-elevate active-elevate-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            duration: 0.2,
+            delay: 6 * 0.05,
+            ease: "easeOut",
+          }}
+          whileHover={(!hasPolicies || isLoading) ? {} : { scale: 1.01 }}
+          whileTap={(!hasPolicies || isLoading) ? {} : { scale: 0.99 }}
+          data-testid="button-schedule-quote-search"
+        >
+          <CalendarClock className="w-5 h-5 text-primary" strokeWidth={2} />
+          <span className="text-sm font-medium text-foreground">Schedule Quote Search</span>
+        </motion.button>
 
         {hasPolicies && showVehicleList && (
           <Card className="shadow-lg" data-testid="card-vehicle-list">
