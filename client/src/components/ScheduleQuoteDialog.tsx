@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { Calendar, Sparkles } from "lucide-react";
@@ -37,6 +38,18 @@ export function ScheduleQuoteDialog({
   const [selectedVehicle, setSelectedVehicle] = useState<string>("");
   const [frequency, setFrequency] = useState<"monthly" | "weekly">(initialFrequency);
   const [timelapseOpen, setTimelapseOpen] = useState(false);
+  const [minSavingsThreshold, setMinSavingsThreshold] = useState<number>(() => {
+    const stored = localStorage.getItem("minSavingsThreshold");
+    if (stored) {
+      const parsed = parseInt(stored, 10);
+      // Validate stored value - clamp to 1-2000 or fallback to 50 if NaN
+      if (isNaN(parsed)) return 50;
+      if (parsed < 1) return 1;
+      if (parsed > 2000) return 2000;
+      return parsed;
+    }
+    return 50;
+  });
 
   // Reset and sync state when dialog opens or frequency changes
   useEffect(() => {
@@ -81,6 +94,36 @@ export function ScheduleQuoteDialog({
       // TODO: Implement backend API for schedule persistence
       // For now, this updates local state only
       // Future: POST to /api/schedule-quote-search with { vehicle_id, frequency }
+    }
+  };
+
+  // Handle minimum savings threshold change with validation
+  const handleThresholdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // Allow empty input for editing
+    if (value === "") {
+      return;
+    }
+    
+    const numValue = parseInt(value, 10);
+    
+    // Only accept values between 1 and 2000
+    if (!isNaN(numValue) && numValue >= 1 && numValue <= 2000) {
+      setMinSavingsThreshold(numValue);
+      localStorage.setItem("minSavingsThreshold", numValue.toString());
+    }
+  };
+
+  // Handle blur to ensure we have a valid value
+  const handleThresholdBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value, 10);
+    if (isNaN(value) || value < 1) {
+      setMinSavingsThreshold(1);
+      localStorage.setItem("minSavingsThreshold", "1");
+    } else if (value > 2000) {
+      setMinSavingsThreshold(2000);
+      localStorage.setItem("minSavingsThreshold", "2000");
     }
   };
 
@@ -156,14 +199,35 @@ export function ScheduleQuoteDialog({
           </div>
         </div>
 
-        {/* Next Search Preview */}
-        <div className="bg-muted/50 rounded-md p-4 border border-border">
-          <p className="text-sm font-medium text-foreground mb-1">
-            Next scheduled search:
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {calculateNextSearchDate()}
-          </p>
+        {/* Next Search Preview with Savings Threshold */}
+        <div className="bg-muted/50 rounded-md p-4 border border-border flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-foreground mb-1">
+              Next scheduled search:
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {calculateNextSearchDate()}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="savings-threshold" className="text-xs text-muted-foreground whitespace-nowrap">
+              Alert me only if annual saving is above:
+            </Label>
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-medium">£</span>
+              <Input
+                id="savings-threshold"
+                type="number"
+                min={1}
+                max={2000}
+                value={minSavingsThreshold}
+                onChange={handleThresholdChange}
+                onBlur={handleThresholdBlur}
+                className="w-20 h-8 text-sm"
+                data-testid="input-savings-threshold"
+              />
+            </div>
+          </div>
         </div>
 
         <p className="text-xs text-muted-foreground text-center">
@@ -177,6 +241,7 @@ export function ScheduleQuoteDialog({
           selectedVehicleId={selectedVehicle}
           frequency={frequency}
           userEmail={userEmail}
+          minSavingsThreshold={minSavingsThreshold}
         />
       </DialogContent>
     </Dialog>

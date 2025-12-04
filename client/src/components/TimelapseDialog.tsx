@@ -14,6 +14,7 @@ interface TimelapseDialogProps {
   selectedVehicleId: string | null;
   frequency: "weekly" | "monthly";
   userEmail: string | null;
+  minSavingsThreshold?: number;
 }
 
 type TimelapseState = "intro" | "searching_with_phone" | "notification_slide" | "match_found" | "no_match" | "confirming_purchase" | "celebration";
@@ -44,6 +45,7 @@ export function TimelapseDialog({
   selectedVehicleId,
   frequency,
   userEmail,
+  minSavingsThreshold = 50,
 }: TimelapseDialogProps) {
   const [state, setState] = useState<TimelapseState>("intro");
   const [currentDate, setCurrentDate] = useState<string>("");
@@ -87,17 +89,24 @@ export function TimelapseDialog({
       });
 
       const response: any = await apiResponse.json();
-      const matches: MatchData[] = response.matches || [];
+      const allMatches: MatchData[] = response.matches || [];
       
       // Store the current insurance provider from the API response
       if (response.current_insurance_provider) {
         setCurrentInsuranceProvider(response.current_insurance_provider);
       }
 
-      console.log(`[Timelapse] Week ${dateStr}: ${matches.length} matches found`);
+      // Filter matches based on minimum savings threshold
+      // Net annual savings = annual_premium_delta - cancellation_fee
+      const matches = allMatches.filter((match) => {
+        const netAnnualSavings = match.financial_breakdown.annual_premium_delta - match.financial_breakdown.cancellation_fee;
+        return netAnnualSavings >= minSavingsThreshold;
+      });
+
+      console.log(`[Timelapse] Week ${dateStr}: ${allMatches.length} total matches, ${matches.length} above £${minSavingsThreshold} threshold`);
 
       if (matches.length > 0) {
-        // Match found! Show notification on iPhone
+        // Match found above threshold! Show notification on iPhone
         flushSync(() => {
           setCurrentWeekMatches(matches);
           setCurrentMatchIndex(0);
@@ -319,7 +328,8 @@ export function TimelapseDialog({
               showNotification={showNotification}
               notificationData={{
                 vehicle: vehicleName,
-                savings: Math.abs(currentWeekMatches[currentMatchIndex].financial_breakdown.annual_premium_delta),
+                // Show net annual savings (after cancellation fee) to match the filtering threshold
+                savings: currentWeekMatches[currentMatchIndex].financial_breakdown.annual_premium_delta - currentWeekMatches[currentMatchIndex].financial_breakdown.cancellation_fee,
                 provider: currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_insurer,
               }}
               onNotificationTap={handleNotificationTap}
