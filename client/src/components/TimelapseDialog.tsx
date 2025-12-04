@@ -711,11 +711,15 @@ function MatchFoundState({
             size="lg"
             variant="outline"
             onClick={onKeepSearching}
-            disabled={!hasMoreMatches}
+            disabled={!hasMoreMatchesThisMonth && !canSearchMoreMonths}
             className="flex-1 text-lg py-6"
             data-testid="button-keep-searching"
           >
-            {hasMoreMatches ? "Keep searching" : "No more matches"}
+            {hasMoreMatchesThisMonth 
+              ? "Show next match" 
+              : canSearchMoreMonths 
+                ? `Search next ${frequency === "weekly" ? "week" : "month"}` 
+                : "End of policy period"}
           </Button>
         </div>
       </div>
