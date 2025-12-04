@@ -53,6 +53,7 @@ export function TimelapseDialog({
   const [isSearching, setIsSearching] = useState(false);
   const [vehicleName, setVehicleName] = useState<string>("");
   const [showNotification, setShowNotification] = useState(false);
+  const [currentInsuranceProvider, setCurrentInsuranceProvider] = useState<string>("");
   const { toast } = useToast();
 
   // Calculate next search date based on frequency
@@ -86,6 +87,11 @@ export function TimelapseDialog({
 
       const response: any = await apiResponse.json();
       const matches: MatchData[] = response.matches || [];
+      
+      // Store the current insurance provider from the API response
+      if (response.current_insurance_provider) {
+        setCurrentInsuranceProvider(response.current_insurance_provider);
+      }
 
       console.log(`[Timelapse] Week ${dateStr}: ${matches.length} matches found`);
 
@@ -342,7 +348,7 @@ export function TimelapseDialog({
         {state === "confirming_purchase" && currentWeekMatches.length > 0 && (
           <ConfirmingPurchaseState
             newProvider={currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_insurer}
-            oldProvider={currentWeekMatches[currentMatchIndex].insurer}
+            oldProvider={currentInsuranceProvider}
             onComplete={() => setState("celebration")}
           />
         )}

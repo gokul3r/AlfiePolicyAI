@@ -519,6 +519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         search_date,
         match_found: matches.length > 0,
         matches,
+        current_insurance_provider: policy.current_insurance_provider,
         total_quotes_searched: quotes.length,
         parsed_preferences: parsedPrefs,
         message: matches.length > 0 
