@@ -155,6 +155,9 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
   
   // Flag to track if we already cancelled divergent speech for this response
   let divergenceCancelled = false;
+  
+  // Flag to ensure welcome greeting only plays once
+  let hasWelcomed = false;
 
   // Helper to send TTS message through OpenAI Realtime (or text-only when disabled)
   const sendVoiceMessage = (text: string) => {
@@ -179,14 +182,14 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       lastScriptedText = text;
       divergenceCancelled = false;
       
-      // Use response.create with inline input and verbatim instructions
-      // This bypasses conversation history entirely and forces OpenAI to read exactly what we provide
-      // Using role: "assistant" tells OpenAI this is the output to speak, not user input to respond to
+      // Use response.create with inline input
+      // The friendly Auto Annie persona is set at session level
+      // Here we just ensure the exact text is spoken with warmth
       openaiWs.send(JSON.stringify({
         type: "response.create",
         response: {
           modalities: ["text", "audio"],
-          instructions: "You are a text-to-speech reader. Your ONLY task is to speak the assistant message below EXACTLY as written, word-for-word. Do not add any commentary, opinions, disclaimers, confirmations, or additional information. Do not acknowledge, refuse, or modify the text. Just read it aloud exactly as provided.",
+          instructions: "You are Auto Annie, a warm and friendly insurance assistant. Read the following text aloud with a helpful, reassuring tone. Do not add extra commentary - just deliver the message naturally and warmly.",
           input: [{
             type: "message",
             role: "assistant",
@@ -575,17 +578,16 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       type: "session.update",
       session: {
         modalities: ["text", "audio"],
-        instructions: `You are a text-to-speech reader. You MUST follow these rules EXACTLY:
+        instructions: `You are Auto Annie, a warm and friendly female insurance assistant. Your ONLY job is to read text aloud EXACTLY as provided.
 
+RULES:
 1. READ ONLY the exact text provided - word for word, nothing more
-2. NEVER add your own words, phrases, or responses after reading
-3. NEVER interpret the text as a question to answer
-4. NEVER continue the conversation on your own
-5. STOP immediately after reading the provided text
-6. Use a warm, friendly British female voice
+2. Use a warm, friendly, and reassuring tone
+3. NEVER add commentary, opinions, or follow-up questions after reading
+4. STOP immediately after reading the provided text
 
-You are NOT a chatbot. You are ONLY a voice reader. When given text, read it aloud and STOP.`,
-        voice: "alloy",
+You are a voice reader, not a chatbot. Read the text and stop.`,
+        voice: "shimmer",
         input_audio_format: "pcm16",
         output_audio_format: "pcm16",
         input_audio_transcription: {
@@ -653,19 +655,19 @@ You are NOT a chatbot. You are ONLY a voice reader. When given text, read it alo
         // If handled, processUserIntent already called sendVoiceMessage which sets the flag
       }
 
-      // Capture assistant transcription - with divergence detection
+      // Capture assistant transcription - with relaxed divergence detection
       if (event.type === "response.audio_transcript.delta") {
         transcriptionBuffer.assistantTranscript += event.delta || "";
         
-        // DIVERGENCE DETECTION: If OpenAI is speaking text we didn't script, cancel it
+        // RELAXED DIVERGENCE DETECTION: Only cancel if OpenAI goes WAY off-script
+        // We give more leeway to allow natural speech completion
         if (ourResponseInProgress && lastScriptedText && !divergenceCancelled) {
           const currentTranscript = transcriptionBuffer.assistantTranscript.trim().toLowerCase();
-          const scriptedStart = lastScriptedText.trim().toLowerCase().substring(0, currentTranscript.length);
           
-          // Allow small variations (punctuation, minor word differences) but catch major divergence
-          // If the current text is longer than our script OR doesn't match the start, it's diverging
-          if (currentTranscript.length > lastScriptedText.length + 20 || 
-              (currentTranscript.length > 30 && !lastScriptedText.toLowerCase().includes(currentTranscript.substring(0, 25)))) {
+          // Only cancel if output is significantly longer than expected AND doesn't contain our text
+          // This prevents cutting off legitimate responses while still catching runaway AI
+          if (currentTranscript.length > lastScriptedText.length + 100 && 
+              !currentTranscript.includes(lastScriptedText.toLowerCase().substring(0, Math.min(50, lastScriptedText.length)))) {
             console.log(`[VoiceChat] DIVERGENCE DETECTED! Cancelling extra speech`);
             console.log(`[VoiceChat]   Scripted: "${lastScriptedText.substring(0, 50)}..."`);
             console.log(`[VoiceChat]   Got: "${currentTranscript.substring(0, 50)}..."`);
@@ -709,11 +711,21 @@ You are NOT a chatbot. You are ONLY a voice reader. When given text, read it alo
         };
       }
 
-      // Forward session events to client
+      // Forward session events to client and send welcome greeting
       if (event.type === "session.created" || event.type === "session.updated") {
         clientWs.send(JSON.stringify({
           type: "session_ready",
         }));
+        
+        // Send welcome greeting ONLY ONCE when session is configured
+        if (event.type === "session.updated" && !hasWelcomed) {
+          hasWelcomed = true;
+          // Small delay to ensure session is fully ready
+          setTimeout(() => {
+            console.log("[VoiceChat] Sending welcome greeting");
+            sendVoiceMessage("Hi! I'm Auto Annie, your personal insurance assistant. How can I help you today?");
+          }, 500);
+        }
       }
       
       // Intercept speech stopped event - cancel any auto-response UNLESS we triggered it
@@ -735,14 +747,12 @@ You are NOT a chatbot. You are ONLY a voice reader. When given text, read it alo
         }
       }
       
-      // Reset flag when response is done - also cancel any continuation
+      // Reset flag when response is done
       if (event.type === "response.done") {
         console.log("[VoiceChat] Response completed, resetting flags");
         
-        // Safety cancel: prevent OpenAI from generating a follow-up response
-        if (lastScriptedText) {
-          openaiWs.send(JSON.stringify({ type: "response.cancel" }));
-        }
+        // NOTE: Removed aggressive post-response cancel that was cutting off subsequent responses
+        // OpenAI with create_response: false should not auto-continue anyway
         
         ourResponseInProgress = false;
         lastScriptedText = "";

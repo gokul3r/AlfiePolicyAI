@@ -196,27 +196,28 @@ function fallbackIntentDetection(transcript: string): VoiceIntent {
 }
 
 /**
- * Generate polite voice responses for different scenarios
+ * Generate warm, friendly voice responses for different scenarios
+ * Auto Annie should sound helpful, reassuring, and professional
  */
 export function generateVoiceResponse(scenario: string, data?: any): string {
   switch (scenario) {
     case "quote_search_start":
-      return "Let me search for the best car insurance quotes for you. This will just take a moment.";
+      return "Great! I'm searching for the best car insurance deals for you. Just give me a moment.";
     
     case "quotes_found":
       if (data?.topQuote) {
-        return `I've found ${data.totalQuotes || "several"} quotes for you. The best one is from ${data.topQuote.insurer} at ${data.topQuote.price} pounds per year, with a Trustpilot rating of ${data.topQuote.trustpilot}. You can see all the options on screen. Would you like to go with any of these?`;
+        return `Wonderful! I've found ${data.totalQuotes || "several"} quotes for you. The top option is ${data.topQuote.insurer} at ${data.topQuote.price} pounds per year, with an excellent Trustpilot rating of ${data.topQuote.trustpilot}. Take a look at the options on your screen. Just let me know which one you'd like to go with!`;
       }
-      return "I've found some quotes for you. Take a look at the options on your screen and let me know which one you'd like.";
+      return "Great news! I've found some quotes for you. Have a look at the options on your screen and let me know which one catches your eye.";
     
     case "insurer_selected":
       if (data?.insurerName && data?.price) {
-        return `You've chosen ${data.insurerName} at ${data.price} pounds per year. Do you want to proceed with this?`;
+        return `Excellent choice! ${data.insurerName} at ${data.price} pounds per year. Shall I go ahead and set this up for you?`;
       }
-      return "Do you want to proceed with this insurer?";
+      return "Great choice! Would you like me to proceed with this policy?";
     
     case "purchase_confirmed":
-      return "Perfect. I'm processing your payment now.";
+      return "Perfect! I'm processing your payment now. This will just take a moment.";
     
     case "purchase_processing":
       return "Processing your payment...";
@@ -226,27 +227,27 @@ export function generateVoiceResponse(scenario: string, data?: any): string {
     
     case "purchase_contacting":
       if (data?.insurerName) {
-        return `Contacting ${data.insurerName}...`;
+        return `Getting in touch with ${data.insurerName} to finalise your policy...`;
       }
-      return "Contacting the insurer...";
+      return "Contacting the insurer to finalise your policy...";
     
     case "purchase_complete":
       if (data?.insurerName) {
-        return `Congratulations! Your ${data.insurerName} policy is now active. You'll receive confirmation details by email shortly.`;
+        return `Brilliant! Your ${data.insurerName} policy is now active. You're all covered! I'm sending the confirmation details to your email right now. Is there anything else I can help you with?`;
       }
-      return "Congratulations! Your new policy is now active.";
+      return "Brilliant! Your new policy is now active. You're all covered!";
     
     case "purchase_cancelled":
-      return "No problem. Let me know if you'd like to explore other options.";
+      return "No problem at all. Take your time to look through the other options. Just let me know when you're ready.";
     
     case "insurer_not_found":
-      return "I didn't catch which insurer you'd like. Could you please say the name again?";
+      return "I'm sorry, I didn't quite catch which insurer you'd like. Could you please say the name again?";
     
     case "no_quotes_available":
-      return "I couldn't find any quotes at the moment. Would you like me to try again?";
+      return "I'm sorry, I couldn't find any quotes at the moment. Would you like me to try again?";
     
     default:
-      return "I'm here to help. What would you like to know?";
+      return "I'm here to help! What would you like to know?";
   }
 }
 
