@@ -11,75 +11,77 @@ const KNOWN_INSURERS = [
 export interface VoiceIntent {
   type: "quote_search" | "insurer_selection" | "confirmation" | "cancellation" | "general_chat";
   confidence: number;
-  insurerName?: string; // Only present for insurer_selection
+  insurerName?: string;
   rawTranscript: string;
 }
 
+// Use the same proven prompt structure as text chat intent classifier
+const INTENT_SYSTEM_PROMPT = `You are an intent router for a UK car insurance voice assistant. Given a user's speech (which may have transcription errors), classify their intent.
+
+QUOTE_SEARCH - User wants insurance quotes, prices, or to compare/switch/renew. Be VERY lenient - this is a car insurance app. Includes:
+- Any mention of: quote, coat, code (mishearings of "quote"), price, cost, insure, insurance, cover, premium, compare, find, search, get, need, want, looking, switch, renew, cheaper, cheapest, best deal
+- Mentioning their car (Tesla, Honda, BMW, etc.)
+- Phrases like "I want to...", "can you find...", "help me get...", "how much..."
+- Common mishearings: "coat" = quote, "code" = quote, "ensure" = insure
+
+INSURER_SELECTION - User picks a specific insurer from available quotes.
+Known insurers: ${KNOWN_INSURERS.join(", ")}
+Also matches: "first one", "second one", "third", "cheapest", "best one", "top one", "that one"
+
+CONFIRMATION - User agrees/confirms to proceed with purchase.
+Examples: "yes", "yeah", "sure", "okay", "proceed", "go ahead", "do it", "confirm", "let's do it"
+IMPORTANT: "No, please proceed" or "No, go ahead" = CONFIRMATION (the "no" denies alternatives, followed by positive action)
+
+CANCELLATION - User wants to stop/cancel. ONLY when no positive action follows.
+Examples: "cancel", "stop", "no thanks", "never mind", "forget it"
+NOT cancellation if followed by proceed/go ahead/confirm.
+
+GENERAL_CHAT - User asking a general insurance question (not requesting quotes).
+Examples: "what is comprehensive cover?", "explain no claims bonus", "how does insurance work?"
+
+DEFAULT TO "quote_search" if the user seems to want anything related to getting insurance.
+
+Respond with JSON only:
+{"type":"quote_search|insurer_selection|confirmation|cancellation|general_chat","confidence":0.0-1.0,"insurerName":"Name"|null}`;
+
 /**
  * Uses OpenAI to detect the user's intent from voice transcript.
- * This provides semantic understanding rather than keyword matching,
- * which is crucial for voice input that may have variations.
+ * Aligned with text chat's proven intent classification approach.
  */
 export async function detectVoiceIntent(transcript: string): Promise<VoiceIntent> {
   const normalizedTranscript = transcript.toLowerCase().trim();
   
-  // Quick fallback for empty/very short transcripts
+  // Quick fallback for empty/very short transcripts or obvious garbage
   if (!normalizedTranscript || normalizedTranscript.length < 3) {
     return { type: "general_chat", confidence: 0, rawTranscript: transcript };
   }
+  
+  // Detect obvious garbage transcriptions (repeated characters, non-Latin scripts when unexpected)
+  if (isGarbageTranscript(normalizedTranscript)) {
+    console.log("[VoiceIntent] Detected garbage transcript, treating as quote_search");
+    return { type: "quote_search", confidence: 0.5, rawTranscript: transcript };
+  }
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       temperature: 0,
+      max_tokens: 100,
       messages: [
-        {
-          role: "system",
-          content: `You are an intent classifier for a UK car insurance voice assistant. The user is speaking to get car insurance quotes. Speech recognition may mishear words.
-
-IMPORTANT: Be LENIENT with quote_search detection. This is a car insurance app so users are likely asking about insurance/quotes.
-
-Classify into these intents:
-
-1. "quote_search" - User wants insurance quotes. Be VERY lenient - assume quote intent if:
-   - They mention: quote, coat, code, insure, insurance, cover, policy, price, cost, premium, compare, search, find, get, need, want, looking for
-   - They mention their car brand (Tesla, BMW, Ford, etc.)
-   - They say things like: "I want to...", "can you find...", "help me get...", "I need..."
-   - EVEN IF words are slightly wrong (e.g., "coat" = "quote", "code" = "quote", "ensure" = "insure")
-   Examples: "I want a quote", "get me a coat for my Tesla", "insure my car", "find me insurance", "I want to get a code", "insurance for my Tesla"
-
-2. "insurer_selection" - User picks a specific insurer. KNOWN INSURERS: ${KNOWN_INSURERS.join(", ")}
-   Examples: "go with Admiral", "I'll take Paxa", "choose the first one", "that one", "Admiral please"
-
-3. "confirmation" - User confirms/agrees to proceed.
-   Examples: "yes", "yeah", "yep", "go ahead", "proceed", "do it", "sure", "okay", "confirm", "let's do it", "absolutely"
-   IMPORTANT: "No, please proceed" or "No, go ahead" or "No, just proceed" are CONFIRMATIONS (the "no" is denying alternatives, followed by positive action)
-
-4. "cancellation" - User wants to stop/cancel. ONLY when no positive action follows.
-   Examples: "cancel", "stop", "no thanks", "never mind", "forget it", "no, I don't want that"
-   IMPORTANT: If "no" is followed by "proceed", "go ahead", "continue", "do it" etc., that is a CONFIRMATION not cancellation!
-
-5. "general_chat" - ONLY use this if clearly NOT about quotes/insurance/purchasing.
-   Examples: "what time is it?", "tell me a joke", "who are you?"
-
-DEFAULT TO "quote_search" if the user seems to want anything insurance-related.
-
-Respond with JSON only:
-{
-  "type": "quote_search" | "insurer_selection" | "confirmation" | "cancellation" | "general_chat",
-  "confidence": 0.0-1.0,
-  "insurerName": "InsureName" | null
-}`
-        },
-        {
-          role: "user",
-          content: `Classify this speech from a user in a car insurance app: "${transcript}"`
-        }
+        { role: "system", content: INTENT_SYSTEM_PROMPT },
+        { role: "user", content: `Classify this speech from a user in a car insurance app: "${transcript}"` }
       ],
       response_format: { type: "json_object" }
-    });
+    }, { signal: controller.signal });
+    
+    clearTimeout(timeoutId);
 
     const result = JSON.parse(response.choices[0]?.message?.content || "{}");
+    
+    console.log(`[VoiceIntent] LLM classified "${transcript.substring(0, 50)}..." as ${result.type} (${(result.confidence * 100).toFixed(0)}%)`);
     
     return {
       type: result.type || "general_chat",
@@ -87,34 +89,65 @@ Respond with JSON only:
       insurerName: result.insurerName || undefined,
       rawTranscript: transcript
     };
-  } catch (error) {
-    console.error("[VoiceIntent] LLM intent detection failed:", error);
-    // Fallback to basic keyword matching
+  } catch (error: any) {
+    if (error.name === "AbortError" || error.message?.includes("aborted")) {
+      console.log("[VoiceIntent] LLM timeout, using keyword fallback");
+    } else {
+      console.error("[VoiceIntent] LLM intent detection failed:", error.message);
+    }
     return fallbackIntentDetection(transcript);
   }
 }
 
 /**
+ * Detect garbage transcriptions that should be ignored or defaulted
+ */
+function isGarbageTranscript(text: string): boolean {
+  // Repeated characters pattern like "ba-ba-ba" or "na na na"
+  if (/(.)\1{3,}/.test(text) || /(\w+)[- ]\1([- ]\1)+/.test(text)) {
+    return true;
+  }
+  
+  // Non-Latin scripts (Hindi, Chinese, etc.) when we expect English
+  if (/[\u0900-\u097F\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/.test(text)) {
+    return true;
+  }
+  
+  // Very short nonsense
+  if (text.length < 5 && !/yes|no|ok|hi|hey/.test(text)) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
  * Fallback keyword-based intent detection when LLM fails
- * This is VERY lenient because we're in a car insurance app
+ * Aligned with text chat's keyword fallback - VERY lenient for quote detection
  */
 function fallbackIntentDetection(transcript: string): VoiceIntent {
   const lower = transcript.toLowerCase().trim();
   
   // Quote search keywords - be VERY lenient, include common mishearings
   const quoteKeywords = [
-    "quote", "coat", "code", "cold", // Common mishearings of "quote"
-    "insure", "insurance", "ensure", // Insurance terms
+    "quote", "quotes", "coat", "code", "cold",
+    "price", "prices", "pricing", "cost", "costs",
+    "insure", "insurance", "ensure",
     "search", "find", "get", "need", "want", "looking",
-    "compare", "policy", "policies", "price", "cost", "premium",
-    "tesla", "bmw", "ford", "audi", "mercedes", "car", "vehicle", // Car mentions
-    "my car", "my vehicle", "for my"
+    "compare", "comparison", "shop around",
+    "policy", "policies", "premium",
+    "renew", "renewal", "switch", "switching",
+    "cheaper", "cheapest", "best deal", "better rate",
+    "how much", "cover my", "coverage",
+    "car insurance", "motor insurance", "vehicle insurance",
+    "tesla", "bmw", "ford", "audi", "mercedes", "honda", "toyota", "car", "vehicle",
+    "my car", "my vehicle", "for my", "new car"
   ];
   if (quoteKeywords.some(kw => lower.includes(kw))) {
     return { type: "quote_search", confidence: 0.8, rawTranscript: transcript };
   }
   
-  // Positive action keywords that indicate confirmation even if preceded by "no"
+  // Positive action keywords that indicate confirmation
   const positiveActions = ["proceed", "go ahead", "continue", "do it", "go on", "confirm"];
   
   // Check for "No, [positive action]" pattern - this is CONFIRMATION not cancellation
@@ -122,11 +155,11 @@ function fallbackIntentDetection(transcript: string): VoiceIntent {
     return { type: "confirmation", confidence: 0.9, rawTranscript: transcript };
   }
   
-  // Confirmation keywords - check first if very short
+  // Confirmation keywords
   const confirmKeywords = [
     "yes", "yeah", "yep", "sure", "okay", "ok", "confirm", "proceed",
-    "go ahead", "do it", "absolutely", "definitely", "let's go", "lets go",
-    "that's fine", "sounds good", "please proceed", "go on"
+    "go ahead", "do it", "absolutely", "definitely", "let's go",
+    "sounds good", "please proceed", "go on"
   ];
   if (confirmKeywords.some(kw => lower === kw || lower.startsWith(kw + " ") || lower.includes(kw))) {
     return { type: "confirmation", confidence: 0.8, rawTranscript: transcript };
@@ -152,12 +185,13 @@ function fallbackIntentDetection(transcript: string): VoiceIntent {
     }
   }
   
-  // Also check for "first one", "second one", "cheapest", "best"
+  // Position selection keywords
   const selectionKeywords = ["first", "second", "third", "cheapest", "best", "top", "that one"];
   if (selectionKeywords.some(kw => lower.includes(kw))) {
     return { type: "insurer_selection", confidence: 0.6, rawTranscript: transcript };
   }
   
+  // Default to general_chat - but this will now be handled properly
   return { type: "general_chat", confidence: 0.5, rawTranscript: transcript };
 }
 
@@ -213,5 +247,36 @@ export function generateVoiceResponse(scenario: string, data?: any): string {
     
     default:
       return "I'm here to help. What would you like to know?";
+  }
+}
+
+/**
+ * Generate a helpful response for general insurance questions
+ * This is called when the intent is general_chat
+ */
+export async function generateGeneralResponse(question: string): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.7,
+      max_tokens: 150,
+      messages: [
+        { 
+          role: "system", 
+          content: `You are Auto Annie, a friendly UK car insurance assistant. Answer the user's question briefly and helpfully (2-3 sentences max). Keep responses conversational and easy to understand. If the question isn't about insurance, politely redirect to insurance topics.`
+        },
+        { role: "user", content: question }
+      ]
+    }, { signal: controller.signal });
+    
+    clearTimeout(timeoutId);
+    
+    return response.choices[0]?.message?.content || "I'm here to help with car insurance. What would you like to know?";
+  } catch (error) {
+    console.error("[VoiceIntent] Failed to generate general response:", error);
+    return "I'm here to help with car insurance. What would you like to know?";
   }
 }

@@ -1,7 +1,7 @@
 import WebSocket from "ws";
 import { storage } from "./storage";
 import { buildPolicyContext } from "./policy-context-builder";
-import { detectVoiceIntent, generateVoiceResponse, type VoiceIntent } from "./voice-intent-detector";
+import { detectVoiceIntent, generateVoiceResponse, generateGeneralResponse, type VoiceIntent } from "./voice-intent-detector";
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_REALTIME_URL = "wss://api.openai.com/v1/realtime?model=gpt-realtime-mini";
@@ -401,7 +401,8 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
   };
 
   // Process user transcript and handle intents
-  const processUserIntent = async (transcript: string) => {
+  // Returns {handled: boolean, intent: VoiceIntent} so caller can handle unhandled intents
+  const processUserIntent = async (transcript: string): Promise<{handled: boolean, intent: VoiceIntent}> => {
     console.log(`[VoiceChat] Processing intent for: "${transcript}"`);
     console.log(`[VoiceChat] Current state: ${sessionState.flowState}`);
 
@@ -448,7 +449,7 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
             sendVoiceMessage(generateVoiceResponse("no_quotes_available"));
             sendStatusUpdate(null);
           }
-          return true; // Handled
+          return { handled: true, intent }; // Handled
         }
         break;
 
@@ -500,10 +501,10 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
               insurerName: selectedQuote.insurer,
               price: selectedQuote.annualCost
             }));
-            return true;
+            return { handled: true, intent };
           } else {
             sendVoiceMessage(generateVoiceResponse("insurer_not_found"));
-            return true;
+            return { handled: true, intent };
           }
         }
         break;
@@ -545,7 +546,7 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
             sendVoiceMessage("I'm sorry, there was an issue processing your payment. Would you like to try again?");
             sendStatusUpdate(null);
           }
-          return true;
+          return { handled: true, intent };
         } else if (intent.type === "cancellation") {
           // User cancelled
           sessionState.flowState = "quotes_ready";
@@ -556,13 +557,13 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
           }));
           
           sendVoiceMessage(generateVoiceResponse("purchase_cancelled"));
-          return true;
+          return { handled: true, intent };
         }
         break;
     }
 
     // Intent not handled by flow - return false to let normal chat handle it
-    return false;
+    return { handled: false, intent };
   };
 
   openaiWs.on("open", () => {
@@ -634,13 +635,20 @@ You are NOT a chatbot. You are ONLY a voice reader. When given text, read it alo
           transcript: transcriptionBuffer.userTranscript,
         }));
 
-        // Process intent - this may call sendVoiceMessage which sets ourResponseInProgress
-        const handled = await processUserIntent(transcriptionBuffer.userTranscript);
+        // Process intent - returns {handled, intent} so we can check what type it was
+        const { handled, intent } = await processUserIntent(transcriptionBuffer.userTranscript);
         
         if (!handled) {
-          // Intent not handled - provide a helpful fallback (don't let OpenAI think for itself)
-          console.log("[VoiceChat] Intent not handled, sending fallback response");
-          sendVoiceMessage("I'm here to help you find car insurance quotes. Just say something like 'find me quotes' or 'get me car insurance' to get started.");
+          // Intent not handled by flow state - check if it's a general question
+          if (intent.type === "general_chat") {
+            console.log("[VoiceChat] General chat intent, generating helpful response");
+            const response = await generateGeneralResponse(transcriptionBuffer.userTranscript);
+            sendVoiceMessage(response);
+          } else {
+            // Unknown or unhandled intent - provide helpful fallback
+            console.log("[VoiceChat] Intent not handled, sending fallback response");
+            sendVoiceMessage("I'm here to help you find car insurance quotes. Just say something like 'find me quotes' or 'get me car insurance' to get started.");
+          }
         }
         // If handled, processUserIntent already called sendVoiceMessage which sets the flag
       }
