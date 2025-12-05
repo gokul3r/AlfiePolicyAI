@@ -18,6 +18,7 @@ import { handleGmailAuthorize, handleGmailCallback, handleGmailDisconnect, handl
 import { scanGmailForTravelEmails } from "./gmail-scanner";
 import { parseWhisperPreferences } from "./preference-parser";
 import { calculateFinancialBreakdown } from "./financial-calculator";
+import { classifyIntent, isQuoteIntent, isPolicyIntent, type IntentResult } from "./intent-classifier";
 
 // Helper function to flatten policy response for frontend compatibility
 function flattenPolicyResponse(policy: VehiclePolicyWithDetails): any {
@@ -811,38 +812,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Helper: Detect if user message is a quote search request
-  function isQuoteSearchIntent(message: string): boolean {
-    const lowerMessage = message.toLowerCase();
-    const quoteSearchPhrases = [
-      "search for",
-      "search quote",
-      "find quote",
-      "get quote",
-      "insurance quote",
-      "buy a policy",
-      "buy policy",
-      "insure my",
-      "get insurance",
-      "find insurance",
-      "search insurance",
-      "compare quotes",
-      "compare insurance",
-      "new quote",
-      "quote search",
-      "want to insure",
-      "need insurance",
-      "looking for insurance",
-      "looking for quote",
-      "find me quote",
-      "get me quote"
-    ];
-    // Check if any phrase matches and the message relates to quotes/insurance
-    const hasQuotePhrase = quoteSearchPhrases.some(phrase => lowerMessage.includes(phrase));
-    const hasQuoteWord = lowerMessage.includes("quote") || lowerMessage.includes("insurance") || lowerMessage.includes("insure") || lowerMessage.includes("policy");
-    return hasQuotePhrase && hasQuoteWord;
-  }
-
   // Helper: Get top 3 quotes sorted by alfie_touch_score
   function getTop3Quotes(data: any): any[] {
     const quotes = data.quotes_with_insights || [];
@@ -920,8 +889,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let aiResponse: string;
 
+      // Use LLM-based intent classification with fallback
+      const intentResult = await classifyIntent(userMessage);
+      console.log(`[Chat] Intent classification: ${intentResult.intent} (${(intentResult.confidence * 100).toFixed(0)}% via ${intentResult.source}) - ${intentResult.reason}`);
+
       // Check if this is a quote search request
-      if (isQuoteSearchIntent(userMessage)) {
+      if (isQuoteIntent(intentResult)) {
         console.log(`[Chat] Detected quote search intent from: "${userMessage}"`);
         
         // Get user's vehicle policies

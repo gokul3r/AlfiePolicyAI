@@ -50,15 +50,29 @@ function parseQuoteCards(content: string): { isQuoteCards: boolean; data?: Quote
   return { isQuoteCards: false, plainText: content };
 }
 
-// Detect quote search intent (matches backend logic)
+// Detect quote search intent (broad matching for UI animation, server does LLM-based classification)
 function isQuoteSearchIntent(message: string): boolean {
   const lowerMessage = message.toLowerCase();
   const quoteKeywords = [
-    "search for quotes", "find quotes", "get quotes", "look for quotes",
-    "find me quotes", "get me quotes", "search quotes", "quote search",
-    "insurance quotes", "find insurance", "search insurance", "get insurance",
-    "buy a policy", "buy insurance", "purchase insurance", "new policy",
-    "compare quotes", "compare insurance", "find me insurance"
+    // Core quote words
+    "quote", "quotes",
+    // Price/cost related
+    "price", "prices", "pricing", "cost", "costs", "how much",
+    // Insurance actions
+    "insure my", "insure a", "get insurance", "buy insurance", "need insurance", "want insurance",
+    "find insurance", "search insurance", "looking for insurance",
+    // Comparison/shopping
+    "compare", "comparison", "shop around", "shopping around",
+    // Renewal/switching
+    "renew", "renewal", "switch", "switching",
+    // Value seeking
+    "cheaper", "cheapest", "best deal", "better deal", "better rate",
+    // New policy
+    "new policy", "new insurance",
+    // Coverage
+    "cover my", "coverage for my",
+    // Insurance types
+    "motor insurance", "car insurance", "vehicle insurance", "auto insurance"
   ];
   return quoteKeywords.some(keyword => lowerMessage.includes(keyword));
 }
