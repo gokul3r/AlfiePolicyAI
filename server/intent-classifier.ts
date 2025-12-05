@@ -11,7 +11,8 @@ export interface IntentResult {
   source: "llm" | "fallback";
 }
 
-const INTENT_SYSTEM_PROMPT = `You are an intent router for an insurance assistant chatbot. Given a user message about insurance, classify the intent as one of three categories:
+// NOTE: POLICY intent is currently disabled - all policy-related questions go to GENERAL
+const INTENT_SYSTEM_PROMPT = `You are an intent router for an insurance assistant chatbot. Given a user message about insurance, classify the intent as one of two categories:
 
 QUOTE - User wants to get a new insurance quote, compare prices, shop around, renew, switch insurers, or find cheaper insurance. This includes:
 - Asking for quotes or prices
@@ -20,16 +21,13 @@ QUOTE - User wants to get a new insurance quote, compare prices, shop around, re
 - Looking for cheaper/better deals
 - Asking "how much to insure" something
 
-POLICY - User is asking about their existing policy details, status, payments, coverage, or wants to cancel/modify. This includes:
-- Questions about policy end dates, coverage details
-- Payment or billing questions
-- Cancellation requests
-- Policy document requests
-
-GENERAL - General insurance education questions not specific to getting a quote or their own policy. This includes:
+GENERAL - Everything else, including:
+- Questions about their existing policy (when does it end, coverage details, payments)
+- General insurance education questions
 - "What is comprehensive cover?"
 - "Explain no claims bonus"
-- General insurance concepts or terminology
+- Cancellation questions
+- Any other insurance-related questions
 
 Respond ONLY with valid JSON in this exact format:
 {"intent":"QUOTE","confidence":0.95,"reason":"User wants to compare insurance prices"}
@@ -46,9 +44,9 @@ const FEW_SHOT_EXAMPLES = [
   { role: "user" as const, content: "I want to switch from Admiral" },
   { role: "assistant" as const, content: '{"intent":"QUOTE","confidence":0.90,"reason":"User wants to switch insurers, which requires getting new quotes"}' },
   { role: "user" as const, content: "When does my policy end?" },
-  { role: "assistant" as const, content: '{"intent":"POLICY","confidence":0.95,"reason":"User asking about their existing policy details"}' },
+  { role: "assistant" as const, content: '{"intent":"GENERAL","confidence":0.95,"reason":"User asking about their existing policy details"}' },
   { role: "user" as const, content: "Cancel my insurance" },
-  { role: "assistant" as const, content: '{"intent":"POLICY","confidence":0.92,"reason":"User wants to take action on their existing policy"}' },
+  { role: "assistant" as const, content: '{"intent":"GENERAL","confidence":0.92,"reason":"User asking about policy cancellation"}' },
   { role: "user" as const, content: "What is comprehensive cover?" },
   { role: "assistant" as const, content: '{"intent":"GENERAL","confidence":0.95,"reason":"User asking a general educational question about insurance"}' },
 ];
@@ -69,15 +67,7 @@ const QUOTE_KEYWORDS = [
   "motor insurance", "car insurance", "vehicle insurance", "auto insurance"
 ];
 
-const POLICY_KEYWORDS = [
-  "my policy", "my insurance", "my cover", "my coverage",
-  "policy end", "policy expires", "when does my", "when will my",
-  "cancel", "cancellation",
-  "payment", "billing", "pay",
-  "claim", "claims",
-  "policy document", "policy details", "show my policy",
-  "current insurance", "current policy", "current provider"
-];
+// POLICY_KEYWORDS disabled - these now fall through to GENERAL
 
 function keywordFallback(message: string): IntentResult {
   const lowerMessage = message.toLowerCase();
@@ -93,21 +83,11 @@ function keywordFallback(message: string): IntentResult {
     }
   }
   
-  for (const keyword of POLICY_KEYWORDS) {
-    if (lowerMessage.includes(keyword)) {
-      return {
-        intent: "POLICY",
-        confidence: 0.75,
-        reason: `Matched policy keyword: "${keyword}"`,
-        source: "fallback"
-      };
-    }
-  }
-  
+  // All non-quote messages go to GENERAL (including former POLICY intents)
   return {
     intent: "GENERAL",
     confidence: 0.60,
-    reason: "No specific intent keywords detected, defaulting to general",
+    reason: "No quote keywords detected, routing to general assistant",
     source: "fallback"
   };
 }
@@ -139,13 +119,20 @@ async function tryClassifyWithLLM(message: string, timeoutMs: number): Promise<I
     
     const parsed = JSON.parse(content);
     
-    if (!["QUOTE", "POLICY", "GENERAL"].includes(parsed.intent)) {
+    // Only accept QUOTE or GENERAL - convert any POLICY to GENERAL
+    let intent = parsed.intent;
+    if (intent === "POLICY") {
+      intent = "GENERAL";
+      console.log(`[Intent] Converted POLICY to GENERAL (POLICY intent disabled)`);
+    }
+    
+    if (!["QUOTE", "GENERAL"].includes(intent)) {
       console.log(`[Intent] Invalid intent "${parsed.intent}"`);
       return null;
     }
     
     return {
-      intent: parsed.intent as IntentType,
+      intent: intent as IntentType,
       confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.8,
       reason: parsed.reason || "LLM classification",
       source: "llm"
@@ -185,7 +172,8 @@ export function isQuoteIntent(result: IntentResult): boolean {
 }
 
 export function isPolicyIntent(result: IntentResult): boolean {
-  return result.intent === "POLICY";
+  // POLICY intent is disabled - always returns false
+  return false;
 }
 
 export function isGeneralIntent(result: IntentResult): boolean {
