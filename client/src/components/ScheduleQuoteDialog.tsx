@@ -38,18 +38,29 @@ export function ScheduleQuoteDialog({
   const [selectedVehicle, setSelectedVehicle] = useState<string>("");
   const [frequency, setFrequency] = useState<"monthly" | "weekly">(initialFrequency);
   const [timelapseOpen, setTimelapseOpen] = useState(false);
+  
+  // Store both the validated number and the raw text for editing
   const [minSavingsThreshold, setMinSavingsThreshold] = useState<number>(() => {
     const stored = localStorage.getItem("minSavingsThreshold");
     if (stored) {
       const parsed = parseInt(stored, 10);
-      // Validate stored value - clamp to 1-2000 or fallback to 50 if NaN
+      // Validate stored value - clamp to 0-1000 or fallback to 50 if NaN
       if (isNaN(parsed)) return 50;
-      if (parsed < 1) return 1;
-      if (parsed > 2000) return 2000;
+      if (parsed < 0) return 0;
+      if (parsed > 1000) return 1000;
       return parsed;
     }
     return 50;
   });
+  const [thresholdInput, setThresholdInput] = useState<string>(() => {
+    const stored = localStorage.getItem("minSavingsThreshold");
+    if (stored) {
+      const parsed = parseInt(stored, 10);
+      if (!isNaN(parsed) && parsed >= 0 && parsed <= 1000) return stored;
+    }
+    return "50";
+  });
+  const [thresholdError, setThresholdError] = useState<string>("");
 
   // Reset and sync state when dialog opens or frequency changes
   useEffect(() => {
@@ -101,30 +112,64 @@ export function ScheduleQuoteDialog({
   const handleThresholdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     
-    // Allow empty input for editing
+    // Always update the text input to allow free editing
+    setThresholdInput(value);
+    
+    // Allow empty input for editing (will validate on blur)
     if (value === "") {
+      setThresholdError("");
       return;
     }
     
-    const numValue = parseInt(value, 10);
+    // Strip non-numeric characters for validation
+    const cleanValue = value.replace(/[^0-9]/g, "");
     
-    // Only accept values between 1 and 2000
-    if (!isNaN(numValue) && numValue >= 1 && numValue <= 2000) {
-      setMinSavingsThreshold(numValue);
-      localStorage.setItem("minSavingsThreshold", numValue.toString());
+    // Check if input contains non-numeric characters
+    if (value !== cleanValue) {
+      setThresholdError("Please enter numbers only");
+      return;
     }
+    
+    const numValue = parseInt(cleanValue, 10);
+    
+    // Validate range 0-1000
+    if (isNaN(numValue)) {
+      setThresholdError("Please enter a valid number");
+      return;
+    }
+    
+    if (numValue < 0 || numValue > 1000) {
+      setThresholdError("Value must be between 0 and 1000");
+      return;
+    }
+    
+    // Valid value - save it
+    setThresholdError("");
+    setMinSavingsThreshold(numValue);
+    localStorage.setItem("minSavingsThreshold", numValue.toString());
   };
 
   // Handle blur to ensure we have a valid value
-  const handleThresholdBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value, 10);
-    if (isNaN(value) || value < 1) {
-      setMinSavingsThreshold(1);
-      localStorage.setItem("minSavingsThreshold", "1");
-    } else if (value > 2000) {
-      setMinSavingsThreshold(2000);
-      localStorage.setItem("minSavingsThreshold", "2000");
+  const handleThresholdBlur = () => {
+    const cleanValue = thresholdInput.replace(/[^0-9]/g, "");
+    const numValue = parseInt(cleanValue, 10);
+    
+    let finalValue: number;
+    if (isNaN(numValue) || thresholdInput === "") {
+      finalValue = 50; // Default to 50 if empty or invalid
+    } else if (numValue < 0) {
+      finalValue = 0;
+    } else if (numValue > 1000) {
+      finalValue = 1000;
+    } else {
+      finalValue = numValue;
     }
+    
+    // Update both states and localStorage
+    setMinSavingsThreshold(finalValue);
+    setThresholdInput(finalValue.toString());
+    setThresholdError("");
+    localStorage.setItem("minSavingsThreshold", finalValue.toString());
   };
 
   return (
@@ -212,24 +257,32 @@ export function ScheduleQuoteDialog({
           </div>
           
           {/* Savings threshold - stacks below on mobile, inline on larger screens */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <Label htmlFor="savings-threshold" className="text-xs text-muted-foreground">
-              Alert me only if annual saving is above:
-            </Label>
-            <div className="flex items-center gap-1">
-              <span className="text-sm font-medium">£</span>
-              <Input
-                id="savings-threshold"
-                type="number"
-                min={1}
-                max={2000}
-                value={minSavingsThreshold}
-                onChange={handleThresholdChange}
-                onBlur={handleThresholdBlur}
-                className="w-20 h-8 text-sm"
-                data-testid="input-savings-threshold"
-              />
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <Label htmlFor="savings-threshold" className="text-xs text-muted-foreground">
+                Alert me only if annual saving is above:
+              </Label>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-medium">£</span>
+                <Input
+                  id="savings-threshold"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={thresholdInput}
+                  onChange={handleThresholdChange}
+                  onBlur={handleThresholdBlur}
+                  className={`w-24 h-8 text-sm ${thresholdError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                  placeholder="0-1000"
+                  data-testid="input-savings-threshold"
+                />
+              </div>
             </div>
+            {thresholdError && (
+              <p className="text-xs text-red-500" data-testid="text-threshold-error">
+                {thresholdError}
+              </p>
+            )}
           </div>
         </div>
 
