@@ -200,7 +200,8 @@ export function ScheduleQuoteDialog({
         </div>
 
         {/* Next Search Preview with Savings Threshold */}
-        <div className="bg-muted/50 rounded-md p-4 border border-border flex flex-wrap items-center justify-between gap-4">
+        <div className="bg-muted/50 rounded-md p-4 border border-border space-y-4">
+          {/* Next scheduled search - always visible */}
           <div>
             <p className="text-sm font-medium text-foreground mb-1">
               Next scheduled search:
@@ -209,8 +210,10 @@ export function ScheduleQuoteDialog({
               {calculateNextSearchDate()}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="savings-threshold" className="text-xs text-muted-foreground whitespace-nowrap">
+          
+          {/* Savings threshold - stacks below on mobile, inline on larger screens */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <Label htmlFor="savings-threshold" className="text-xs text-muted-foreground">
               Alert me only if annual saving is above:
             </Label>
             <div className="flex items-center gap-1">
