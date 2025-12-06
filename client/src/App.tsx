@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useMutation } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
+import PasswordGatePage from "@/components/PasswordGatePage";
 import HomePage from "@/components/HomePage";
 import NewUserDialog from "@/components/NewUserDialog";
 import ExistingUserDialog from "@/components/ExistingUserDialog";
@@ -19,7 +20,7 @@ import type { User, InsertVehiclePolicy, VehiclePolicy, QuotesApiResponse } from
 import { apiRequest } from "./lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 
-type AppState = "home" | "confirmation" | "welcome" | "onboarding" | "quotes";
+type AppState = "gate" | "home" | "confirmation" | "welcome" | "onboarding" | "quotes";
 
 const ALLOWED_FUEL_TYPES = ["Electric", "Hybrid", "Petrol", "Diesel"] as const;
 
@@ -52,7 +53,10 @@ function sanitizePolicyForForm(policy: VehiclePolicy | Partial<VehiclePolicyForm
 }
 
 function AppContent() {
-  const [appState, setAppState] = useState<AppState>("home");
+  const [appState, setAppState] = useState<AppState>(() => {
+    const hasAccess = sessionStorage.getItem("autoannie_access_granted") === "true";
+    return hasAccess ? "home" : "gate";
+  });
   const [newUserDialogOpen, setNewUserDialogOpen] = useState(false);
   const [existingUserDialogOpen, setExistingUserDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -67,6 +71,10 @@ function AppContent() {
   const [quotesData, setQuotesData] = useState<QuotesApiResponse | null>(null);
   const [selectedVehicleForQuotes, setSelectedVehicleForQuotes] = useState<VehiclePolicy | null>(null);
   const { toast } = useToast();
+
+  const handleAccessGranted = () => {
+    setAppState("home");
+  };
 
   const { data: userPolicies = [] } = useQuery<VehiclePolicy[]>({
     queryKey: ["/api/vehicle-policies", currentUser?.email_id],
@@ -433,6 +441,10 @@ function AppContent() {
 
   return (
     <>
+      {appState === "gate" && (
+        <PasswordGatePage onAccessGranted={handleAccessGranted} />
+      )}
+
       {appState === "home" && (
         <>
           <HomePage 
