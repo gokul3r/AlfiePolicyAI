@@ -12,6 +12,7 @@ Preferred communication style: Simple, everyday language.
 The frontend is built with **React 18** and TypeScript, using **Vite** for building. It features a **mobile-first design** optimized for single-hand navigation, utilizing **shadcn/ui** components (New York style) built on Radix UI, styled with **Tailwind CSS**. The design philosophy emphasizes Material Design with minimalist refinement for trust and calm interactions. **TanStack Query** manages server state, caching, and data synchronization. Component-based routing handles five main states: "home", "confirmation", "welcome", "onboarding", and "quotes".
 
 Key UI components include:
+- **`PasswordGatePage`**: Access control page shown before the login page. Features AutoAnnie branding with "Innovation Lab" subtitle, AI-themed gradient background with animated orbs and particles, and access key validation (key: "AA@ITCTO"). Session access persists via sessionStorage.
 - **`WelcomeScreen`**: Modern dashboard with AI chat input, animated microphone, and a 6-button responsive icon grid for core functionalities (Policy Details, Whisper, Quote Search, Add Policy, Update Policy, Cancel Policy).
 - **`WhisperDialog`**: Interface for recording and editing user insurance preferences with stable recommendation system.
 - **`QuoteSearchDialog`**: Initiates insurance quote searches with retry logic and loading indicators.
