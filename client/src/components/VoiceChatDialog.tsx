@@ -28,6 +28,35 @@ interface VoiceChatDialogProps {
   userEmail: string;
 }
 
+// Vehicle for selection display
+interface VehicleForDisplay {
+  policy_id: string;
+  vehicle_registration_number: string;
+  vehicle_manufacturer_name: string;
+  vehicle_model: string;
+  vehicle_year: number;
+}
+
+// Quote details for confirmation (16 fields)
+interface QuoteDetails {
+  email_id: string;
+  driver_age: number;
+  vehicle_registration_number: string;
+  vehicle_manufacturer_name: string;
+  vehicle_model: string;
+  vehicle_year: number;
+  type_of_fuel: string;
+  type_of_cover_needed: string;
+  no_claim_bonus_years: number;
+  voluntary_excess: number;
+  current_insurance_provider: string;
+  policy_id: string;
+  policy_type: string;
+  policy_end_date: string;
+  policy_number: string;
+  whisper_preferences: string;
+}
+
 // Map backend quote format to ChatQuote format
 function mapToQuoteCard(quote: any): ChatQuote {
   return {
@@ -55,6 +84,11 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
   const [quotes, setQuotes] = useState<ChatQuote[]>([]);
   const [selectedInsurer, setSelectedInsurer] = useState<{ name: string; price: number } | null>(null);
   const [purchaseComplete, setPurchaseComplete] = useState(false);
+  
+  // Quote flow states
+  const [vehicleList, setVehicleList] = useState<VehicleForDisplay[]>([]);
+  const [quoteDetails, setQuoteDetails] = useState<QuoteDetails | null>(null);
+  const [isSearchingQuotes, setIsSearchingQuotes] = useState(false);
   
   const { toast } = useToast();
 
@@ -191,6 +225,94 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
           setQuotes([]);
           setPurchaseComplete(false);
         }, 5000);
+      }
+      
+      // Handle vehicle list display
+      if (data.type === "show_vehicle_list") {
+        console.log("[VoiceChat] Showing vehicle list:", data.vehicles);
+        setVehicleList(data.vehicles);
+        setQuoteDetails(null);
+      }
+      
+      // Handle quote details display for confirmation
+      if (data.type === "show_quote_details") {
+        console.log("[VoiceChat] Showing quote details for confirmation:", data.details);
+        setQuoteDetails(data.details);
+        setVehicleList([]);
+      }
+      
+      // Handle hide quote details
+      if (data.type === "hide_quote_details") {
+        setQuoteDetails(null);
+      }
+      
+      // Handle trigger quote search - call the API
+      if (data.type === "trigger_quote_search") {
+        console.log("[VoiceChat] Triggering quote search for vehicle:", data.vehicle);
+        setIsSearchingQuotes(true);
+        setStatusMessage("Searching for the best quotes...");
+        setQuoteDetails(null);
+        
+        try {
+          const vehicle = data.vehicle;
+          const requestPayload = {
+            insurance_details: {
+              email_id: vehicle.email_id || userEmail,
+              driver_age: vehicle.details.driver_age,
+              vehicle_registration_number: vehicle.details.vehicle_registration_number,
+              vehicle_manufacturer_name: vehicle.details.vehicle_manufacturer_name,
+              vehicle_model: vehicle.details.vehicle_model,
+              vehicle_year: vehicle.details.vehicle_year,
+              type_of_fuel: vehicle.details.type_of_fuel,
+              type_of_Cover_needed: vehicle.details.type_of_cover_needed,
+              No_Claim_bonus_years: vehicle.details.no_claim_bonus_years,
+              Voluntary_Excess: vehicle.details.voluntary_excess,
+              current_insurance_provider: vehicle.current_insurance_provider,
+              policy_id: vehicle.policy_id,
+              policy_type: vehicle.policy_type,
+            },
+            user_preferences: vehicle.whisper_preferences || "",
+          };
+          
+          const response = await fetch("/api/search-quotes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(requestPayload),
+          });
+          
+          if (response.ok) {
+            const quotesData = await response.json();
+            console.log("[VoiceChat] Quote search results:", quotesData);
+            
+            // Map and display quotes
+            const mappedQuotes = (quotesData.quotes || []).map(mapToQuoteCard);
+            setQuotes(mappedQuotes);
+            
+            // Send results back to server for Annie to announce
+            wsRef.current?.send(JSON.stringify({
+              type: "quote_search_results",
+              success: true,
+              quotes: quotesData.quotes || [],
+            }));
+          } else {
+            throw new Error(`API error: ${response.status}`);
+          }
+        } catch (error) {
+          console.error("[VoiceChat] Quote search error:", error);
+          wsRef.current?.send(JSON.stringify({
+            type: "quote_search_results",
+            success: false,
+            error: String(error),
+          }));
+          toast({
+            title: "Search Failed",
+            description: "Could not find quotes. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsSearchingQuotes(false);
+          setStatusMessage(null);
+        }
       }
 
       if (data.type === "error") {
@@ -514,6 +636,137 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
                         {statusMessage}
                       </span>
                     </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            {/* Vehicle selection cards */}
+            <AnimatePresence>
+              {vehicleList.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-2 my-4"
+                >
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Select a vehicle for your quote:
+                  </p>
+                  {vehicleList.map((vehicle, idx) => (
+                    <motion.button
+                      key={vehicle.policy_id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.1 }}
+                      onClick={() => {
+                        wsRef.current?.send(JSON.stringify({
+                          type: "select_vehicle",
+                          index: idx,
+                        }));
+                      }}
+                      className="w-full text-left bg-card hover:bg-accent/50 border rounded-lg p-3 transition-colors"
+                      data-testid={`vehicle-card-${idx}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold text-sm">
+                          {idx + 1}
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">
+                            {vehicle.vehicle_year} {vehicle.vehicle_manufacturer_name} {vehicle.vehicle_model}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {vehicle.vehicle_registration_number}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            {/* Quote details confirmation panel - All 16 fields */}
+            <AnimatePresence>
+              {quoteDetails && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="my-4 bg-card border rounded-lg p-4"
+                >
+                  <h4 className="font-semibold text-foreground mb-3">Quote Search Details (16 Fields)</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm max-h-64 overflow-y-auto">
+                    <div className="text-muted-foreground">1. Email:</div>
+                    <div className="text-foreground truncate">{quoteDetails.email_id}</div>
+                    
+                    <div className="text-muted-foreground">2. Driver Age:</div>
+                    <div className="text-foreground">{quoteDetails.driver_age}</div>
+                    
+                    <div className="text-muted-foreground">3. Registration:</div>
+                    <div className="text-foreground">{quoteDetails.vehicle_registration_number}</div>
+                    
+                    <div className="text-muted-foreground">4. Manufacturer:</div>
+                    <div className="text-foreground">{quoteDetails.vehicle_manufacturer_name}</div>
+                    
+                    <div className="text-muted-foreground">5. Model:</div>
+                    <div className="text-foreground">{quoteDetails.vehicle_model}</div>
+                    
+                    <div className="text-muted-foreground">6. Year:</div>
+                    <div className="text-foreground">{quoteDetails.vehicle_year}</div>
+                    
+                    <div className="text-muted-foreground">7. Fuel Type:</div>
+                    <div className="text-foreground">{quoteDetails.type_of_fuel}</div>
+                    
+                    <div className="text-muted-foreground">8. Cover Type:</div>
+                    <div className="text-foreground">{quoteDetails.type_of_cover_needed}</div>
+                    
+                    <div className="text-muted-foreground">9. No Claims Bonus:</div>
+                    <div className="text-foreground">{quoteDetails.no_claim_bonus_years} years</div>
+                    
+                    <div className="text-muted-foreground">10. Voluntary Excess:</div>
+                    <div className="text-foreground">£{quoteDetails.voluntary_excess}</div>
+                    
+                    <div className="text-muted-foreground">11. Current Provider:</div>
+                    <div className="text-foreground">{quoteDetails.current_insurance_provider}</div>
+                    
+                    <div className="text-muted-foreground">12. Policy ID:</div>
+                    <div className="text-foreground truncate">{quoteDetails.policy_id}</div>
+                    
+                    <div className="text-muted-foreground">13. Policy Type:</div>
+                    <div className="text-foreground">{quoteDetails.policy_type}</div>
+                    
+                    <div className="text-muted-foreground">14. Policy Number:</div>
+                    <div className="text-foreground">{quoteDetails.policy_number}</div>
+                    
+                    <div className="text-muted-foreground">15. Policy Ends:</div>
+                    <div className="text-foreground">{quoteDetails.policy_end_date}</div>
+                    
+                    <div className="text-muted-foreground">16. Preferences:</div>
+                    <div className="text-foreground truncate">{quoteDetails.whisper_preferences || "None"}</div>
+                  </div>
+                  
+                  <div className="flex gap-2 mt-4">
+                    <Button
+                      onClick={() => {
+                        wsRef.current?.send(JSON.stringify({ type: "confirm_quote_details" }));
+                      }}
+                      className="flex-1"
+                      data-testid="button-confirm-quote-details"
+                    >
+                      Confirm & Search
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setQuoteDetails(null);
+                        wsRef.current?.send(JSON.stringify({ type: "cancel_quote_details" }));
+                      }}
+                      data-testid="button-cancel-quote-details"
+                    >
+                      Cancel
+                    </Button>
                   </div>
                 </motion.div>
               )}
