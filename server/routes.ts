@@ -13,7 +13,9 @@ import {
 import { z } from "zod";
 import multer from "multer";
 import { sendChatMessage } from "./openai-realtime";
-import { handleVoiceChat } from "./voice-chat-handler";
+// Voice Chat 2.0 - Simplified greeting + intent detection
+// To revert to 1.0: import { handleVoiceChat } from "./voice-chat-handler";
+import { handleVoiceChat } from "./voice-chat-handler-2.0";
 import { handleGmailAuthorize, handleGmailCallback, handleGmailDisconnect, handleGmailStatus } from "./gmail-oauth";
 import { scanGmailForTravelEmails } from "./gmail-scanner";
 import { parseWhisperPreferences } from "./preference-parser";
