@@ -274,18 +274,18 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
         
         if (session) {
           const vehicleDesc = `${vehicle.details.vehicle_year} ${vehicle.details.vehicle_manufacturer_name} ${vehicle.details.vehicle_model}`;
-          const systemMessage = `I found your registered vehicle - your ${vehicleDesc}. I've got all your details ready. Would you like me to search for the best quotes for this vehicle?`;
           console.log("[VoiceChatGemini] Asking for single vehicle confirmation");
           
           session.sendClientContent({
             turns: [{ 
               role: "user", 
               parts: [{ 
-                text: `[SYSTEM INSTRUCTION: Say this to the user: "${systemMessage}"]` 
+                text: `[SYSTEM: Found 1 registered vehicle: ${vehicleDesc}. The quote details are now showing on screen. Tell the user you found their ${vehicleDesc} and the details are displayed. Ask them to confirm if these details look correct, then you'll search for quotes.]` 
               }] 
             }],
             turnComplete: true
           });
+          console.log("[VoiceChatGemini] Sent single vehicle confirmation message to Gemini");
         }
         return;
       }
@@ -304,14 +304,13 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       ).join(". ");
       
       if (session) {
-        const systemMessage = `I've found ${availableVehicles.length} registered vehicles. Here's what I have: ${vehicleList}. Which vehicle would you like me to get quotes for? You can say "first one", "second one", or tap on a card to select.`;
         console.log("[VoiceChatGemini] Sending system message to announce vehicles");
         
         session.sendClientContent({
           turns: [{ 
             role: "user", 
             parts: [{ 
-              text: `[SYSTEM INSTRUCTION: Say this to the user: "${systemMessage}"]` 
+              text: `[SYSTEM: Found ${availableVehicles.length} registered vehicles: ${vehicleList}. The vehicles are now displayed on screen. List each vehicle and ask which one they'd like quotes for. They can say "first one", "second one", or tap a card to select.]` 
             }] 
           }],
           turnComplete: true
