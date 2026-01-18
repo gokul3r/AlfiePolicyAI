@@ -70,6 +70,7 @@ function getAIClient(): GoogleGenAI | null {
   return ai;
 }
 
+// Native audio model for voice chat
 const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
 
 const SYSTEM_INSTRUCTION = `You are Annie, a warm and friendly female insurance assistant with a British accent. You work for AutoAnnie, helping users find the best insurance quotes.
@@ -93,12 +94,17 @@ RESPONSE STYLE:
 
 IMPORTANT: When the conversation starts, you MUST greet the user with: "Hello! I'm Annie, your insurance assistant. How can I help you with your insurance today?"
 
-CRITICAL QUOTE FLOW INSTRUCTION:
+QUOTE FLOW INSTRUCTIONS:
 When a user asks for insurance quotes (mentions "quote", "insurance", "price", "cheaper", or any vehicle like Tesla, car, etc.):
-- Say something brief like "I'd be happy to help! Let me check your registered vehicles..."
-- DO NOT ask them for vehicle details like make, model, year, etc. - the system will automatically fetch their vehicles from the database.
-- Wait for a [SYSTEM:] message that will provide you with the user's vehicles to announce.
-- Never ask for manual vehicle information - we already have it on file.
+- Say: "Perfect! I'm pulling up your vehicle details now. You should see them on your screen - please take a look and confirm if everything looks correct, and I'll search for the best quotes for you."
+- The system will automatically show the user's registered vehicles on their screen.
+- DO NOT ask them for vehicle details like make, model, year, etc. - we already have it on file.
+- Wait for the user to confirm (they'll say "yes", "looks good", "confirm", etc.)
+- When they confirm, say something like "Great! I'm searching for the best quotes now. This will just take a moment..."
+- If the user says "no vehicles" or mentions they don't have any registered, apologize and offer to help them add a policy first.
+
+When quote results come back (user says "got results" or "quotes are in" or the search completes):
+- Say something like "Wonderful! The quotes are showing on your screen now. Have a look through them and let me know if you'd like more details on any of them."
 
 For non-insurance questions, politely redirect the conversation back to insurance, explaining that you specialize in finding the best insurance deals.`;
 
@@ -239,6 +245,8 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
   }
   
   // Handle quote intent - fetch and display vehicles
+  // NOTE: We do NOT call sendClientContent here as it crashes the Gemini session.
+  // Instead, Annie's system instruction tells her what to say, and we just send UI data to the client.
   async function handleQuoteIntent() {
     console.log("[VoiceChatGemini] Quote intent detected, fetching vehicles for:", emailId);
     
@@ -247,78 +255,35 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       console.log(`[VoiceChatGemini] Fetched ${availableVehicles.length} vehicles`);
       
       if (availableVehicles.length === 0) {
-        console.log("[VoiceChatGemini] No vehicles found, informing user");
-        // No vehicles found - let Annie inform the user
-        if (session) {
-          session.sendClientContent({
-            turns: [{ role: "user", parts: [{ text: "I want to search for insurance quotes but I don't have any vehicles registered yet." }] }],
-            turnComplete: true
-          });
-        }
+        console.log("[VoiceChatGemini] No vehicles found, sending notification to client");
+        // Send notification to client UI
+        clientWs.send(JSON.stringify({
+          type: "no_vehicles_found",
+          message: "No registered vehicles found. Please add a policy first."
+        }));
         return;
       }
-      
-      // Give a small delay to ensure previous turn is complete before sending new content
-      await new Promise(resolve => setTimeout(resolve, 500));
       
       // SINGLE VEHICLE: Skip selection, go directly to confirmation
       if (availableVehicles.length === 1) {
         const vehicle = availableVehicles[0];
         selectedVehicle = vehicle;
         quoteFlowState = "awaiting_confirmation";
-        console.log("[VoiceChatGemini] Single vehicle found, skipping selection - going to confirmation");
+        console.log("[VoiceChatGemini] Single vehicle found, going to confirmation state");
         
         // Send quote details to client for confirmation display
         sendQuoteDetailsForConfirmation(vehicle);
-        console.log("[VoiceChatGemini] Sent quote details for confirmation");
-        
-        if (session) {
-          const vehicleDesc = `${vehicle.details.vehicle_year} ${vehicle.details.vehicle_manufacturer_name} ${vehicle.details.vehicle_model}`;
-          console.log("[VoiceChatGemini] Asking for single vehicle confirmation");
-          
-          session.sendClientContent({
-            turns: [{ 
-              role: "user", 
-              parts: [{ 
-                text: `[SYSTEM: Found 1 registered vehicle: ${vehicleDesc}. The quote details are now showing on screen. Tell the user you found their ${vehicleDesc} and the details are displayed. Ask them to confirm if these details look correct, then you'll search for quotes.]` 
-              }] 
-            }],
-            turnComplete: true
-          });
-          console.log("[VoiceChatGemini] Sent single vehicle confirmation message to Gemini");
-        }
+        console.log("[VoiceChatGemini] Sent quote details for confirmation - user will see panel on screen");
         return;
       }
       
-      // MULTIPLE VEHICLES: Show list and ask for selection
+      // MULTIPLE VEHICLES: Show list for selection
       quoteFlowState = "awaiting_vehicle_selection";
       console.log("[VoiceChatGemini] Multiple vehicles found, showing selection list");
       
       // Send vehicle list to client
       sendVehicleList(availableVehicles);
-      console.log("[VoiceChatGemini] Sent vehicle list to client");
-      
-      // Build prompt for Annie to list the vehicles
-      const vehicleList = availableVehicles.map((v, i) => 
-        `${i + 1}. ${v.details.vehicle_year} ${v.details.vehicle_manufacturer_name} ${v.details.vehicle_model}, registration ${v.details.vehicle_registration_number}`
-      ).join(". ");
-      
-      if (session) {
-        console.log("[VoiceChatGemini] Sending system message to announce vehicles");
-        
-        session.sendClientContent({
-          turns: [{ 
-            role: "user", 
-            parts: [{ 
-              text: `[SYSTEM: Found ${availableVehicles.length} registered vehicles: ${vehicleList}. The vehicles are now displayed on screen. List each vehicle and ask which one they'd like quotes for. They can say "first one", "second one", or tap a card to select.]` 
-            }] 
-          }],
-          turnComplete: true
-        });
-        console.log("[VoiceChatGemini] System message sent successfully");
-      } else {
-        console.error("[VoiceChatGemini] Session is null, cannot send vehicle list message");
-      }
+      console.log("[VoiceChatGemini] Sent vehicle list to client - user will see cards on screen");
     } catch (error) {
       console.error("[VoiceChatGemini] Error in handleQuoteIntent:", error);
     }
@@ -349,59 +314,28 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
         const selectedIndex = parseOrdinalToIndex(userText);
         if (selectedIndex >= 0 && selectedIndex < availableVehicles.length) {
           handleVehicleSelection(selectedIndex);
-          
-          // Tell Annie to confirm the details
-          const v = selectedVehicle!;
-          if (session) {
-            session.sendClientContent({
-              turns: [{ 
-                role: "user", 
-                parts: [{ 
-                  text: `[SYSTEM: User selected their ${v.details.vehicle_year} ${v.details.vehicle_manufacturer_name} ${v.details.vehicle_model}. The quote details are now showing on screen. Ask them to confirm if the details look correct before you search for quotes. Say something like "Great choice! I've got all the details for your [car]. Please take a look at the details on your screen. Does everything look correct?"]` 
-                }] 
-              }],
-              turnComplete: true
-            });
-          }
+          // Send quote details to client - Annie will respond naturally via voice
+          sendQuoteDetailsForConfirmation(selectedVehicle!);
+          console.log("[VoiceChatGemini] User selected vehicle, showing details panel");
         }
         break;
         
       case "awaiting_confirmation":
         if (isConfirmation(userText)) {
           quoteFlowState = "searching_quotes";
+          console.log("[VoiceChatGemini] User confirmed, triggering quote search");
           // Signal client to call quote API
           clientWs.send(JSON.stringify({
             type: "trigger_quote_search",
             vehicle: selectedVehicle,
           }));
-          
-          if (session) {
-            session.sendClientContent({
-              turns: [{ 
-                role: "user", 
-                parts: [{ 
-                  text: `[SYSTEM: User confirmed the details. You are now searching for quotes. Say something like "Perfect! I'm searching for the best quotes for you now. This will just take a moment..."]` 
-                }] 
-              }],
-              turnComplete: true
-            });
-          }
+          // Annie will respond naturally based on her system instruction
         } else if (isDenial(userText)) {
           quoteFlowState = "idle";
           selectedVehicle = null;
+          console.log("[VoiceChatGemini] User denied, hiding quote details");
           clientWs.send(JSON.stringify({ type: "hide_quote_details" }));
-          
-          if (session) {
-            session.sendClientContent({
-              turns: [{ 
-                role: "user", 
-                parts: [{ 
-                  text: `[SYSTEM: User said the details are not correct. Ask what they'd like to change or if they want to select a different vehicle.]` 
-                }] 
-              }],
-              turnComplete: true
-            });
-          }
+          // Annie will respond naturally
         }
         break;
         
@@ -516,9 +450,11 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
           assistantTranscript: assistantText,
         }));
         
-        // Process user message for quote flow
+        // Process user message for quote flow - delay to let session settle after turn complete
         if (userText) {
-          processUserMessage(userText);
+          setTimeout(() => {
+            processUserMessage(userText);
+          }, 1000);
         }
         
         currentUserTranscript = "";
@@ -593,39 +529,22 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
         if (quoteFlowState === "awaiting_vehicle_selection") {
           const success = handleVehicleSelection(message.index);
           if (success) {
-            const v = selectedVehicle!;
-            session.sendClientContent({
-              turns: [{ 
-                role: "user", 
-                parts: [{ 
-                  text: `[SYSTEM: User clicked to select their ${v.details.vehicle_year} ${v.details.vehicle_manufacturer_name} ${v.details.vehicle_model}. The quote details are now showing on screen. Ask them to confirm if the details look correct before you search for quotes.]` 
-                }] 
-              }],
-              turnComplete: true
-            });
+            console.log("[VoiceChatGemini] Vehicle selected via click, showing details panel");
+            // Just show the details panel - no sendClientContent to avoid crashing session
           }
         }
       }
       
       // Handle confirmation from client (user clicked confirm button)
       if (message.type === "confirm_quote_details") {
-        console.log("[VoiceChatGemini] Client confirmed quote details");
+        console.log("[VoiceChatGemini] Client confirmed quote details via click");
         if (quoteFlowState === "awaiting_confirmation" && selectedVehicle) {
           quoteFlowState = "searching_quotes";
           clientWs.send(JSON.stringify({
             type: "trigger_quote_search",
             vehicle: selectedVehicle,
           }));
-          
-          session.sendClientContent({
-            turns: [{ 
-              role: "user", 
-              parts: [{ 
-                text: `[SYSTEM: User confirmed the details by clicking confirm. You are now searching for quotes. Say something like "Perfect! I'm searching for the best quotes for you now. This will just take a moment..."]` 
-              }] 
-            }],
-            turnComplete: true
-          });
+          // No sendClientContent - Annie continues naturally
         }
       }
       
@@ -633,33 +552,8 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       if (message.type === "quote_search_results") {
         console.log("[VoiceChatGemini] Received quote search results");
         quoteFlowState = "idle";
-        
-        if (message.success && message.quotes && message.quotes.length > 0) {
-          const topQuotes = message.quotes.slice(0, 3);
-          const quoteSummary = topQuotes.map((q: any, i: number) => 
-            `${i + 1}. ${q.insurer_name || q.insurer} at £${q.quote_price || q.annualCost} per year`
-          ).join(", ");
-          
-          session.sendClientContent({
-            turns: [{ 
-              role: "user", 
-              parts: [{ 
-                text: `[SYSTEM: Quote search completed! Found ${message.quotes.length} quotes. Top options: ${quoteSummary}. Tell the user you found some great options and the results are showing on their screen. Briefly mention the top 2-3 options.]` 
-              }] 
-            }],
-            turnComplete: true
-          });
-        } else {
-          session.sendClientContent({
-            turns: [{ 
-              role: "user", 
-              parts: [{ 
-                text: `[SYSTEM: Quote search failed or no quotes found. Apologize and offer to try again.]` 
-              }] 
-            }],
-            turnComplete: true
-          });
-        }
+        // Results are displayed on client - no need to inject into Gemini
+        // Annie doesn't need to announce results since they're shown visually
       }
       
     } catch (error) {
