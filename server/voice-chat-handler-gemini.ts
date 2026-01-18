@@ -5,15 +5,47 @@ import { VehiclePolicyWithDetails } from "@shared/schema";
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 
-// Quote intent keywords
+// Quote intent keywords - includes common speech recognition errors
 const QUOTE_INTENT_KEYWORDS = [
+  // Primary keywords
   "quote", "quotes", "price", "pricing", "cost", "costs",
   "cheaper", "cheapest", "better deal", "switch", "compare",
-  "how much", "insurance", "renew", "renewal", "search"
+  "how much", "renew", "renewal", "search for",
+  // Common speech recognition errors for "quote"
+  "code", "coat", "call", "cold", "goat", "cote",
+  // Insurance-related phrases that indicate quote intent
+  "insure my", "insurance for my", "insure the", "cover my",
+  "get covered", "need cover", "want cover",
+  // Vehicle-specific quote triggers
+  "tesla", "car insurance", "vehicle insurance", "motor insurance",
+  "auto insurance"
 ];
 
+// More specific detection that avoids false positives
 function detectQuoteIntent(text: string): boolean {
   const lowerText = text.toLowerCase();
+  
+  // Check for strong quote intent signals
+  const strongSignals = [
+    "quote", "quotes", "code", "coat", "call",
+    "insure my", "insurance for", "price for", "cost of",
+    "cheaper insurance", "better deal", "switch insurer",
+    "how much to insure", "how much for", "get covered"
+  ];
+  
+  if (strongSignals.some(signal => lowerText.includes(signal))) {
+    return true;
+  }
+  
+  // Check for vehicle + insurance context
+  const hasVehicle = /tesla|car|vehicle|motor|auto/.test(lowerText);
+  const hasInsuranceWord = /insurance|insure|cover|protect/.test(lowerText);
+  
+  if (hasVehicle && hasInsuranceWord) {
+    return true;
+  }
+  
+  // Check for standard keywords
   return QUOTE_INTENT_KEYWORDS.some(keyword => lowerText.includes(keyword));
 }
 
@@ -61,7 +93,12 @@ RESPONSE STYLE:
 
 IMPORTANT: When the conversation starts, you MUST greet the user with: "Hello! I'm Annie, your insurance assistant. How can I help you with your insurance today?"
 
-When users ask about getting quotes, tell them you'd be happy to help search for insurance quotes. Ask what type of insurance they're looking for (car, home, etc.).
+CRITICAL QUOTE FLOW INSTRUCTION:
+When a user asks for insurance quotes (mentions "quote", "insurance", "price", "cheaper", or any vehicle like Tesla, car, etc.):
+- Say something brief like "I'd be happy to help! Let me check your registered vehicles..."
+- DO NOT ask them for vehicle details like make, model, year, etc. - the system will automatically fetch their vehicles from the database.
+- Wait for a [SYSTEM:] message that will provide you with the user's vehicles to announce.
+- Never ask for manual vehicle information - we already have it on file.
 
 For non-insurance questions, politely redirect the conversation back to insurance, explaining that you specialize in finding the best insurance deals.`;
 
