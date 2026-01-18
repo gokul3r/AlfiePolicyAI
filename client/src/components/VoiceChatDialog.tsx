@@ -59,15 +59,19 @@ interface QuoteDetails {
 
 // Map backend quote format to ChatQuote format
 function mapToQuoteCard(quote: any): ChatQuote {
+  // Handle the quotes_with_insights format from the API
+  const originalQuote = quote.original_quote?.output || quote.original_quote || quote;
+  const aiAnalysis = quote.ai_analysis || {};
+  
   return {
-    insurer_name: quote.insurer || quote.insurer_name,
-    alfie_touch_score: quote.autoAnnieScore || quote.alfie_touch_score || 4.0,
-    alfie_message: quote.aiSummary || quote.alfie_message || "A competitive insurance option.",
+    insurer_name: quote.insurer_name || originalQuote.insurer_name || quote.insurer || "Unknown",
+    alfie_touch_score: quote.alfie_touch_score || aiAnalysis.alfie_touch_score || quote.autoAnnieScore || 4.0,
+    alfie_message: aiAnalysis.alfie_message || quote.alfie_message || quote.aiSummary || "A competitive insurance option.",
     isTopMatch: false,
-    quote_price: quote.annualCost || quote.quote_price,
-    available_features: quote.available_features || [],
-    features_matched: quote.features_matched || [],
-    features_missing: quote.features_missing || []
+    quote_price: originalQuote.policy_cost || quote.policy_cost || quote.annualCost || quote.quote_price,
+    available_features: aiAnalysis.available_features || quote.available_features || [],
+    features_matched: aiAnalysis.features_matched || quote.features_matched || [],
+    features_missing: aiAnalysis.features_missing || quote.features_missing || []
   };
 }
 
@@ -186,10 +190,23 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         setStatusMessage(data.status);
       }
       
-      // Handle quotes received
+      // Handle quotes received (from server push, if any)
       if (data.type === "quotes_received") {
-        console.log("[VoiceChat] Received quotes:", data.quotes);
-        const mappedQuotes = data.quotes.map(mapToQuoteCard);
+        const rawQuotes = data.quotes_with_insights || data.quotes || [];
+        console.log("[VoiceChat] Received quotes from server:", rawQuotes.length);
+        
+        // Sort by alfie_touch_score and take top 3
+        const sortedQuotes = [...rawQuotes].sort((a: any, b: any) => {
+          const scoreA = a.alfie_touch_score || a.ai_analysis?.alfie_touch_score || 0;
+          const scoreB = b.alfie_touch_score || b.ai_analysis?.alfie_touch_score || 0;
+          return scoreB - scoreA;
+        });
+        const topQuotes = sortedQuotes.slice(0, 3);
+        
+        const mappedQuotes = topQuotes.map((q: any, idx: number) => ({
+          ...mapToQuoteCard(q),
+          isTopMatch: idx === 0
+        }));
         setQuotes(mappedQuotes);
         setStatusMessage(null);
       }
@@ -284,15 +301,32 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
             const quotesData = await response.json();
             console.log("[VoiceChat] Quote search results:", quotesData);
             
-            // Map and display quotes
-            const mappedQuotes = (quotesData.quotes || []).map(mapToQuoteCard);
+            // Map and display quotes - use quotes_with_insights from API response
+            const rawQuotes = quotesData.quotes_with_insights || quotesData.quotes || [];
+            console.log("[VoiceChat] Raw quotes from API:", rawQuotes.length, "quotes");
+            
+            // Sort by alfie_touch_score (highest first) and take top 3
+            const sortedQuotes = [...rawQuotes].sort((a, b) => {
+              const scoreA = a.alfie_touch_score || a.ai_analysis?.alfie_touch_score || 0;
+              const scoreB = b.alfie_touch_score || b.ai_analysis?.alfie_touch_score || 0;
+              return scoreB - scoreA;
+            });
+            const topQuotes = sortedQuotes.slice(0, 3);
+            
+            // Mark the top quote
+            const mappedQuotes = topQuotes.map((q, idx) => ({
+              ...mapToQuoteCard(q),
+              isTopMatch: idx === 0
+            }));
+            
+            console.log("[VoiceChat] Top 3 quotes by alfie_touch_score:", mappedQuotes);
             setQuotes(mappedQuotes);
             
             // Send results back to server for Annie to announce
             wsRef.current?.send(JSON.stringify({
               type: "quote_search_results",
               success: true,
-              quotes: quotesData.quotes || [],
+              quotesCount: mappedQuotes.length,
             }));
           } else {
             throw new Error(`API error: ${response.status}`);
