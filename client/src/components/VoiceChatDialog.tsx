@@ -105,32 +105,41 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         console.log("[VoiceChat] Session ready");
       }
 
-      if (data.type === "user_transcript") {
-        userTranscriptRef.current = data.transcript;
-        setCurrentUserTranscript(data.transcript);
+      if (data.type === "user_transcript_delta") {
+        userTranscriptRef.current += data.delta;
+        setCurrentUserTranscript(userTranscriptRef.current);
       }
-
-      if (data.type === "assistant_transcript") {
-        assistantTranscriptRef.current = data.transcript;
-        setCurrentAssistantTranscript(data.transcript);
+      
+      if (data.type === "assistant_transcript_delta") {
+        assistantTranscriptRef.current += data.delta;
+        setCurrentAssistantTranscript(assistantTranscriptRef.current);
+      }
+      
+      if (data.type === "turn_complete") {
+        const userText = data.userTranscript || userTranscriptRef.current;
+        const assistantText = data.assistantTranscript || assistantTranscriptRef.current;
         
-        // Add completed messages to history using refs (not stale state)
-        const userText = userTranscriptRef.current;
-        const assistantText = assistantTranscriptRef.current;
+        console.log(`[VoiceChat] Turn complete - User: "${userText}", Assistant: "${assistantText}"`);
         
-        if (userText && assistantText) {
-          setMessages(prev => [
-            ...prev,
-            { role: "user", content: userText, timestamp: new Date() },
-            { role: "assistant", content: assistantText, timestamp: new Date() },
-          ]);
-          
-          // Reset both state and refs
-          userTranscriptRef.current = "";
-          assistantTranscriptRef.current = "";
-          setCurrentUserTranscript("");
-          setCurrentAssistantTranscript("");
+        if (assistantText) {
+          if (userText) {
+            setMessages(prev => [
+              ...prev,
+              { role: "user", content: userText, timestamp: new Date() },
+              { role: "assistant", content: assistantText, timestamp: new Date() },
+            ]);
+          } else {
+            setMessages(prev => [
+              ...prev,
+              { role: "assistant", content: assistantText, timestamp: new Date() },
+            ]);
+          }
         }
+        
+        userTranscriptRef.current = "";
+        assistantTranscriptRef.current = "";
+        setCurrentUserTranscript("");
+        setCurrentAssistantTranscript("");
       }
 
       if (data.type === "audio" && data.audio) {
@@ -214,8 +223,8 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
 
-      // Create audio context for recording
-      const audioContext = new AudioContext({ sampleRate: 24000 });
+      // Create audio context for recording at 16kHz (Gemini input format)
+      const audioContext = new AudioContext({ sampleRate: 16000 });
       recordingAudioContextRef.current = audioContext;
 
       // Initialize playback context if not already done (resume on user interaction)
