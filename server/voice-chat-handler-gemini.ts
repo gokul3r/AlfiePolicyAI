@@ -258,8 +258,41 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
         return;
       }
       
+      // Give a small delay to ensure previous turn is complete before sending new content
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // SINGLE VEHICLE: Skip selection, go directly to confirmation
+      if (availableVehicles.length === 1) {
+        const vehicle = availableVehicles[0];
+        selectedVehicle = vehicle;
+        quoteFlowState = "awaiting_confirmation";
+        console.log("[VoiceChatGemini] Single vehicle found, skipping selection - going to confirmation");
+        
+        // Send quote details to client for confirmation display
+        sendQuoteDetailsForConfirmation(vehicle);
+        console.log("[VoiceChatGemini] Sent quote details for confirmation");
+        
+        if (session) {
+          const vehicleDesc = `${vehicle.details.vehicle_year} ${vehicle.details.vehicle_manufacturer_name} ${vehicle.details.vehicle_model}`;
+          const systemMessage = `I found your registered vehicle - your ${vehicleDesc}. I've got all your details ready. Would you like me to search for the best quotes for this vehicle?`;
+          console.log("[VoiceChatGemini] Asking for single vehicle confirmation");
+          
+          session.sendClientContent({
+            turns: [{ 
+              role: "user", 
+              parts: [{ 
+                text: `[SYSTEM INSTRUCTION: Say this to the user: "${systemMessage}"]` 
+              }] 
+            }],
+            turnComplete: true
+          });
+        }
+        return;
+      }
+      
+      // MULTIPLE VEHICLES: Show list and ask for selection
       quoteFlowState = "awaiting_vehicle_selection";
-      console.log("[VoiceChatGemini] State changed to: awaiting_vehicle_selection");
+      console.log("[VoiceChatGemini] Multiple vehicles found, showing selection list");
       
       // Send vehicle list to client
       sendVehicleList(availableVehicles);
@@ -270,11 +303,8 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
         `${i + 1}. ${v.details.vehicle_year} ${v.details.vehicle_manufacturer_name} ${v.details.vehicle_model}, registration ${v.details.vehicle_registration_number}`
       ).join(". ");
       
-      // Give a small delay to ensure previous turn is complete before sending new content
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
       if (session) {
-        const systemMessage = `I've found your registered vehicles. Here's what I have on file: ${vehicleList}. Which vehicle would you like me to get quotes for? You can say "first one" or tap on the card to select.`;
+        const systemMessage = `I've found ${availableVehicles.length} registered vehicles. Here's what I have: ${vehicleList}. Which vehicle would you like me to get quotes for? You can say "first one", "second one", or tap on a card to select.`;
         console.log("[VoiceChatGemini] Sending system message to announce vehicles");
         
         session.sendClientContent({
