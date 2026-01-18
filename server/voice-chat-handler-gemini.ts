@@ -240,51 +240,77 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
   
   // Handle quote intent - fetch and display vehicles
   async function handleQuoteIntent() {
-    console.log("[VoiceChatGemini] Quote intent detected, fetching vehicles");
-    availableVehicles = await fetchUserVehicles();
+    console.log("[VoiceChatGemini] Quote intent detected, fetching vehicles for:", emailId);
     
-    if (availableVehicles.length === 0) {
-      // No vehicles found - let Annie inform the user
+    try {
+      availableVehicles = await fetchUserVehicles();
+      console.log(`[VoiceChatGemini] Fetched ${availableVehicles.length} vehicles`);
+      
+      if (availableVehicles.length === 0) {
+        console.log("[VoiceChatGemini] No vehicles found, informing user");
+        // No vehicles found - let Annie inform the user
+        if (session) {
+          session.sendClientContent({
+            turns: [{ role: "user", parts: [{ text: "I want to search for insurance quotes but I don't have any vehicles registered yet." }] }],
+            turnComplete: true
+          });
+        }
+        return;
+      }
+      
+      quoteFlowState = "awaiting_vehicle_selection";
+      console.log("[VoiceChatGemini] State changed to: awaiting_vehicle_selection");
+      
+      // Send vehicle list to client
+      sendVehicleList(availableVehicles);
+      console.log("[VoiceChatGemini] Sent vehicle list to client");
+      
+      // Build prompt for Annie to list the vehicles
+      const vehicleList = availableVehicles.map((v, i) => 
+        `${i + 1}. ${v.details.vehicle_year} ${v.details.vehicle_manufacturer_name} ${v.details.vehicle_model}, registration ${v.details.vehicle_registration_number}`
+      ).join(". ");
+      
+      // Give a small delay to ensure previous turn is complete before sending new content
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       if (session) {
+        const systemMessage = `I've found your registered vehicles. Here's what I have on file: ${vehicleList}. Which vehicle would you like me to get quotes for? You can say "first one" or tap on the card to select.`;
+        console.log("[VoiceChatGemini] Sending system message to announce vehicles");
+        
         session.sendClientContent({
-          turns: [{ role: "user", parts: [{ text: "I want to search for insurance quotes but I don't have any vehicles registered yet." }] }],
+          turns: [{ 
+            role: "user", 
+            parts: [{ 
+              text: `[SYSTEM INSTRUCTION: Say this to the user: "${systemMessage}"]` 
+            }] 
+          }],
           turnComplete: true
         });
+        console.log("[VoiceChatGemini] System message sent successfully");
+      } else {
+        console.error("[VoiceChatGemini] Session is null, cannot send vehicle list message");
       }
-      return;
-    }
-    
-    quoteFlowState = "awaiting_vehicle_selection";
-    sendVehicleList(availableVehicles);
-    
-    // Build prompt for Annie to list the vehicles
-    const vehicleList = availableVehicles.map((v, i) => 
-      `${i + 1}. ${v.details.vehicle_year} ${v.details.vehicle_manufacturer_name} ${v.details.vehicle_model}, registration ${v.details.vehicle_registration_number}`
-    ).join(". ");
-    
-    if (session) {
-      session.sendClientContent({
-        turns: [{ 
-          role: "user", 
-          parts: [{ 
-            text: `[SYSTEM: The user wants insurance quotes. You found their vehicles. List them and ask which one they want a quote for. Here are their vehicles: ${vehicleList}. Say something like "I found your vehicles. You have: [list them]. Which one would you like a quote for?"]` 
-          }] 
-        }],
-        turnComplete: true
-      });
+    } catch (error) {
+      console.error("[VoiceChatGemini] Error in handleQuoteIntent:", error);
     }
   }
   
   // Process user message based on current flow state
   async function processUserMessage(userText: string) {
-    if (!userText.trim()) return;
+    if (!userText.trim()) {
+      console.log("[VoiceChatGemini] Empty user text, skipping processing");
+      return;
+    }
     
-    console.log(`[VoiceChatGemini] Processing user message in state: ${quoteFlowState}`);
+    console.log(`[VoiceChatGemini] Processing user message: "${userText}" in state: ${quoteFlowState}`);
+    const hasQuoteIntent = detectQuoteIntent(userText);
+    console.log(`[VoiceChatGemini] Quote intent detected: ${hasQuoteIntent}`);
     
     switch (quoteFlowState) {
       case "idle":
         // Check for quote intent
-        if (detectQuoteIntent(userText)) {
+        if (hasQuoteIntent) {
+          console.log("[VoiceChatGemini] Calling handleQuoteIntent");
           await handleQuoteIntent();
         }
         break;
