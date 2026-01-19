@@ -1,53 +1,9 @@
 import WebSocket from "ws";
-import { GoogleGenAI, Modality, Session, LiveConnectConfig, LiveServerMessage } from "@google/genai";
+import { GoogleGenAI, Modality, Session, LiveConnectConfig, LiveServerMessage, FunctionDeclaration, Type, Tool } from "@google/genai";
 import { storage } from "./storage";
 import { VehiclePolicyWithDetails } from "@shared/schema";
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-
-// Quote intent keywords - includes common speech recognition errors
-const QUOTE_INTENT_KEYWORDS = [
-  // Primary keywords
-  "quote", "quotes", "price", "pricing", "cost", "costs",
-  "cheaper", "cheapest", "better deal", "switch", "compare",
-  "how much", "renew", "renewal", "search for",
-  // Common speech recognition errors for "quote"
-  "code", "coat", "call", "cold", "goat", "cote",
-  // Insurance-related phrases that indicate quote intent
-  "insure my", "insurance for my", "insure the", "cover my",
-  "get covered", "need cover", "want cover",
-  // Vehicle-specific quote triggers
-  "tesla", "car insurance", "vehicle insurance", "motor insurance",
-  "auto insurance"
-];
-
-// More specific detection that avoids false positives
-function detectQuoteIntent(text: string): boolean {
-  const lowerText = text.toLowerCase();
-  
-  // Check for strong quote intent signals
-  const strongSignals = [
-    "quote", "quotes", "code", "coat", "call",
-    "insure my", "insurance for", "price for", "cost of",
-    "cheaper insurance", "better deal", "switch insurer",
-    "how much to insure", "how much for", "get covered"
-  ];
-  
-  if (strongSignals.some(signal => lowerText.includes(signal))) {
-    return true;
-  }
-  
-  // Check for vehicle + insurance context
-  const hasVehicle = /tesla|car|vehicle|motor|auto/.test(lowerText);
-  const hasInsuranceWord = /insurance|insure|cover|protect/.test(lowerText);
-  
-  if (hasVehicle && hasInsuranceWord) {
-    return true;
-  }
-  
-  // Check for standard keywords
-  return QUOTE_INTENT_KEYWORDS.some(keyword => lowerText.includes(keyword));
-}
 
 // Simple vehicle type for client display
 export interface VehicleForDisplay {
@@ -70,8 +26,91 @@ function getAIClient(): GoogleGenAI | null {
   return ai;
 }
 
-// Native audio model for voice chat
+// Native audio model for voice chat with function calling support
 const MODEL = "gemini-2.5-flash-native-audio-preview-12-2025";
+
+// Define the tools/functions that Annie can call
+const TOOL_DECLARATIONS: FunctionDeclaration[] = [
+  {
+    name: "get_user_vehicles",
+    description: "Retrieves the list of vehicles registered to the current user. Call this when the user asks about insurance quotes, wants to compare prices, or mentions their vehicle. This will show the vehicle details on the user's screen.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "search_quotes",
+    description: "Searches for insurance quotes for a specific vehicle. Call this after the user has confirmed they want quotes for a vehicle. The results will be displayed on the user's screen.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        vehicle_id: {
+          type: Type.STRING,
+          description: "The policy_id of the vehicle to search quotes for. If only one vehicle, can be omitted."
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: "get_available_quotes",
+    description: "Gets the list of currently available insurance quotes. Call this if you need to know what quotes are showing on the user's screen, or if user asks about the options.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "select_quote",
+    description: "Selects a specific insurance quote for purchase. Call this when the user indicates they want to go with a specific insurer. You can use insurer name OR ordinal (first, second, cheapest). The backend will resolve the exact quote and price.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        selection: {
+          type: Type.STRING,
+          description: "The insurer name or ordinal the user mentioned (e.g., 'Admiral', 'Baviva', 'first', 'cheapest', 'the second one')"
+        }
+      },
+      required: ["selection"]
+    }
+  },
+  {
+    name: "show_payment",
+    description: "Shows the payment confirmation UI to the user. Call this after the user has confirmed they want to proceed with the selected quote (e.g., 'yes', 'proceed', 'confirm'). Uses the previously selected quote.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "complete_purchase",
+    description: "Completes the insurance policy purchase. Call this ONLY after the user has explicitly confirmed the payment (e.g., 'confirm payment', 'pay now', 'complete the purchase'). Uses the previously selected quote and vehicle.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "cancel_flow",
+    description: "Cancels the current quote search or purchase flow. Call this when the user says they want to cancel, go back, or change their mind.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+      required: []
+    }
+  }
+];
+
+const TOOLS: Tool[] = [
+  {
+    functionDeclarations: TOOL_DECLARATIONS
+  }
+];
 
 const SYSTEM_INSTRUCTION = `You are Annie, a warm and friendly female insurance assistant with a British accent. You work for AutoAnnie, helping users find the best insurance quotes.
 
@@ -81,229 +120,60 @@ PERSONALITY:
 - Helpful and patient
 - Uses British English spellings and expressions
 
-YOUR CAPABILITIES:
-- Help users search for insurance quotes
-- Answer questions about insurance
-- Guide users through the quote search process
+YOUR TOOLS (always use these to take actions):
+- get_user_vehicles: Fetch user's registered vehicles - call this when user mentions quotes/insurance
+- search_quotes: Search for quotes - call after user confirms vehicle, vehicle_id is optional for single vehicle
+- get_available_quotes: Get list of current quotes - call if you need to know available options
+- select_quote(selection): Select a quote - pass the insurer name or ordinal user mentioned (e.g., "Admiral", "first", "cheapest")
+- show_payment: Show payment UI - call after user confirms quote selection (e.g., "yes", "proceed")
+- complete_purchase: Complete the purchase - call ONLY after explicit payment confirmation
+- cancel_flow: Cancel current operation
 
 RESPONSE STYLE:
-- Keep responses concise and natural
-- Be conversational, not robotic
-- Use a warm, empathetic tone
+- Keep responses concise (1-2 sentences)
+- Be conversational and warm
 - Avoid technical jargon
 
-IMPORTANT: When the conversation starts, you MUST greet the user with: "Hello! I'm Annie, your insurance assistant. How can I help you with your insurance today?"
+IMPORTANT: Greet the user with: "Hello! I'm Annie, your insurance assistant. How can I help you with your insurance today?"
 
-QUOTE FLOW INSTRUCTIONS:
-When a user asks for insurance quotes (mentions "quote", "insurance", "price", "cheaper", or any vehicle like Tesla, car, etc.):
-- Say: "Perfect! I'm pulling up your vehicle details now. You should see them on your screen - please take a look and confirm if everything looks correct, and I'll search for the best quotes for you."
-- The system will automatically show the user's registered vehicles on their screen.
-- DO NOT ask them for vehicle details like make, model, year, etc. - we already have it on file.
-- Wait for the user to confirm (they'll say "yes", "looks good", "confirm", etc.)
-- When they confirm, say something like "Great! I'm searching for the best quotes now. This will just take a moment..."
-- If the user says "no vehicles" or mentions they don't have any registered, apologize and offer to help them add a policy first.
+QUOTE FLOW - USE YOUR TOOLS:
+1. User asks for quotes (mentions "quote", "insurance", "price", "cheaper", vehicle, etc.):
+   - Call get_user_vehicles
+   - Say: "I'm pulling up your vehicle details now."
 
-When quote results come back (user says "got results" or "quotes are in" or the search completes):
-- Say something like "Wonderful! The quotes are showing on your screen now. I've found some great options for you. Have a look and let me know which one catches your eye, or if you'd like more details on any of them."
+2. User confirms vehicle (says "yes", "looks good", "correct", "proceed"):
+   - Call search_quotes (vehicle_id optional if single vehicle)
+   - Say: "Searching for the best quotes now..."
+   - The tool response will tell you the quotes are being searched
 
-QUOTE SELECTION AND PURCHASE FLOW:
-When a user selects a quote (says things like "go with Admiral", "I want PAXA", "the first one", "cheapest one", etc.):
-- ALWAYS confirm before proceeding. Say something like: "Just to confirm - you'd like to go with [insurer name] at [price]? Say 'yes' to proceed or 'no' if you'd like to look at other options."
-- Wait for their confirmation.
-- If they say "yes", "proceed", "confirm", "go ahead" - say: "Great choice! I'm showing the payment details on your screen now. Please review and say 'confirm payment' or 'pay now' when you're ready to complete the switch."
-- If they say "no", "cancel", or want to look at others - say: "No problem! Take your time looking through the quotes. Let me know when you've decided."
+3. User selects a quote (says "go with Baviva", "first one", "cheapest"):
+   - Call select_quote with their selection as the 'selection' parameter
+   - The tool will find the matching quote and return the exact insurer name and price
+   - Confirm with user: "Just to confirm - you'd like [insurer] at £[price]?"
 
-PAYMENT CONFIRMATION FLOW:
-After showing payment details, wait for the user to confirm payment:
-- If they say "confirm payment", "pay now", "proceed with payment", "yes pay", "complete", "go ahead" - say: "Brilliant! I'm processing your policy switch now. You'll see the progress on your screen..."
-- If they say "cancel", "no", "wait", "stop" - say: "No worries! I've cancelled the payment. The quotes are still here if you'd like to choose a different option."
+4. User confirms selection (says "yes", "proceed", "confirm"):
+   - Call show_payment (no parameters needed - uses selected quote)
+   - Say: "Showing payment details on your screen now."
 
-If a user wants MORE quotes or isn't happy with the options:
-- Say: "I understand! This quick quote gives you a snapshot of available options. For a more comprehensive search with additional filters, you can use the Quote Search option from the home screen. Would you like me to help with anything else?"
+5. User confirms PAYMENT (says "confirm payment", "pay now", "complete purchase", "do it"):
+   - Call complete_purchase (no parameters needed - uses stored state)
+   - Say: "Processing your policy switch now..."
 
-IMPORTANT RULES:
-- Always confirm with the customer before proceeding with any purchase
-- Be reassuring during the purchase process
-- If something goes wrong, apologize and offer to help
+6. User cancels (says "no", "cancel", "wait", "stop"):
+   - Call cancel_flow
+   - Say: "No problem, I've cancelled that."
 
-For non-insurance questions, politely redirect the conversation back to insurance, explaining that you specialize in finding the best insurance deals.`;
+CRITICAL RULES:
+- ALWAYS call your tools to take actions - don't just talk about doing things
+- The backend stores the state (selected vehicle, selected quote) - your tools use this state
+- For select_quote, just pass what the user said (e.g., "Admiral", "the first one", "cheapest")
+- Payment confirmation requires explicit payment words ("pay", "purchase", "complete")
+- If unsure which quote user wants, call get_available_quotes to see options`;
 
 const GREETING_TEXT = "Hello! I'm Annie, your insurance assistant. How can I help you with your insurance today?";
 
-// Quote flow states
-type QuoteFlowState = 
-  | "idle" 
-  | "awaiting_vehicle_selection" 
-  | "awaiting_confirmation" 
-  | "searching_quotes"
-  | "quotes_displayed"
-  | "awaiting_purchase_confirmation"  // User has selected a quote, waiting for "yes/no" to proceed
-  | "awaiting_payment_confirmation"   // User confirmed selection, now waiting for payment confirmation
-  | "processing_purchase";
-
-// Known insurer names for detection
-const KNOWN_INSURERS = [
-  "admiral", "paxa", "direct line", "directline", "aviva", "axa", 
-  "churchill", "hastings", "esure", "more than", "morethan", 
-  "tesco", "sainsbury", "rac", "aa", "confused", "compare the market",
-  "go compare", "moneysupermarket", "zurich", "allianz", "lloyds",
-  // Additional insurers from quote API
-  "hestingsdrive", "hestings", "ventura", "quotemehappy", "quote me happy",
-  "elephant", "1st central", "first central", "policy expert"
-];
-
-// Detect if user is selecting a provider from their message
-function detectProviderSelection(text: string): { detected: boolean; provider?: string; ordinal?: number; useTopQuote?: boolean } {
-  const lowerText = text.toLowerCase();
-  
-  // Selection verb indicators (make detection more confident but not required)
-  const hasSelectionVerb = /\b(go with|want|choose|select|take|switch to|let's do|i'll take|sounds good|please)\b/.test(lowerText);
-  
-  // Check for ordinal selection ("first one", "second option", "the third", "first", "the first")
-  const ordinalPatterns = [
-    { pattern: /\b(the\s+)?(first|1st)(\s+one|\s+option|\s+quote|\s+choice)?\b/, ordinal: 1 },
-    { pattern: /\b(the\s+)?(second|2nd)(\s+one|\s+option|\s+quote|\s+choice)?\b/, ordinal: 2 },
-    { pattern: /\b(the\s+)?(third|3rd)(\s+one|\s+option|\s+quote|\s+choice)?\b/, ordinal: 3 },
-    { pattern: /\bnumber\s*(one|1)\b/, ordinal: 1 },
-    { pattern: /\bnumber\s*(two|2)\b/, ordinal: 2 },
-    { pattern: /\bnumber\s*(three|3)\b/, ordinal: 3 },
-  ];
-  
-  for (const { pattern, ordinal } of ordinalPatterns) {
-    if (pattern.test(lowerText)) {
-      // Allow ordinal selection even without explicit verb (e.g., "the first one" is enough)
-      return { detected: true, ordinal };
-    }
-  }
-  
-  // Check for "cheapest", "lowest", "best" - these indicate selection
-  if (/\b(cheapest|lowest|best|top)\s*(one|option|quote|price)?\b/.test(lowerText)) {
-    return { detected: true, ordinal: 1 }; // Top quote is best/cheapest after sorting
-  }
-  
-  // Check for specific insurer names - allow with or without selection verbs
-  for (const insurer of KNOWN_INSURERS) {
-    if (lowerText.includes(insurer)) {
-      // If has selection verb or positive phrase, definitely selecting
-      if (hasSelectionVerb || /\b(please|sounds good|looks good|that one|ok|okay)\b/.test(lowerText)) {
-        return { detected: true, provider: insurer };
-      }
-      // Even just mentioning insurer name alone after quotes displayed likely means selection
-      // (e.g., user says "Admiral" or "Admiral please")
-      if (lowerText.trim().length < 50) { // Short utterances with insurer name = selection
-        return { detected: true, provider: insurer };
-      }
-    }
-  }
-  
-  // NOTE: We intentionally do NOT auto-select the top quote when user says incomplete phrases
-  // like "go with" without a provider name. This would cause a mismatch between the LLM's 
-  // spoken response (which may guess any insurer) and the backend-selected insurer.
-  // Instead, we return { detected: false } and let the LLM ask for clarification naturally.
-  // The state stays in quotes_displayed until the user explicitly says a provider name or ordinal.
-  
-  return { detected: false };
-}
-
-// Detect purchase confirmation
-function detectPurchaseConfirmation(text: string): "confirm" | "reject" | "none" {
-  const lowerText = text.toLowerCase();
-  
-  // Rejection patterns - check these FIRST as they're more safety-critical
-  const rejectPatterns = [
-    /\bcancel\b/, /\bstop\b/, /\bwait\b/, /\bnope\b/,
-    /\bhold on\b/, /\bdon'?t\b/, /\bdo not\b/,
-    /\bchanged my mind\b/, /\bother options\b/, 
-    /\bnot\s*(sure|yet|now|ready)\b/,
-    /^no\b/,  // "no" at start of sentence is rejection
-  ];
-  
-  for (const pattern of rejectPatterns) {
-    if (pattern.test(lowerText)) {
-      return "reject";
-    }
-  }
-  
-  // Confirmation patterns - selection/commitment verbs and clear affirmatives
-  // Kept specific to avoid false positives on generic praise
-  const confirmPatterns = [
-    // Clear affirmative responses (when asked "do you want to proceed?")
-    /\byes\b/, /\byeah\b/, /\byep\b/, /\byup\b/, /\bsure\b/,
-    
-    // Action-oriented confirmations
-    /\bproceed\b/, /\bconfirm\b/, /\bgo ahead\b/, /\bdo it\b/, /\bgo on\b/,
-    /\blet'?s\s*(do\s*it|go|proceed)\b/,  // "let's do it", "let's go"
-    
-    // Selection/choice phrases - THE KEY PATTERNS for "go with that"
-    /\bgo with\s*(that|it|them|this|him|her)\b/,  // "go with that", "go with it"
-    /\bgo\s*for\s*(it|that|this)\b/,              // "go for it", "go for that"
-    /\bI'?ll\s*take\s*(it|that|this|them)\b/,     // "I'll take it"
-    /\bchoose\s*(that|this|it|them)\b/,           // "choose that"
-    /\bselect\s*(that|this|it|them)\b/,           // "select that"
-    /\bthat'?s\s*(the one|my choice)\b/,          // "that's the one"
-  ];
-  
-  for (const pattern of confirmPatterns) {
-    if (pattern.test(lowerText)) {
-      return "confirm";
-    }
-  }
-  
-  return "none";
-}
-
-// Detect payment confirmation (MUST be explicit - requires payment-related keywords)
-function detectPaymentConfirmation(text: string): "confirm" | "reject" | "none" {
-  const lowerText = text.toLowerCase();
-  
-  // Rejection patterns - check these FIRST as they're more safety-critical
-  const rejectPatterns = [
-    /\bcancel\b/, /\bno\b/, /\bnope\b/, /\bstop\b/, /\bwait\b/,
-    /\bhold\s*on\b/, /\bdon'?t\b/, /\bdo\s*not\b/, /\bback\b/,
-    /\bchanged\s*my\s*mind\b/, /\bnot\s*(now|yet|sure)\b/
-  ];
-  
-  for (const pattern of rejectPatterns) {
-    if (pattern.test(lowerText)) {
-      return "reject";
-    }
-  }
-  
-  // Check for explicit payment intent - MUST contain payment-related keywords
-  const hasPaymentKeyword = /\b(pay|payment|charge|complete|purchase|buy|switch)\b/.test(lowerText);
-  
-  // Explicit payment confirmation patterns
-  const explicitPaymentPatterns = [
-    /\bconfirm\s*(the\s*)?(payment|purchase)\b/,
-    /\bpay\s*(now|please|it)?\b/,
-    /\bproceed\s*(with\s*)?(the\s*)?(payment|purchase)\b/,
-    /\bcomplete\s*(the\s*)?(payment|purchase|switch)\b/,
-    /\bmake\s*(the\s*)?(payment|purchase)\b/,
-    /\byes\s*(,?\s*)?(pay|payment|purchase|complete)\b/,
-    /\bgo\s*ahead\s*(with\s*)?(the\s*)?(payment|purchase)?\b/,
-    /\bdo\s*it\b/,  // "do it" is clear intent after seeing payment card
-    /\blet'?s\s*(do\s*it|pay|complete|go)\b/
-  ];
-  
-  // Must match an explicit pattern AND have payment context (or be "do it"/"let's do it")
-  for (const pattern of explicitPaymentPatterns) {
-    if (pattern.test(lowerText)) {
-      // "do it" and "let's do it" are explicit enough after payment card is shown
-      if (/\bdo\s*it\b/.test(lowerText) || /\blet'?s\s*(do\s*it|go)\b/.test(lowerText)) {
-        return "confirm";
-      }
-      // Other patterns should have payment keyword for safety
-      if (hasPaymentKeyword) {
-        return "confirm";
-      }
-    }
-  }
-  
-  return "none";
-}
-
 export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
-  console.log(`[VoiceChatGemini] New connection for ${emailId}`);
+  console.log(`[VoiceChatGemini] New connection for ${emailId} - AGENT MODE`);
   
   const aiClient = getAIClient();
   if (!aiClient) {
@@ -322,63 +192,76 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
   let currentAssistantTranscript = "";
   let currentUserTranscript = "";
   
-  // Quote flow state
-  let quoteFlowState: QuoteFlowState = "idle";
+  // State for context (shared with tool handlers)
   let availableVehicles: VehiclePolicyWithDetails[] = [];
   let selectedVehicle: VehiclePolicyWithDetails | null = null;
+  let displayedQuotes: { insurer_name: string; policy_cost: number; quote_reference_number?: string }[] = [];
+  let selectedQuote: { insurer_name: string; price: number } | null = null;
   
-  // Quote selection state (for purchase flow)
-  interface DisplayedQuote {
-    insurer_name: string;
-    policy_cost: number;
-    quote_reference_number?: string;
-  }
-  let displayedQuotes: DisplayedQuote[] = [];
-  let selectedQuoteForPurchase: DisplayedQuote | null = null;
-  
-  // Fetch user's vehicles from database
-  async function fetchUserVehicles(): Promise<VehiclePolicyWithDetails[]> {
+  // Tool execution handlers
+  async function executeGetUserVehicles(): Promise<{ 
+    success: boolean; 
+    vehicle_count: number;
+    selected_vehicle_id?: string;
+    vehicles?: { id: string; description: string }[];
+    message: string 
+  }> {
     try {
       const vehicles = await storage.getVehiclePoliciesByEmail(emailId);
-      console.log(`[VoiceChatGemini] Found ${vehicles.length} vehicles for ${emailId}`);
-      return vehicles;
-    } catch (error) {
-      console.error("[VoiceChatGemini] Error fetching vehicles:", error);
-      return [];
-    }
-  }
-  
-  // Send vehicle list to client for display
-  function sendVehicleList(vehicles: VehiclePolicyWithDetails[]) {
-    const vehiclesForDisplay: VehicleForDisplay[] = vehicles.map(v => ({
-      policy_id: v.policy_id,
-      vehicle_registration_number: v.details.vehicle_registration_number,
-      vehicle_manufacturer_name: v.details.vehicle_manufacturer_name,
-      vehicle_model: v.details.vehicle_model,
-      vehicle_year: v.details.vehicle_year,
-    }));
-    
-    clientWs.send(JSON.stringify({
-      type: "show_vehicle_list",
-      vehicles: vehiclesForDisplay,
-    }));
-  }
-  
-  // Handle vehicle selection (by index: 0-based)
-  function handleVehicleSelection(index: number): boolean {
-    if (index >= 0 && index < availableVehicles.length) {
-      selectedVehicle = availableVehicles[index];
-      quoteFlowState = "awaiting_confirmation";
-      console.log(`[VoiceChatGemini] Selected vehicle: ${selectedVehicle.details.vehicle_manufacturer_name} ${selectedVehicle.details.vehicle_model}`);
+      console.log(`[VoiceChatGemini] get_user_vehicles: Found ${vehicles.length} vehicles`);
+      availableVehicles = vehicles;
       
-      // Send quote details to client for confirmation display
-      sendQuoteDetailsForConfirmation(selectedVehicle);
-      return true;
+      if (vehicles.length === 0) {
+        clientWs.send(JSON.stringify({
+          type: "no_vehicles_found",
+          message: "No registered vehicles found."
+        }));
+        return { success: false, vehicle_count: 0, message: "No vehicles registered. Please add a policy first." };
+      }
+      
+      // Convert to simplified format for Gemini
+      const vehiclesList = vehicles.map((v, i) => ({
+        id: v.policy_id,
+        description: `${i + 1}. ${v.details.vehicle_manufacturer_name} ${v.details.vehicle_model} (${v.details.vehicle_registration_number})`
+      }));
+      
+      // If single vehicle, auto-select it and show quote details
+      if (vehicles.length === 1) {
+        selectedVehicle = vehicles[0];
+        sendQuoteDetailsForConfirmation(vehicles[0]);
+        return { 
+          success: true,
+          vehicle_count: 1,
+          selected_vehicle_id: vehicles[0].policy_id,
+          vehicles: vehiclesList,
+          message: `Found 1 vehicle: ${vehicles[0].details.vehicle_manufacturer_name} ${vehicles[0].details.vehicle_model}. It is automatically selected and details are shown on screen. When user confirms, call search_quotes with vehicle_id: "${vehicles[0].policy_id}".`
+        };
+      }
+      
+      // Multiple vehicles - show list and let user choose
+      clientWs.send(JSON.stringify({
+        type: "show_vehicle_list",
+        vehicles: vehicles.map(v => ({
+          policy_id: v.policy_id,
+          vehicle_registration_number: v.details.vehicle_registration_number,
+          vehicle_manufacturer_name: v.details.vehicle_manufacturer_name,
+          vehicle_model: v.details.vehicle_model,
+          vehicle_year: v.details.vehicle_year,
+        })),
+      }));
+      
+      return { 
+        success: true,
+        vehicle_count: vehicles.length,
+        vehicles: vehiclesList,
+        message: `Found ${vehicles.length} vehicles. Ask which one they want quotes for. Use the vehicle_id when calling search_quotes.`
+      };
+    } catch (error) {
+      console.error("[VoiceChatGemini] get_user_vehicles error:", error);
+      return { success: false, vehicle_count: 0, message: "Error fetching vehicles" };
     }
-    return false;
   }
   
-  // Send quote details to client for confirmation
   function sendQuoteDetailsForConfirmation(vehicle: VehiclePolicyWithDetails) {
     const quoteDetails = {
       email_id: emailId,
@@ -405,22 +288,204 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
     }));
   }
   
-  // Process the actual purchase after confirmation
-  async function processPurchase(quote: DisplayedQuote) {
-    if (!selectedVehicle) {
-      console.error("[VoiceChatGemini] No vehicle selected for purchase");
+  async function executeSearchQuotes(vehicleId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // Find the vehicle
+      let vehicle = availableVehicles.find(v => v.policy_id === vehicleId);
+      
+      // If not found by ID, try first vehicle if only one available
+      if (!vehicle && availableVehicles.length === 1) {
+        vehicle = availableVehicles[0];
+      }
+      
+      // If still not found, use selectedVehicle
+      if (!vehicle && selectedVehicle) {
+        vehicle = selectedVehicle;
+      }
+      
+      if (!vehicle) {
+        return { success: false, message: "Vehicle not found. Please ask user to select a vehicle." };
+      }
+      
+      selectedVehicle = vehicle;
+      console.log(`[VoiceChatGemini] search_quotes: Triggering search for ${vehicle.details.vehicle_registration_number}`);
+      
+      // Trigger quote search on client
       clientWs.send(JSON.stringify({
-        type: "purchase_error",
-        message: "No vehicle selected for purchase"
+        type: "trigger_quote_search",
+        vehicle: vehicle,
       }));
-      quoteFlowState = "quotes_displayed";
-      return;
+      
+      return { 
+        success: true, 
+        message: `Searching quotes for ${vehicle.details.vehicle_manufacturer_name} ${vehicle.details.vehicle_model}. Results will appear on the user's screen shortly. Tell the user you're searching and they'll see results soon.`
+      };
+    } catch (error) {
+      console.error("[VoiceChatGemini] search_quotes error:", error);
+      return { success: false, message: "Error searching quotes" };
+    }
+  }
+  
+  // Get available quotes tool
+  async function executeGetAvailableQuotes(): Promise<{
+    success: boolean;
+    quote_count: number;
+    quotes?: { position: number; insurer: string; price: number }[];
+    message: string;
+  }> {
+    console.log(`[VoiceChatGemini] get_available_quotes: ${displayedQuotes.length} quotes available`);
+    
+    if (displayedQuotes.length === 0) {
+      return {
+        success: false,
+        quote_count: 0,
+        message: "No quotes available yet. Call search_quotes first to get quotes."
+      };
     }
     
-    console.log(`[VoiceChatGemini] Processing purchase: ${quote.insurer_name} at £${quote.policy_cost}`);
+    const quotes = displayedQuotes.slice(0, 10).map((q, i) => ({
+      position: i + 1,
+      insurer: q.insurer_name,
+      price: q.policy_cost
+    }));
+    
+    const summary = quotes.map(q => `${q.position}. ${q.insurer}: £${q.price}`).join(", ");
+    
+    return {
+      success: true,
+      quote_count: displayedQuotes.length,
+      quotes: quotes,
+      message: `Available quotes: ${summary}. The first quote is the best match based on user preferences.`
+    };
+  }
+  
+  async function executeSelectQuote(selection: string): Promise<{ 
+    success: boolean; 
+    insurer_name?: string;
+    price?: number;
+    available_quotes?: string[];
+    message: string 
+  }> {
+    console.log(`[VoiceChatGemini] select_quote: selection="${selection}"`);
+    
+    // If no quotes available, return error with helpful message
+    if (displayedQuotes.length === 0) {
+      return { 
+        success: false, 
+        message: "No quotes available. Call search_quotes first to get quotes."
+      };
+    }
+    
+    const selectionLower = (selection || "").toLowerCase();
+    let quote = null;
+    
+    // First try ordinal matching (first, second, third, cheapest, best)
+    const ordinalPatterns: { pattern: RegExp; index: number }[] = [
+      { pattern: /\b(first|1st|cheapest|best|top|number\s*one|number\s*1)\b/, index: 0 },
+      { pattern: /\b(second|2nd|number\s*two|number\s*2)\b/, index: 1 },
+      { pattern: /\b(third|3rd|number\s*three|number\s*3)\b/, index: 2 },
+      { pattern: /\b(fourth|4th)\b/, index: 3 },
+      { pattern: /\b(fifth|5th)\b/, index: 4 },
+    ];
+    
+    for (const { pattern, index } of ordinalPatterns) {
+      if (pattern.test(selectionLower) && index < displayedQuotes.length) {
+        quote = displayedQuotes[index];
+        console.log(`[VoiceChatGemini] Matched by ordinal: position ${index + 1}`);
+        break;
+      }
+    }
+    
+    // If no ordinal match, try fuzzy name matching
+    if (!quote) {
+      quote = displayedQuotes.find(q => {
+        const qLower = q.insurer_name.toLowerCase();
+        // Partial match in either direction
+        return qLower.includes(selectionLower) || selectionLower.includes(qLower);
+      }) || null;
+      if (quote) {
+        console.log(`[VoiceChatGemini] Matched by name: ${quote.insurer_name}`);
+      }
+    }
+    
+    // If still no match, return available options
+    if (!quote) {
+      const availableQuotes = displayedQuotes.slice(0, 5).map(q => `${q.insurer_name}: £${q.policy_cost}`);
+      return { 
+        success: false,
+        available_quotes: availableQuotes,
+        message: `Could not find a quote matching "${selection}". Available quotes: ${availableQuotes.join(", ")}. Ask user to clarify which one they want.`
+      };
+    }
+    
+    selectedQuote = { insurer_name: quote.insurer_name, price: quote.policy_cost };
+    
+    // Notify client
+    clientWs.send(JSON.stringify({
+      type: "quote_selected",
+      insurer: selectedQuote.insurer_name,
+      price: selectedQuote.price,
+    }));
+    
+    return { 
+      success: true,
+      insurer_name: selectedQuote.insurer_name,
+      price: selectedQuote.price,
+      message: `Selected ${selectedQuote.insurer_name} at £${selectedQuote.price}. Confirm with user: "Just to confirm - you'd like ${selectedQuote.insurer_name} at £${selectedQuote.price}?"`
+    };
+  }
+  
+  async function executeShowPayment(): Promise<{ success: boolean; insurer_name?: string; price?: number; message: string }> {
+    console.log(`[VoiceChatGemini] show_payment called, selectedQuote:`, selectedQuote);
+    
+    // Validate we have a selected quote
+    if (!selectedQuote) {
+      return { 
+        success: false, 
+        message: "No quote selected. Call select_quote first to select a quote before showing payment."
+      };
+    }
+    
+    // Notify client to show payment card
+    clientWs.send(JSON.stringify({
+      type: "show_payment_card",
+      insurer: selectedQuote.insurer_name,
+      price: selectedQuote.price,
+    }));
+    
+    return { 
+      success: true,
+      insurer_name: selectedQuote.insurer_name,
+      price: selectedQuote.price,
+      message: `Payment card for ${selectedQuote.insurer_name} at £${selectedQuote.price} is now shown. Wait for user to confirm payment with phrases like "confirm payment", "pay now", or "complete purchase" before calling complete_purchase.`
+    };
+  }
+  
+  async function executeCompletePurchase(): Promise<{ success: boolean; policy_id?: string; message: string }> {
+    console.log(`[VoiceChatGemini] complete_purchase called, vehicle:`, selectedVehicle?.details?.vehicle_registration_number, `quote:`, selectedQuote);
+    
+    // Validate required state
+    if (!selectedVehicle) {
+      return { success: false, message: "No vehicle selected. Call get_user_vehicles first." };
+    }
+    
+    if (!selectedQuote) {
+      return { success: false, message: "No quote selected. Call select_quote first to select a quote." };
+    }
+    
+    const insurer = selectedQuote.insurer_name;
+    const amount = selectedQuote.price;
+    const registration = selectedVehicle.details.vehicle_registration_number;
     
     try {
-      // Status update 1: Processing payment
+      // Notify client that purchase is starting
+      clientWs.send(JSON.stringify({
+        type: "purchase_confirmed",
+        insurer: insurer,
+        price: amount,
+      }));
+      
+      // Status updates
       clientWs.send(JSON.stringify({
         type: "purchase_status",
         status: "Processing payment...",
@@ -428,7 +493,6 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       }));
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Status update 2: Verifying details
       clientWs.send(JSON.stringify({
         type: "purchase_status",
         status: "Verifying details...",
@@ -436,297 +500,96 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       }));
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Status update 3: Contacting insurer
       clientWs.send(JSON.stringify({
         type: "purchase_status",
-        status: `Contacting ${quote.insurer_name}...`,
+        status: `Contacting ${insurer}...`,
         step: 3
       }));
       await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Make the actual purchase via storage layer directly
+      // Make the actual purchase
       const purchaseData = {
         email_id: emailId,
-        vehicle_registration_number: selectedVehicle.details.vehicle_registration_number,
-        insurer_name: quote.insurer_name,
-        policy_cost: quote.policy_cost,
+        vehicle_registration_number: registration,
+        insurer_name: insurer,
+        policy_cost: amount,
       };
-      
-      console.log("[VoiceChatGemini] Purchasing policy:", purchaseData);
       
       const newPolicy = await storage.purchasePolicy(purchaseData);
       console.log("[VoiceChatGemini] Purchase successful:", newPolicy);
       
-      // Send success to client
+      // Send success
       clientWs.send(JSON.stringify({
         type: "purchase_complete",
         success: true,
-        insurer: quote.insurer_name,
-        price: quote.policy_cost,
+        insurer: insurer,
+        price: amount,
         policy: newPolicy,
       }));
       
       // Reset state
-      quoteFlowState = "idle";
-      selectedQuoteForPurchase = null;
+      selectedQuote = null;
       displayedQuotes = [];
       
+      return { 
+        success: true,
+        policy_id: newPolicy.policy_id,
+        message: `Purchase complete! The user's new policy with ${insurer} at £${amount}/year is now active. Congratulate them and ask if there's anything else you can help with.`
+      };
     } catch (error) {
       console.error("[VoiceChatGemini] Purchase error:", error);
       clientWs.send(JSON.stringify({
         type: "purchase_error",
         message: error instanceof Error ? error.message : "Purchase failed",
       }));
-      quoteFlowState = "quotes_displayed";
-      selectedQuoteForPurchase = null;
+      return { success: false, message: "Purchase failed. Please ask the user to try again." };
     }
   }
   
-  // Parse ordinal words to index (0-based)
-  function parseOrdinalToIndex(text: string): number {
-    const lowerText = text.toLowerCase();
-    const ordinalMap: Record<string, number> = {
-      "first": 0, "1st": 0, "one": 0, "number one": 0, "the first": 0,
-      "second": 1, "2nd": 1, "two": 1, "number two": 1, "the second": 1,
-      "third": 2, "3rd": 2, "three": 2, "number three": 2, "the third": 2,
-      "fourth": 3, "4th": 3, "four": 3, "number four": 3, "the fourth": 3,
-      "fifth": 4, "5th": 4, "five": 4, "number five": 4, "the fifth": 4,
+  async function executeCancelFlow(): Promise<{ success: boolean; message: string }> {
+    console.log("[VoiceChatGemini] cancel_flow called");
+    
+    clientWs.send(JSON.stringify({
+      type: "purchase_cancelled",
+    }));
+    
+    selectedQuote = null;
+    
+    return { 
+      success: true, 
+      message: "Flow cancelled. Ask the user what they'd like to do instead."
     };
-    
-    for (const [word, index] of Object.entries(ordinalMap)) {
-      if (lowerText.includes(word)) {
-        return index;
-      }
-    }
-    return -1;
   }
   
-  // Check for confirmation keywords
-  function isConfirmation(text: string): boolean {
-    const confirmWords = ["yes", "yeah", "yep", "correct", "right", "confirm", "proceed", "go ahead", "looks good", "that's right", "ok", "okay"];
-    const lowerText = text.toLowerCase();
-    return confirmWords.some(word => lowerText.includes(word));
-  }
-  
-  // Check for denial keywords
-  function isDenial(text: string): boolean {
-    const denyWords = ["no", "nope", "wrong", "incorrect", "cancel", "stop", "wait"];
-    const lowerText = text.toLowerCase();
-    return denyWords.some(word => lowerText.includes(word));
-  }
-  
-  // Handle quote intent - fetch and display vehicles
-  // NOTE: We do NOT call sendClientContent here as it crashes the Gemini session.
-  // Instead, Annie's system instruction tells her what to say, and we just send UI data to the client.
-  async function handleQuoteIntent() {
-    console.log("[VoiceChatGemini] Quote intent detected, fetching vehicles for:", emailId);
+  // Execute a tool call and return the result
+  async function executeTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+    console.log(`[VoiceChatGemini] Executing tool: ${name}`, args);
     
-    try {
-      availableVehicles = await fetchUserVehicles();
-      console.log(`[VoiceChatGemini] Fetched ${availableVehicles.length} vehicles`);
-      
-      if (availableVehicles.length === 0) {
-        console.log("[VoiceChatGemini] No vehicles found, sending notification to client");
-        // Send notification to client UI
-        clientWs.send(JSON.stringify({
-          type: "no_vehicles_found",
-          message: "No registered vehicles found. Please add a policy first."
-        }));
-        return;
-      }
-      
-      // SINGLE VEHICLE: Skip selection, go directly to confirmation
-      if (availableVehicles.length === 1) {
-        const vehicle = availableVehicles[0];
-        selectedVehicle = vehicle;
-        quoteFlowState = "awaiting_confirmation";
-        console.log("[VoiceChatGemini] Single vehicle found, going to confirmation state");
+    switch (name) {
+      case "get_user_vehicles":
+        return await executeGetUserVehicles();
         
-        // Send quote details to client for confirmation display
-        sendQuoteDetailsForConfirmation(vehicle);
-        console.log("[VoiceChatGemini] Sent quote details for confirmation - user will see panel on screen");
-        return;
-      }
-      
-      // MULTIPLE VEHICLES: Show list for selection
-      quoteFlowState = "awaiting_vehicle_selection";
-      console.log("[VoiceChatGemini] Multiple vehicles found, showing selection list");
-      
-      // Send vehicle list to client
-      sendVehicleList(availableVehicles);
-      console.log("[VoiceChatGemini] Sent vehicle list to client - user will see cards on screen");
-    } catch (error) {
-      console.error("[VoiceChatGemini] Error in handleQuoteIntent:", error);
-    }
-  }
-  
-  // Process user message based on current flow state
-  async function processUserMessage(userText: string) {
-    if (!userText.trim()) {
-      console.log("[VoiceChatGemini] Empty user text, skipping processing");
-      return;
-    }
-    
-    console.log(`[VoiceChatGemini] Processing user message: "${userText}" in state: ${quoteFlowState}`);
-    const hasQuoteIntent = detectQuoteIntent(userText);
-    console.log(`[VoiceChatGemini] Quote intent detected: ${hasQuoteIntent}`);
-    
-    switch (quoteFlowState) {
-      case "idle":
-        // Check for quote intent
-        if (hasQuoteIntent) {
-          console.log("[VoiceChatGemini] Calling handleQuoteIntent");
-          await handleQuoteIntent();
-        }
-        break;
+      case "search_quotes":
+        return await executeSearchQuotes((args.vehicle_id as string) || "");
         
-      case "awaiting_vehicle_selection":
-        // Try to parse vehicle selection
-        const selectedIndex = parseOrdinalToIndex(userText);
-        if (selectedIndex >= 0 && selectedIndex < availableVehicles.length) {
-          handleVehicleSelection(selectedIndex);
-          // Send quote details to client - Annie will respond naturally via voice
-          sendQuoteDetailsForConfirmation(selectedVehicle!);
-          console.log("[VoiceChatGemini] User selected vehicle, showing details panel");
-        }
-        break;
+      case "get_available_quotes":
+        return await executeGetAvailableQuotes();
         
-      case "awaiting_confirmation":
-        if (isConfirmation(userText)) {
-          quoteFlowState = "searching_quotes";
-          console.log("[VoiceChatGemini] User confirmed, triggering quote search");
-          // Signal client to call quote API
-          clientWs.send(JSON.stringify({
-            type: "trigger_quote_search",
-            vehicle: selectedVehicle,
-          }));
-          // Annie will respond naturally based on her system instruction
-        } else if (isDenial(userText)) {
-          quoteFlowState = "idle";
-          selectedVehicle = null;
-          console.log("[VoiceChatGemini] User denied, hiding quote details");
-          clientWs.send(JSON.stringify({ type: "hide_quote_details" }));
-          // Annie will respond naturally
-        }
-        break;
+      case "select_quote":
+        return await executeSelectQuote((args.selection as string) || "");
         
-      case "searching_quotes":
-        // Quotes are being searched, wait for results
-        break;
+      case "show_payment":
+        return await executeShowPayment();
         
-      case "quotes_displayed":
-        // Check if user is selecting a provider
-        const providerSelection = detectProviderSelection(userText);
-        console.log(`[VoiceChatGemini] Provider selection detection:`, providerSelection);
+      case "complete_purchase":
+        return await executeCompletePurchase();
         
-        let selectedQuote: DisplayedQuote | null = null;
+      case "cancel_flow":
+        return await executeCancelFlow();
         
-        if (providerSelection.detected) {
-          if (providerSelection.ordinal !== undefined && providerSelection.ordinal <= displayedQuotes.length) {
-            // User selected by ordinal (first, second, third)
-            selectedQuote = displayedQuotes[providerSelection.ordinal - 1];
-            console.log(`[VoiceChatGemini] User selected by ordinal ${providerSelection.ordinal}: ${selectedQuote?.insurer_name}`);
-          } else if (providerSelection.provider) {
-            // User selected by provider name
-            selectedQuote = displayedQuotes.find(q => 
-              q.insurer_name.toLowerCase().includes(providerSelection.provider!)
-            ) || null;
-            console.log(`[VoiceChatGemini] User selected by name "${providerSelection.provider}": ${selectedQuote?.insurer_name}`);
-          }
-        }
-        
-        // If no explicit match found, try to match against the actual displayed quote names
-        // This handles cases where the user mentions a provider name not in our static list
-        if (!selectedQuote && displayedQuotes.length > 0) {
-          const lowerText = userText.toLowerCase();
-          for (const quote of displayedQuotes) {
-            const insurerLower = quote.insurer_name.toLowerCase();
-            if (lowerText.includes(insurerLower)) {
-              selectedQuote = quote;
-              console.log(`[VoiceChatGemini] User selected by dynamic quote name match: ${selectedQuote.insurer_name}`);
-              break;
-            }
-          }
-        }
-        
-        if (selectedQuote) {
-          selectedQuoteForPurchase = selectedQuote;
-          quoteFlowState = "awaiting_purchase_confirmation";
-          console.log(`[VoiceChatGemini] Quote selected for purchase: ${selectedQuote.insurer_name} at £${selectedQuote.policy_cost}`);
-          
-          // Notify client about the selection
-          clientWs.send(JSON.stringify({
-            type: "quote_selected",
-            insurer: selectedQuote.insurer_name,
-            price: selectedQuote.policy_cost,
-          }));
-          // Annie will ask for confirmation naturally via her system instruction
-        }
-        break;
-        
-      case "awaiting_purchase_confirmation":
-        // Check if user confirmed or rejected the quote selection
-        const purchaseDecision = detectPurchaseConfirmation(userText);
-        console.log(`[VoiceChatGemini] Purchase confirmation detection: ${purchaseDecision}`);
-        
-        if (purchaseDecision === "confirm" && selectedQuoteForPurchase) {
-          // Move to payment confirmation state - show payment UI
-          quoteFlowState = "awaiting_payment_confirmation";
-          console.log(`[VoiceChatGemini] User confirmed selection of ${selectedQuoteForPurchase.insurer_name}, showing payment UI`);
-          
-          // Notify client to show payment card UI
-          clientWs.send(JSON.stringify({
-            type: "show_payment_card",
-            insurer: selectedQuoteForPurchase.insurer_name,
-            price: selectedQuoteForPurchase.policy_cost,
-          }));
-          // Annie will respond: "Great choice! I'm showing the payment details on your screen now..."
-        } else if (purchaseDecision === "reject") {
-          console.log("[VoiceChatGemini] User rejected selection, going back to quotes displayed");
-          quoteFlowState = "quotes_displayed";
-          selectedQuoteForPurchase = null;
-          
-          clientWs.send(JSON.stringify({
-            type: "purchase_cancelled",
-          }));
-          // Annie will respond: "No problem! Take your time..."
-        }
-        break;
-        
-      case "awaiting_payment_confirmation":
-        // Check if user confirmed or rejected the payment
-        const paymentDecision = detectPaymentConfirmation(userText);
-        console.log(`[VoiceChatGemini] Payment confirmation detection: ${paymentDecision}`);
-        
-        if (paymentDecision === "confirm" && selectedQuoteForPurchase) {
-          quoteFlowState = "processing_purchase";
-          console.log(`[VoiceChatGemini] User confirmed PAYMENT for ${selectedQuoteForPurchase.insurer_name}`);
-          
-          // Notify client that purchase is starting
-          clientWs.send(JSON.stringify({
-            type: "purchase_confirmed",
-            insurer: selectedQuoteForPurchase.insurer_name,
-            price: selectedQuoteForPurchase.policy_cost,
-          }));
-          
-          // Start the actual purchase process (async, with status updates)
-          processPurchase(selectedQuoteForPurchase);
-          // Annie will respond: "Brilliant! I'm processing your policy switch now..."
-        } else if (paymentDecision === "reject") {
-          console.log("[VoiceChatGemini] User cancelled payment, going back to quotes displayed");
-          quoteFlowState = "quotes_displayed";
-          selectedQuoteForPurchase = null;
-          
-          clientWs.send(JSON.stringify({
-            type: "payment_cancelled",
-          }));
-          // Annie will respond: "No worries! I've cancelled the payment..."
-        }
-        break;
-        
-      case "processing_purchase":
-        // Purchase is being processed, wait for completion
-        break;
+      default:
+        console.warn(`[VoiceChatGemini] Unknown tool: ${name}`);
+        return { success: false, message: `Unknown tool: ${name}` };
     }
   }
   
@@ -740,6 +603,7 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
         }
       }
     },
+    tools: TOOLS,
     inputAudioTranscription: {},
     outputAudioTranscription: {}
   };
@@ -774,10 +638,11 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
     });
   };
 
-  const handleServerMessage = (message: LiveServerMessage) => {
+  const handleServerMessage = async (message: LiveServerMessage) => {
     if (isClosing) return;
     
     try {
+      // Handle audio output
       if (message.serverContent?.modelTurn?.parts) {
         for (const part of message.serverContent.modelTurn.parts) {
           if (part.inlineData?.data) {
@@ -793,6 +658,7 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
         }
       }
       
+      // Handle user transcript
       if (message.serverContent?.inputTranscription?.text) {
         const userText = message.serverContent.inputTranscription.text;
         currentUserTranscript += userText;
@@ -803,6 +669,7 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
         }));
       }
       
+      // Handle assistant transcript
       if (message.serverContent?.outputTranscription?.text) {
         const assistantText = message.serverContent.outputTranscription.text;
         currentAssistantTranscript += assistantText;
@@ -813,11 +680,42 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
         }));
       }
       
+      // Handle tool calls from Gemini
+      if (message.toolCall) {
+        console.log("[VoiceChatGemini] Tool call received:", JSON.stringify(message.toolCall));
+        
+        const functionCalls = message.toolCall.functionCalls || [];
+        const functionResponses: { id: string; name: string; response: Record<string, unknown> }[] = [];
+        
+        for (const call of functionCalls) {
+          if (!call.name || !call.id) {
+            console.warn("[VoiceChatGemini] Skipping tool call with missing name or id");
+            continue;
+          }
+          const result = await executeTool(call.name, call.args as Record<string, unknown>);
+          functionResponses.push({
+            id: call.id,
+            name: call.name,
+            response: result as Record<string, unknown>
+          });
+        }
+        
+        // Send tool responses back to Gemini
+        if (functionResponses.length > 0 && session) {
+          console.log("[VoiceChatGemini] Sending tool responses:", JSON.stringify(functionResponses));
+          session.sendToolResponse({
+            functionResponses: functionResponses
+          });
+        }
+      }
+      
+      // Handle interruption
       if (message.serverContent?.interrupted) {
         console.log("[VoiceChatGemini] Response interrupted by user");
         currentAssistantTranscript = "";
       }
       
+      // Handle turn complete
       if (message.serverContent?.turnComplete) {
         const userText = currentUserTranscript.trim();
         const assistantText = currentAssistantTranscript.trim();
@@ -835,13 +733,6 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
           assistantTranscript: assistantText,
         }));
         
-        // Process user message for quote flow - delay to let session settle after turn complete
-        if (userText) {
-          setTimeout(() => {
-            processUserMessage(userText);
-          }, 1000);
-        }
-        
         currentUserTranscript = "";
         currentAssistantTranscript = "";
       }
@@ -856,7 +747,7 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       config: config,
       callbacks: {
         onopen: () => {
-          console.log("[VoiceChatGemini] Connected to Gemini Live API");
+          console.log("[VoiceChatGemini] Connected to Gemini Live API (AGENT MODE with tools)");
           clientWs.send(JSON.stringify({ type: "session_ready" }));
           
           setTimeout(() => {
@@ -911,66 +802,59 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       // Handle vehicle selection from client (user clicked on a vehicle card)
       if (message.type === "select_vehicle" && typeof message.index === "number") {
         console.log(`[VoiceChatGemini] Client selected vehicle index: ${message.index}`);
-        if (quoteFlowState === "awaiting_vehicle_selection") {
-          const success = handleVehicleSelection(message.index);
-          if (success) {
-            console.log("[VoiceChatGemini] Vehicle selected via click, showing details panel");
-            // Just show the details panel - no sendClientContent to avoid crashing session
-          }
+        if (message.index < availableVehicles.length) {
+          selectedVehicle = availableVehicles[message.index];
+          sendQuoteDetailsForConfirmation(selectedVehicle);
         }
       }
       
       // Handle confirmation from client (user clicked confirm button)
       if (message.type === "confirm_quote_details") {
-        console.log("[VoiceChatGemini] Client confirmed quote details via click");
-        if (quoteFlowState === "awaiting_confirmation" && selectedVehicle) {
-          quoteFlowState = "searching_quotes";
+        console.log("[VoiceChatGemini] Client confirmed quote details, triggering search");
+        if (selectedVehicle) {
           clientWs.send(JSON.stringify({
             type: "trigger_quote_search",
             vehicle: selectedVehicle,
           }));
-          // No sendClientContent - Annie continues naturally
         }
       }
       
-      // Handle quote search results from client
-      if (message.type === "quote_search_results") {
-        console.log("[VoiceChatGemini] Received quote search results, count:", message.quotesCount);
-        
-        if (message.success && message.quotesCount > 0) {
-          quoteFlowState = "quotes_displayed";
-          console.log("[VoiceChatGemini] Quotes displayed, ready for selection");
-        } else {
-          quoteFlowState = "idle";
-          console.log("[VoiceChatGemini] No quotes found or error, back to idle");
-        }
-        // Results are displayed on client - Annie's system instruction handles the response
-      }
-      
-      // Handle quote details from client (for tracking displayed quotes)
-      if (message.type === "displayed_quotes") {
-        console.log("[VoiceChatGemini] Received displayed quotes info:", message.quotes?.length);
-        displayedQuotes = (message.quotes || []).map((q: any) => ({
-          insurer_name: q.insurer_name || q.insurer || "Unknown",
-          policy_cost: q.policy_cost || q.quote_price || 0,
-          quote_reference_number: q.quote_reference_number,
+      // Handle quote results from client (client received quotes from API)
+      if (message.type === "quote_results" && message.quotes) {
+        console.log(`[VoiceChatGemini] Received ${message.quotes.length} quote results from client`);
+        displayedQuotes = message.quotes.map((q: { insurer_name: string; policy_cost: number; quote_reference_number?: string }) => ({
+          insurer_name: q.insurer_name,
+          policy_cost: q.policy_cost,
+          quote_reference_number: q.quote_reference_number
         }));
-        console.log("[VoiceChatGemini] Stored quotes for selection:", displayedQuotes.map(q => q.insurer_name));
+        
+        // Inform Gemini about the quotes through context injection
+        if (session && displayedQuotes.length > 0) {
+          const quotesSummary = displayedQuotes
+            .slice(0, 5)
+            .map((q, i) => `${i + 1}. ${q.insurer_name}: £${q.policy_cost}`)
+            .join(", ");
+          
+          // Note: We don't sendClientContent here as it may crash the session
+          // The quotes are displayed on UI and Annie will see user's selection
+          console.log(`[VoiceChatGemini] Quotes available: ${quotesSummary}`);
+        }
+      }
+      
+      // Handle quote selection from client (user clicked on a quote card)
+      if (message.type === "select_quote_from_client" && message.insurer && message.price) {
+        console.log(`[VoiceChatGemini] Client selected quote: ${message.insurer} at £${message.price}`);
+        selectedQuote = { insurer_name: message.insurer, price: message.price };
+        
+        clientWs.send(JSON.stringify({
+          type: "quote_selected",
+          insurer: message.insurer,
+          price: message.price,
+        }));
       }
       
     } catch (error) {
-      if (data instanceof Buffer && session) {
-        try {
-          session.sendRealtimeInput({
-            audio: {
-              data: data.toString("base64"),
-              mimeType: "audio/pcm;rate=16000"
-            }
-          });
-        } catch (sendError) {
-          console.error("[VoiceChatGemini] Error sending raw audio:", sendError);
-        }
-      }
+      console.error("[VoiceChatGemini] Error processing client message:", error);
     }
   });
 
@@ -979,28 +863,17 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
     isClosing = true;
     if (greetingTimeout) {
       clearTimeout(greetingTimeout);
-      greetingTimeout = null;
     }
     if (session) {
-      try {
-        session.close();
-      } catch (error) {
-        console.error("[VoiceChatGemini] Error closing session:", error);
-      }
-      session = null;
+      session.close();
     }
   });
 
   clientWs.on("error", (error) => {
-    console.error("[VoiceChatGemini] Client WebSocket error:", error);
+    console.error("[VoiceChatGemini] Client websocket error:", error);
     isClosing = true;
     if (session) {
-      try {
-        session.close();
-      } catch (closeError) {
-        console.error("[VoiceChatGemini] Error closing session on error:", closeError);
-      }
-      session = null;
+      session.close();
     }
   });
 }
