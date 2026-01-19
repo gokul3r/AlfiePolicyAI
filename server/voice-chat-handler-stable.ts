@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import { GoogleGenAI, FunctionDeclaration, Type, Content, Part, FunctionCall } from "@google/genai";
+import { GoogleGenAI, FunctionDeclaration, Type, Content, Part, FunctionCall, FunctionCallingConfigMode } from "@google/genai";
 import { storage } from "./storage";
 import { VehiclePolicyWithDetails } from "@shared/schema";
 
@@ -160,6 +160,7 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
   let selectedVehicle: VehiclePolicyWithDetails | null = null;
   let displayedQuotes: { insurer_name: string; policy_cost: number }[] = [];
   let selectedQuote: { insurer_name: string; price: number } | null = null;
+  let showingPaymentCard = false;
   let conversationHistory: Content[] = [];
   
   async function executeGetUserVehicles() {
@@ -351,6 +352,8 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
       return { success: false, message: "No quote selected. Call select_quote first." };
     }
     
+    showingPaymentCard = true;
+    
     clientWs.send(JSON.stringify({
       type: "show_payment_card",
       insurer: selectedQuote.insurer_name,
@@ -412,6 +415,7 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
       
       selectedQuote = null;
       displayedQuotes = [];
+      showingPaymentCard = false;
       
       return { 
         success: true,
@@ -429,6 +433,7 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
     console.log("[VoiceChatStable] cancel_flow");
     clientWs.send(JSON.stringify({ type: "purchase_cancelled" }));
     selectedQuote = null;
+    showingPaymentCard = false;
     return { success: true, message: "Cancelled. Ask user what they'd like to do." };
   }
   
@@ -456,16 +461,22 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
     });
     
     try {
-      const model = aiClient!.models.generateContent({
+      let response = await aiClient!.models.generateContent({
         model: MODEL,
         contents: conversationHistory,
         config: {
           systemInstruction: SYSTEM_INSTRUCTION,
           tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
+          toolConfig: {
+            functionCallingConfig: {
+              mode: FunctionCallingConfigMode.AUTO
+            }
+          }
         }
       });
       
-      let response = await model;
+      console.log(`[VoiceChatStable] Gemini response:`, JSON.stringify(response.candidates?.[0]?.content?.parts, null, 2));
+      
       let assistantResponse = "";
       
       while (true) {
@@ -484,6 +495,75 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
         }
         
         if (functionCalls.length === 0) {
+          const userLower = userText.toLowerCase();
+          let forcedTool: string | null = null;
+          let forcedArgs: Record<string, unknown> = {};
+          
+          if (availableVehicles.length === 0 && 
+              (userLower.includes("insure") || userLower.includes("quote") || 
+               userLower.includes("tesla") || userLower.includes("car") ||
+               userLower.includes("vehicle") || userLower.includes("insurance"))) {
+            forcedTool = "get_user_vehicles";
+            console.log(`[VoiceChatStable] FALLBACK: Forcing get_user_vehicles for "${userText}"`);
+          } else if (selectedVehicle && displayedQuotes.length === 0 && 
+              (userLower.includes("yes") || userLower.includes("proceed") || 
+               userLower.includes("go ahead") || userLower.includes("correct") ||
+               userLower.includes("confirm") || userLower.includes("that's right"))) {
+            forcedTool = "search_quotes";
+            console.log(`[VoiceChatStable] FALLBACK: Forcing search_quotes for "${userText}"`);
+          } else if (selectedQuote && !showingPaymentCard && 
+              (userLower.includes("yes") || userLower.includes("yeah") || 
+               userLower.includes("yep") || userLower.includes("proceed") ||
+               userLower.includes("correct") || userLower.includes("that's the one"))) {
+            forcedTool = "show_payment";
+            console.log(`[VoiceChatStable] FALLBACK: Forcing show_payment for "${userText}"`);
+          } else if (displayedQuotes.length > 0 && !selectedQuote) {
+            const quoteMatch = displayedQuotes.find(q => 
+              userLower.includes(q.insurer_name.toLowerCase())
+            );
+            if (quoteMatch) {
+              forcedTool = "select_quote";
+              forcedArgs = { selection: quoteMatch.insurer_name };
+              console.log(`[VoiceChatStable] FALLBACK: Forcing select_quote for "${userText}"`);
+            }
+          }
+          
+          if (forcedTool) {
+            const result = await executeTool(forcedTool, forcedArgs);
+            
+            if (textParts.length > 0 && textParts.join("").trim()) {
+              conversationHistory.push({
+                role: "model",
+                parts: [{ text: textParts.join("") }]
+              });
+            }
+            
+            conversationHistory.push({
+              role: "user",
+              parts: [{
+                functionResponse: {
+                  name: forcedTool,
+                  response: result as Record<string, unknown>
+                }
+              }]
+            });
+            
+            response = await aiClient!.models.generateContent({
+              model: MODEL,
+              contents: conversationHistory,
+              config: {
+                systemInstruction: SYSTEM_INSTRUCTION,
+                tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
+                toolConfig: {
+                  functionCallingConfig: {
+                    mode: FunctionCallingConfigMode.AUTO
+                  }
+                }
+              }
+            });
+            continue;
+          }
+          
           assistantResponse = textParts.join("");
           conversationHistory.push({
             role: "model",
@@ -526,8 +606,15 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
           config: {
             systemInstruction: SYSTEM_INSTRUCTION,
             tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
+            toolConfig: {
+              functionCallingConfig: {
+                mode: FunctionCallingConfigMode.AUTO
+              }
+            }
           }
         });
+        
+        console.log(`[VoiceChatStable] Follow-up response:`, JSON.stringify(response.candidates?.[0]?.content?.parts, null, 2));
       }
       
       return assistantResponse;
