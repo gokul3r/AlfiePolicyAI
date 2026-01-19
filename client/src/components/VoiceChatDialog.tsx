@@ -147,6 +147,8 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
   const wsRef = useRef<WebSocket | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const isRecordingRef = useRef<boolean>(false);
+  const sessionIdRef = useRef<number>(0);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -440,14 +442,41 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         return;
       }
       
+      sessionIdRef.current += 1;
+      const currentSessionId = sessionIdRef.current;
+      
       const recognition = new SpeechRecognitionAPI();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-GB';
       
+      const restartRecognition = () => {
+        if (!isRecordingRef.current || sessionIdRef.current !== currentSessionId) {
+          console.log("[VoiceChat] Not restarting - session changed or recording stopped");
+          return;
+        }
+        
+        console.log("[VoiceChat] Restarting recognition...");
+        setTimeout(() => {
+          if (isRecordingRef.current && sessionIdRef.current === currentSessionId && recognitionRef.current) {
+            try {
+              recognitionRef.current.start();
+              console.log("[VoiceChat] Recognition restarted successfully");
+            } catch (e: any) {
+              if (e.message?.includes('already started')) {
+                console.log("[VoiceChat] Recognition already running");
+              } else {
+                console.error("[VoiceChat] Failed to restart recognition:", e);
+                isRecordingRef.current = false;
+                setIsRecording(false);
+              }
+            }
+          }
+        }, 150);
+      };
+      
       recognition.onstart = () => {
-        console.log("[VoiceChat] Recognition started");
-        setIsRecording(true);
+        console.log("[VoiceChat] Recognition started, session:", currentSessionId);
       };
       
       recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -472,31 +501,42 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
       };
       
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error("[VoiceChat] Recognition error:", event.error);
+        console.log("[VoiceChat] Recognition error:", event.error, "session:", currentSessionId);
         
         if (event.error === 'not-allowed') {
           setPermissionError("Microphone access was denied. Please allow microphone permissions.");
+          isRecordingRef.current = false;
+          setIsRecording(false);
         } else if (event.error === 'no-speech') {
           console.log("[VoiceChat] No speech detected");
-        } else if (event.error !== 'aborted') {
-          setPermissionError(`Speech recognition error: ${event.error}`);
+        } else if (event.error === 'aborted') {
+          console.log("[VoiceChat] Recognition aborted");
+        } else if (event.error === 'network') {
+          console.log("[VoiceChat] Network error");
+        } else {
+          console.error("[VoiceChat] Unhandled recognition error:", event.error);
         }
-        setIsRecording(false);
       };
       
       recognition.onend = () => {
-        console.log("[VoiceChat] Recognition ended");
-        if (isRecording && recognitionRef.current === recognition) {
-          try {
-            recognition.start();
-          } catch (e) {
-            setIsRecording(false);
-          }
+        console.log("[VoiceChat] Recognition ended, session:", currentSessionId, "shouldRestart:", isRecordingRef.current);
+        if (isRecordingRef.current && sessionIdRef.current === currentSessionId) {
+          restartRecognition();
         }
       };
       
       recognitionRef.current = recognition;
-      recognition.start();
+      
+      try {
+        recognition.start();
+        isRecordingRef.current = true;
+        setIsRecording(true);
+        console.log("[VoiceChat] Recognition started successfully, session:", currentSessionId);
+      } catch (e) {
+        console.error("[VoiceChat] Failed to start recognition:", e);
+        setPermissionError("Unable to start speech recognition. Please try again.");
+        recognitionRef.current = null;
+      }
       
     } catch (error: any) {
       console.error("[VoiceChat] Error starting recognition:", error);
@@ -505,6 +545,9 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
   };
 
   const stopRecording = () => {
+    console.log("[VoiceChat] Stopping recording, session:", sessionIdRef.current);
+    isRecordingRef.current = false;
+    sessionIdRef.current += 1;
     if (recognitionRef.current) {
       recognitionRef.current.abort();
       recognitionRef.current = null;
