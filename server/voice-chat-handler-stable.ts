@@ -132,7 +132,7 @@ STEP 4: User gives EXPLICIT confirmation with clear words ("yes", "yeah", "yep",
 
 STEP 5: User explicitly confirms payment ("confirm payment", "pay now", "complete purchase", "process it")
 → Call complete_purchase
-→ Say: "Processing your policy now..."
+→ WAIT for the tool response, then say the SUCCESS message from the tool result (e.g., "All done! Your new policy with [insurer] is now active...")
 
 STEP 6: User cancels ("cancel", "stop", "never mind")
 → Call cancel_flow
@@ -432,7 +432,7 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
       return { 
         success: true,
         policy_id: newPolicy.policy_id,
-        message: `Purchase complete! New policy with ${insurer} at £${amount}/year is now active. Congratulate the user and ask if they need anything else.`
+        message: `SUCCESS: Policy purchased. SAY EXACTLY: "All done! Your new policy with ${insurer} at £${amount} per year is now active. Is there anything else I can help you with?"`
       };
     } catch (error) {
       console.error("[VoiceChatStable] Purchase error:", error);
