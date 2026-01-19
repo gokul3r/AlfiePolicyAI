@@ -146,11 +146,14 @@ const KNOWN_INSURERS = [
   "admiral", "paxa", "direct line", "directline", "aviva", "axa", 
   "churchill", "hastings", "esure", "more than", "morethan", 
   "tesco", "sainsbury", "rac", "aa", "confused", "compare the market",
-  "go compare", "moneysupermarket", "zurich", "allianz", "lloyds"
+  "go compare", "moneysupermarket", "zurich", "allianz", "lloyds",
+  // Additional insurers from quote API
+  "hestingsdrive", "hestings", "ventura", "quotemehappy", "quote me happy",
+  "elephant", "1st central", "first central", "policy expert"
 ];
 
 // Detect if user is selecting a provider from their message
-function detectProviderSelection(text: string): { detected: boolean; provider?: string; ordinal?: number } {
+function detectProviderSelection(text: string): { detected: boolean; provider?: string; ordinal?: number; useTopQuote?: boolean } {
   const lowerText = text.toLowerCase();
   
   // Selection verb indicators (make detection more confident but not required)
@@ -192,6 +195,12 @@ function detectProviderSelection(text: string): { detected: boolean; provider?: 
       }
     }
   }
+  
+  // NOTE: We intentionally do NOT auto-select the top quote when user says incomplete phrases
+  // like "go with" without a provider name. This would cause a mismatch between the LLM's 
+  // spoken response (which may guess any insurer) and the backend-selected insurer.
+  // Instead, we return { detected: false } and let the LLM ask for clarification naturally.
+  // The state stays in quotes_displayed until the user explicitly says a provider name or ordinal.
   
   return { detected: false };
 }
@@ -610,9 +619,9 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
         const providerSelection = detectProviderSelection(userText);
         console.log(`[VoiceChatGemini] Provider selection detection:`, providerSelection);
         
+        let selectedQuote: DisplayedQuote | null = null;
+        
         if (providerSelection.detected) {
-          let selectedQuote: DisplayedQuote | null = null;
-          
           if (providerSelection.ordinal !== undefined && providerSelection.ordinal <= displayedQuotes.length) {
             // User selected by ordinal (first, second, third)
             selectedQuote = displayedQuotes[providerSelection.ordinal - 1];
@@ -624,20 +633,34 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
             ) || null;
             console.log(`[VoiceChatGemini] User selected by name "${providerSelection.provider}": ${selectedQuote?.insurer_name}`);
           }
-          
-          if (selectedQuote) {
-            selectedQuoteForPurchase = selectedQuote;
-            quoteFlowState = "awaiting_purchase_confirmation";
-            console.log(`[VoiceChatGemini] Quote selected for purchase: ${selectedQuote.insurer_name} at £${selectedQuote.policy_cost}`);
-            
-            // Notify client about the selection
-            clientWs.send(JSON.stringify({
-              type: "quote_selected",
-              insurer: selectedQuote.insurer_name,
-              price: selectedQuote.policy_cost,
-            }));
-            // Annie will ask for confirmation naturally via her system instruction
+        }
+        
+        // If no explicit match found, try to match against the actual displayed quote names
+        // This handles cases where the user mentions a provider name not in our static list
+        if (!selectedQuote && displayedQuotes.length > 0) {
+          const lowerText = userText.toLowerCase();
+          for (const quote of displayedQuotes) {
+            const insurerLower = quote.insurer_name.toLowerCase();
+            if (lowerText.includes(insurerLower)) {
+              selectedQuote = quote;
+              console.log(`[VoiceChatGemini] User selected by dynamic quote name match: ${selectedQuote.insurer_name}`);
+              break;
+            }
           }
+        }
+        
+        if (selectedQuote) {
+          selectedQuoteForPurchase = selectedQuote;
+          quoteFlowState = "awaiting_purchase_confirmation";
+          console.log(`[VoiceChatGemini] Quote selected for purchase: ${selectedQuote.insurer_name} at £${selectedQuote.policy_cost}`);
+          
+          // Notify client about the selection
+          clientWs.send(JSON.stringify({
+            type: "quote_selected",
+            insurer: selectedQuote.insurer_name,
+            price: selectedQuote.policy_cost,
+          }));
+          // Annie will ask for confirmation naturally via her system instruction
         }
         break;
         
