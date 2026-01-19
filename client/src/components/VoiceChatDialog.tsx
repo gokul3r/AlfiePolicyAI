@@ -232,11 +232,28 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         setSelectedInsurer(null);
       }
       
-      // Handle purchase confirmed (Phase 2 will implement the actual purchase)
+      // Handle purchase confirmed - start of purchase flow
       if (data.type === "purchase_confirmed") {
         console.log("[VoiceChat] Purchase confirmed:", data.insurer, data.price);
         setStatusMessage("Processing your policy switch...");
-        // Phase 2 will handle the actual purchase flow with status updates
+      }
+      
+      // Handle purchase status updates (animated flow)
+      if (data.type === "purchase_status") {
+        console.log("[VoiceChat] Purchase status:", data.status, "step:", data.step);
+        setStatusMessage(data.status);
+      }
+      
+      // Handle purchase error
+      if (data.type === "purchase_error") {
+        console.log("[VoiceChat] Purchase error:", data.message);
+        setStatusMessage(null);
+        setSelectedInsurer(null);
+        toast({
+          title: "Purchase Failed",
+          description: data.message || "Something went wrong. Please try again.",
+          variant: "destructive",
+        });
       }
       
       // Handle purchase complete

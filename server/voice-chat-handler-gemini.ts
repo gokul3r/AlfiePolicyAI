@@ -326,6 +326,83 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
     }));
   }
   
+  // Process the actual purchase after confirmation
+  async function processPurchase(quote: DisplayedQuote) {
+    if (!selectedVehicle) {
+      console.error("[VoiceChatGemini] No vehicle selected for purchase");
+      clientWs.send(JSON.stringify({
+        type: "purchase_error",
+        message: "No vehicle selected for purchase"
+      }));
+      quoteFlowState = "quotes_displayed";
+      return;
+    }
+    
+    console.log(`[VoiceChatGemini] Processing purchase: ${quote.insurer_name} at £${quote.policy_cost}`);
+    
+    try {
+      // Status update 1: Processing payment
+      clientWs.send(JSON.stringify({
+        type: "purchase_status",
+        status: "Processing payment...",
+        step: 1
+      }));
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Status update 2: Verifying details
+      clientWs.send(JSON.stringify({
+        type: "purchase_status",
+        status: "Verifying details...",
+        step: 2
+      }));
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Status update 3: Contacting insurer
+      clientWs.send(JSON.stringify({
+        type: "purchase_status",
+        status: `Contacting ${quote.insurer_name}...`,
+        step: 3
+      }));
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Make the actual purchase via storage layer directly
+      const purchaseData = {
+        email_id: emailId,
+        vehicle_registration_number: selectedVehicle.details.vehicle_registration_number,
+        insurer_name: quote.insurer_name,
+        policy_cost: quote.policy_cost,
+      };
+      
+      console.log("[VoiceChatGemini] Purchasing policy:", purchaseData);
+      
+      const newPolicy = await storage.purchasePolicy(purchaseData);
+      console.log("[VoiceChatGemini] Purchase successful:", newPolicy);
+      
+      // Send success to client
+      clientWs.send(JSON.stringify({
+        type: "purchase_complete",
+        success: true,
+        insurer: quote.insurer_name,
+        price: quote.policy_cost,
+        policy: newPolicy,
+      }));
+      
+      // Reset state
+      quoteFlowState = "idle";
+      selectedQuoteForPurchase = null;
+      displayedQuotes = [];
+      
+    } catch (error) {
+      console.error("[VoiceChatGemini] Purchase error:", error);
+      clientWs.send(JSON.stringify({
+        type: "purchase_error",
+        message: error instanceof Error ? error.message : "Purchase failed",
+      }));
+      quoteFlowState = "quotes_displayed";
+      selectedQuoteForPurchase = null;
+    }
+  }
+  
   // Parse ordinal words to index (0-based)
   function parseOrdinalToIndex(text: string): number {
     const lowerText = text.toLowerCase();
@@ -503,12 +580,15 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
           quoteFlowState = "processing_purchase";
           console.log(`[VoiceChatGemini] User confirmed purchase of ${selectedQuoteForPurchase.insurer_name}`);
           
-          // Notify client to start purchase flow (Phase 2 will handle this)
+          // Notify client that purchase is starting
           clientWs.send(JSON.stringify({
             type: "purchase_confirmed",
             insurer: selectedQuoteForPurchase.insurer_name,
             price: selectedQuoteForPurchase.policy_cost,
           }));
+          
+          // Start the actual purchase process (async, with status updates)
+          processPurchase(selectedQuoteForPurchase);
           // Annie will respond naturally: "Brilliant! I'm processing your policy switch now..."
         } else if (purchaseDecision === "reject") {
           console.log("[VoiceChatGemini] User rejected purchase, going back to quotes displayed");
