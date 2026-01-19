@@ -211,9 +211,9 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         setQuotes(mappedQuotes);
         setStatusMessage(null);
         
-        // Also send displayed quotes to server for selection tracking
+        // Send quote details to backend so AI agent can select quotes
         wsRef.current?.send(JSON.stringify({
-          type: "displayed_quotes",
+          type: "quote_results",
           quotes: mappedQuotes.map(q => ({
             insurer_name: q.insurer_name,
             policy_cost: q.quote_price,
@@ -381,9 +381,9 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
               quotesCount: mappedQuotes.length,
             }));
             
-            // Also send the quote details so server can track them for selection
+            // Send quote details to backend so AI agent can select quotes
             wsRef.current?.send(JSON.stringify({
-              type: "displayed_quotes",
+              type: "quote_results",
               quotes: mappedQuotes.map(q => ({
                 insurer_name: q.insurer_name,
                 policy_cost: q.quote_price,
