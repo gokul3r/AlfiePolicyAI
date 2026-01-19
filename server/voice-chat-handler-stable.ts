@@ -1,0 +1,622 @@
+import WebSocket from "ws";
+import { GoogleGenAI, FunctionDeclaration, Type, Content, Part, FunctionCall } from "@google/genai";
+import { storage } from "./storage";
+import { VehiclePolicyWithDetails } from "@shared/schema";
+
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+
+let ai: GoogleGenAI | null = null;
+
+function getAIClient(): GoogleGenAI | null {
+  if (!GOOGLE_API_KEY) {
+    return null;
+  }
+  if (!ai) {
+    ai = new GoogleGenAI({ apiKey: GOOGLE_API_KEY });
+  }
+  return ai;
+}
+
+const MODEL = "gemini-2.0-flash";
+
+const TOOL_DECLARATIONS: FunctionDeclaration[] = [
+  {
+    name: "get_user_vehicles",
+    description: "Retrieves the list of vehicles registered to the current user. Call this when the user asks about insurance quotes, wants to compare prices, or mentions their vehicle.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "search_quotes",
+    description: "Searches for insurance quotes for a specific vehicle. Call this after the user has confirmed they want quotes for a vehicle.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        vehicle_id: {
+          type: Type.STRING,
+          description: "The policy_id of the vehicle. Optional if only one vehicle."
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: "get_available_quotes",
+    description: "Gets the list of currently available insurance quotes showing on the user's screen.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "select_quote",
+    description: "Selects a specific insurance quote. Use insurer name OR ordinal (first, second, cheapest).",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        selection: {
+          type: Type.STRING,
+          description: "The insurer name or ordinal (e.g., 'Admiral', 'first', 'cheapest')"
+        }
+      },
+      required: ["selection"]
+    }
+  },
+  {
+    name: "show_payment",
+    description: "Shows the payment UI. Call after user confirms quote selection.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "complete_purchase",
+    description: "Completes the purchase. Call ONLY after explicit payment confirmation ('confirm payment', 'pay now').",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+      required: []
+    }
+  },
+  {
+    name: "cancel_flow",
+    description: "Cancels the current operation.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+      required: []
+    }
+  }
+];
+
+const SYSTEM_INSTRUCTION = `You are Annie, a warm and friendly female insurance assistant with a British accent. You work for AutoAnnie, helping users find the best insurance quotes.
+
+PERSONALITY:
+- Warm, friendly, and reassuring
+- Professional but approachable
+- Uses British English
+
+YOUR TOOLS (always use these to take actions):
+- get_user_vehicles: Fetch user's vehicles - call when user mentions quotes/insurance
+- search_quotes: Search for quotes - call after user confirms vehicle
+- get_available_quotes: Get current quotes if you need to know options
+- select_quote(selection): Select a quote - pass insurer name or ordinal ("Admiral", "first", "cheapest")
+- show_payment: Show payment UI - call after user confirms selection ("yes", "proceed")
+- complete_purchase: Complete purchase - call ONLY after explicit payment confirmation
+- cancel_flow: Cancel current operation
+
+RESPONSE STYLE:
+- Keep responses concise (1-2 sentences)
+- Be conversational and warm
+- Avoid technical jargon
+
+FLOW:
+1. User asks for quotes → call get_user_vehicles → "I'm pulling up your vehicle details now."
+2. User confirms vehicle → call search_quotes → "Searching for the best quotes now..."
+3. User selects quote ("go with Admiral") → call select_quote → "Just to confirm - you'd like [insurer] at £[price]?"
+4. User confirms selection → call show_payment → "Showing payment details now."
+5. User confirms payment ("confirm payment", "pay now") → call complete_purchase → "Processing your policy..."
+6. User cancels → call cancel_flow → "No problem, I've cancelled that."
+
+CRITICAL:
+- ALWAYS use tools to take actions
+- Payment confirmation requires explicit keywords ("pay", "purchase", "complete")`;
+
+export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string) {
+  console.log(`[VoiceChatStable] New connection for ${emailId}`);
+  
+  const aiClient = getAIClient();
+  if (!aiClient) {
+    console.error("[VoiceChatStable] GOOGLE_API_KEY not configured");
+    clientWs.send(JSON.stringify({
+      type: "error",
+      message: "Voice service not configured.",
+    }));
+    clientWs.close();
+    return;
+  }
+  
+  let availableVehicles: VehiclePolicyWithDetails[] = [];
+  let selectedVehicle: VehiclePolicyWithDetails | null = null;
+  let displayedQuotes: { insurer_name: string; policy_cost: number }[] = [];
+  let selectedQuote: { insurer_name: string; price: number } | null = null;
+  let conversationHistory: Content[] = [];
+  
+  async function executeGetUserVehicles() {
+    try {
+      const vehicles = await storage.getVehiclePoliciesByEmail(emailId);
+      console.log(`[VoiceChatStable] get_user_vehicles: Found ${vehicles.length} vehicles`);
+      availableVehicles = vehicles;
+      
+      if (vehicles.length === 0) {
+        return { success: false, vehicle_count: 0, message: "No vehicles found." };
+      }
+      
+      if (vehicles.length === 1) {
+        selectedVehicle = vehicles[0];
+        sendQuoteDetailsForConfirmation(selectedVehicle);
+        return {
+          success: true,
+          vehicle_count: 1,
+          selected_vehicle_id: selectedVehicle.policy_id,
+          vehicles: [{ id: selectedVehicle.policy_id, description: `${selectedVehicle.details.vehicle_manufacturer_name} ${selectedVehicle.details.vehicle_model}` }],
+          message: `Found 1 vehicle: ${selectedVehicle.details.vehicle_manufacturer_name} ${selectedVehicle.details.vehicle_model}. Details shown on screen. When user confirms, call search_quotes.`
+        };
+      }
+      
+      const vehiclesList = vehicles.map((v, i) => ({
+        id: v.policy_id,
+        description: `${i + 1}. ${v.details.vehicle_manufacturer_name} ${v.details.vehicle_model}`
+      }));
+      
+      clientWs.send(JSON.stringify({
+        type: "show_vehicle_selection",
+        vehicles: vehicles.map((v, i) => ({
+          policy_id: v.policy_id,
+          vehicle_registration_number: v.details.vehicle_registration_number,
+          vehicle_manufacturer_name: v.details.vehicle_manufacturer_name,
+          vehicle_model: v.details.vehicle_model,
+          vehicle_year: v.details.vehicle_year,
+        })),
+      }));
+      
+      return {
+        success: true,
+        vehicle_count: vehicles.length,
+        vehicles: vehiclesList,
+        message: `Found ${vehicles.length} vehicles. Ask which one they want quotes for.`
+      };
+    } catch (error) {
+      console.error("[VoiceChatStable] get_user_vehicles error:", error);
+      return { success: false, vehicle_count: 0, message: "Error fetching vehicles" };
+    }
+  }
+  
+  function sendQuoteDetailsForConfirmation(vehicle: VehiclePolicyWithDetails) {
+    const quoteDetails = {
+      email_id: emailId,
+      driver_age: vehicle.details.driver_age,
+      vehicle_registration_number: vehicle.details.vehicle_registration_number,
+      vehicle_manufacturer_name: vehicle.details.vehicle_manufacturer_name,
+      vehicle_model: vehicle.details.vehicle_model,
+      vehicle_year: vehicle.details.vehicle_year,
+      type_of_fuel: vehicle.details.type_of_fuel,
+      type_of_cover_needed: vehicle.details.type_of_cover_needed,
+      no_claim_bonus_years: vehicle.details.no_claim_bonus_years,
+      voluntary_excess: vehicle.details.voluntary_excess,
+      current_insurance_provider: vehicle.current_insurance_provider,
+      policy_id: vehicle.policy_id,
+      policy_type: vehicle.policy_type,
+      policy_end_date: vehicle.policy_end_date,
+      policy_number: vehicle.policy_number,
+      whisper_preferences: vehicle.whisper_preferences || "",
+    };
+    
+    clientWs.send(JSON.stringify({
+      type: "show_quote_details",
+      details: quoteDetails,
+    }));
+  }
+  
+  async function executeSearchQuotes(vehicleId: string) {
+    try {
+      let vehicle = availableVehicles.find(v => v.policy_id === vehicleId);
+      if (!vehicle && availableVehicles.length === 1) vehicle = availableVehicles[0];
+      if (!vehicle && selectedVehicle) vehicle = selectedVehicle;
+      
+      if (!vehicle) {
+        return { success: false, message: "Vehicle not found. Ask user to select a vehicle." };
+      }
+      
+      selectedVehicle = vehicle;
+      console.log(`[VoiceChatStable] search_quotes: Triggering search for ${vehicle.details.vehicle_registration_number}`);
+      
+      clientWs.send(JSON.stringify({
+        type: "trigger_quote_search",
+        vehicle: vehicle,
+      }));
+      
+      return { 
+        success: true, 
+        message: `Searching quotes for ${vehicle.details.vehicle_manufacturer_name} ${vehicle.details.vehicle_model}. Results will appear on screen shortly.`
+      };
+    } catch (error) {
+      console.error("[VoiceChatStable] search_quotes error:", error);
+      return { success: false, message: "Error searching quotes" };
+    }
+  }
+  
+  async function executeGetAvailableQuotes() {
+    console.log(`[VoiceChatStable] get_available_quotes: ${displayedQuotes.length} quotes`);
+    
+    if (displayedQuotes.length === 0) {
+      return { success: false, quote_count: 0, message: "No quotes available yet. Call search_quotes first." };
+    }
+    
+    const quotes = displayedQuotes.slice(0, 10).map((q, i) => ({
+      position: i + 1,
+      insurer: q.insurer_name,
+      price: q.policy_cost
+    }));
+    
+    const summary = quotes.map(q => `${q.position}. ${q.insurer}: £${q.price}`).join(", ");
+    
+    return {
+      success: true,
+      quote_count: displayedQuotes.length,
+      quotes: quotes,
+      message: `Available quotes: ${summary}.`
+    };
+  }
+  
+  async function executeSelectQuote(selection: string) {
+    console.log(`[VoiceChatStable] select_quote: selection="${selection}"`);
+    
+    if (displayedQuotes.length === 0) {
+      return { success: false, message: "No quotes available. Call search_quotes first." };
+    }
+    
+    const selectionLower = (selection || "").toLowerCase();
+    let quote = null;
+    
+    const ordinalPatterns: { pattern: RegExp; index: number }[] = [
+      { pattern: /\b(first|1st|cheapest|best|top|number\s*one)\b/, index: 0 },
+      { pattern: /\b(second|2nd|number\s*two)\b/, index: 1 },
+      { pattern: /\b(third|3rd)\b/, index: 2 },
+    ];
+    
+    for (const { pattern, index } of ordinalPatterns) {
+      if (pattern.test(selectionLower) && index < displayedQuotes.length) {
+        quote = displayedQuotes[index];
+        break;
+      }
+    }
+    
+    if (!quote) {
+      quote = displayedQuotes.find(q => {
+        const qLower = q.insurer_name.toLowerCase();
+        return qLower.includes(selectionLower) || selectionLower.includes(qLower);
+      }) || null;
+    }
+    
+    if (!quote) {
+      const availableQuotes = displayedQuotes.slice(0, 5).map(q => `${q.insurer_name}: £${q.policy_cost}`);
+      return { 
+        success: false,
+        available_quotes: availableQuotes,
+        message: `Could not find "${selection}". Available: ${availableQuotes.join(", ")}.`
+      };
+    }
+    
+    selectedQuote = { insurer_name: quote.insurer_name, price: quote.policy_cost };
+    
+    clientWs.send(JSON.stringify({
+      type: "quote_selected",
+      insurer: selectedQuote.insurer_name,
+      price: selectedQuote.price,
+    }));
+    
+    return { 
+      success: true,
+      insurer_name: selectedQuote.insurer_name,
+      price: selectedQuote.price,
+      message: `Selected ${selectedQuote.insurer_name} at £${selectedQuote.price}. Confirm with user.`
+    };
+  }
+  
+  async function executeShowPayment() {
+    console.log(`[VoiceChatStable] show_payment, quote:`, selectedQuote);
+    
+    if (!selectedQuote) {
+      return { success: false, message: "No quote selected. Call select_quote first." };
+    }
+    
+    clientWs.send(JSON.stringify({
+      type: "show_payment_card",
+      insurer: selectedQuote.insurer_name,
+      price: selectedQuote.price,
+    }));
+    
+    return { 
+      success: true,
+      insurer_name: selectedQuote.insurer_name,
+      price: selectedQuote.price,
+      message: `Payment card shown for ${selectedQuote.insurer_name} at £${selectedQuote.price}. Wait for user to say "confirm payment" or "pay now".`
+    };
+  }
+  
+  async function executeCompletePurchase() {
+    console.log(`[VoiceChatStable] complete_purchase`);
+    
+    if (!selectedVehicle) {
+      return { success: false, message: "No vehicle selected." };
+    }
+    
+    if (!selectedQuote) {
+      return { success: false, message: "No quote selected." };
+    }
+    
+    const insurer = selectedQuote.insurer_name;
+    const amount = selectedQuote.price;
+    const registration = selectedVehicle.details.vehicle_registration_number;
+    
+    try {
+      clientWs.send(JSON.stringify({ type: "purchase_confirmed", insurer, price: amount }));
+      
+      clientWs.send(JSON.stringify({ type: "purchase_status", status: "Processing payment...", step: 1 }));
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      clientWs.send(JSON.stringify({ type: "purchase_status", status: "Verifying details...", step: 2 }));
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      clientWs.send(JSON.stringify({ type: "purchase_status", status: `Contacting ${insurer}...`, step: 3 }));
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      const purchaseData = {
+        email_id: emailId,
+        vehicle_registration_number: registration,
+        insurer_name: insurer,
+        policy_cost: amount,
+      };
+      
+      const newPolicy = await storage.purchasePolicy(purchaseData);
+      console.log("[VoiceChatStable] Purchase successful:", newPolicy);
+      
+      clientWs.send(JSON.stringify({
+        type: "purchase_complete",
+        success: true,
+        insurer: insurer,
+        price: amount,
+        policy: newPolicy,
+      }));
+      
+      selectedQuote = null;
+      displayedQuotes = [];
+      
+      return { 
+        success: true,
+        policy_id: newPolicy.policy_id,
+        message: `Purchase complete! New policy with ${insurer} at £${amount}/year is now active. Congratulate the user.`
+      };
+    } catch (error) {
+      console.error("[VoiceChatStable] Purchase error:", error);
+      clientWs.send(JSON.stringify({ type: "purchase_error", message: "Purchase failed" }));
+      return { success: false, message: "Purchase failed." };
+    }
+  }
+  
+  async function executeCancelFlow() {
+    console.log("[VoiceChatStable] cancel_flow");
+    clientWs.send(JSON.stringify({ type: "purchase_cancelled" }));
+    selectedQuote = null;
+    return { success: true, message: "Cancelled. Ask user what they'd like to do." };
+  }
+  
+  async function executeTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+    console.log(`[VoiceChatStable] Executing tool: ${name}`, args);
+    
+    switch (name) {
+      case "get_user_vehicles": return await executeGetUserVehicles();
+      case "search_quotes": return await executeSearchQuotes((args.vehicle_id as string) || "");
+      case "get_available_quotes": return await executeGetAvailableQuotes();
+      case "select_quote": return await executeSelectQuote((args.selection as string) || "");
+      case "show_payment": return await executeShowPayment();
+      case "complete_purchase": return await executeCompletePurchase();
+      case "cancel_flow": return await executeCancelFlow();
+      default: return { success: false, message: `Unknown tool: ${name}` };
+    }
+  }
+  
+  async function processUserMessage(userText: string): Promise<string> {
+    console.log(`[VoiceChatStable] Processing: "${userText}"`);
+    
+    conversationHistory.push({
+      role: "user",
+      parts: [{ text: userText }]
+    });
+    
+    try {
+      const model = aiClient!.models.generateContent({
+        model: MODEL,
+        contents: conversationHistory,
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
+        }
+      });
+      
+      let response = await model;
+      let assistantResponse = "";
+      
+      while (true) {
+        const candidate = response.candidates?.[0];
+        if (!candidate?.content?.parts) break;
+        
+        const functionCalls: FunctionCall[] = [];
+        let textParts: string[] = [];
+        
+        for (const part of candidate.content.parts) {
+          if (part.functionCall) {
+            functionCalls.push(part.functionCall);
+          } else if (part.text) {
+            textParts.push(part.text);
+          }
+        }
+        
+        if (functionCalls.length === 0) {
+          assistantResponse = textParts.join("");
+          conversationHistory.push({
+            role: "model",
+            parts: [{ text: assistantResponse }]
+          });
+          break;
+        }
+        
+        if (textParts.length > 0) {
+          assistantResponse += textParts.join("");
+        }
+        
+        conversationHistory.push({
+          role: "model",
+          parts: candidate.content.parts
+        });
+        
+        const functionResponses: Part[] = [];
+        
+        for (const fc of functionCalls) {
+          console.log(`[VoiceChatStable] Tool call: ${fc.name}`, fc.args);
+          const args = (fc.args || {}) as Record<string, unknown>;
+          const result = await executeTool(fc.name!, args);
+          functionResponses.push({
+            functionResponse: {
+              name: fc.name!,
+              response: result as Record<string, unknown>
+            }
+          });
+        }
+        
+        conversationHistory.push({
+          role: "user",
+          parts: functionResponses
+        });
+        
+        response = await aiClient!.models.generateContent({
+          model: MODEL,
+          contents: conversationHistory,
+          config: {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            tools: [{ functionDeclarations: TOOL_DECLARATIONS }],
+          }
+        });
+      }
+      
+      return assistantResponse;
+    } catch (error) {
+      console.error("[VoiceChatStable] Error:", error);
+      return "I'm sorry, I'm having trouble processing that. Could you please try again?";
+    }
+  }
+  
+  clientWs.send(JSON.stringify({ type: "session_ready" }));
+  
+  const greeting = "Hello! I'm Annie, your insurance assistant. How can I help you with your insurance today?";
+  conversationHistory.push({
+    role: "model",
+    parts: [{ text: greeting }]
+  });
+  
+  clientWs.send(JSON.stringify({
+    type: "assistant_response",
+    text: greeting,
+  }));
+  
+  clientWs.on("message", async (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+      
+      if (message.type === "user_message" && message.text) {
+        const userText = message.text.trim();
+        if (!userText) return;
+        
+        console.log(`[VoiceChatStable] User said: "${userText}"`);
+        
+        const response = await processUserMessage(userText);
+        
+        clientWs.send(JSON.stringify({
+          type: "assistant_response",
+          text: response,
+        }));
+      }
+      
+      if (message.type === "select_vehicle" && typeof message.index === "number") {
+        console.log(`[VoiceChatStable] Client selected vehicle index: ${message.index}`);
+        if (message.index < availableVehicles.length) {
+          selectedVehicle = availableVehicles[message.index];
+          sendQuoteDetailsForConfirmation(selectedVehicle);
+        }
+      }
+      
+      if (message.type === "confirm_quote_details") {
+        console.log("[VoiceChatStable] Client confirmed quote details");
+        if (selectedVehicle) {
+          clientWs.send(JSON.stringify({
+            type: "trigger_quote_search",
+            vehicle: selectedVehicle,
+          }));
+        }
+      }
+      
+      if (message.type === "quote_results" && message.quotes) {
+        console.log(`[VoiceChatStable] Received ${message.quotes.length} quotes`);
+        displayedQuotes = message.quotes.map((q: { insurer_name: string; policy_cost: number }) => ({
+          insurer_name: q.insurer_name,
+          policy_cost: q.policy_cost
+        }));
+        
+        if (displayedQuotes.length > 0) {
+          const summary = displayedQuotes.slice(0, 3).map((q, i) => `${i + 1}. ${q.insurer_name}: £${q.policy_cost}`).join(", ");
+          console.log(`[VoiceChatStable] Quotes: ${summary}`);
+          
+          const quotesMessage = `I found ${displayedQuotes.length} quotes for you. The top options are: ${summary}. Which one would you like to go with?`;
+          
+          conversationHistory.push({
+            role: "model",
+            parts: [{ text: quotesMessage }]
+          });
+          
+          clientWs.send(JSON.stringify({
+            type: "assistant_response",
+            text: quotesMessage,
+          }));
+        }
+      }
+      
+      if (message.type === "select_quote_from_client" && message.insurer && message.price) {
+        console.log(`[VoiceChatStable] Client selected: ${message.insurer} at £${message.price}`);
+        selectedQuote = { insurer_name: message.insurer, price: message.price };
+        clientWs.send(JSON.stringify({
+          type: "quote_selected",
+          insurer: message.insurer,
+          price: message.price,
+        }));
+      }
+      
+    } catch (error) {
+      console.error("[VoiceChatStable] Error processing message:", error);
+    }
+  });
+  
+  clientWs.on("close", () => {
+    console.log("[VoiceChatStable] Client disconnected");
+  });
+  
+  clientWs.on("error", (error) => {
+    console.error("[VoiceChatStable] WebSocket error:", error);
+  });
+}

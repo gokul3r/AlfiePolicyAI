@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { Mic, MicOff, X, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Mic, MicOff, X, Loader2, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,7 +28,6 @@ interface VoiceChatDialogProps {
   userEmail: string;
 }
 
-// Vehicle for selection display
 interface VehicleForDisplay {
   policy_id: string;
   vehicle_registration_number: string;
@@ -37,7 +36,6 @@ interface VehicleForDisplay {
   vehicle_year: number;
 }
 
-// Quote details for confirmation (16 fields)
 interface QuoteDetails {
   email_id: string;
   driver_age: number;
@@ -57,9 +55,7 @@ interface QuoteDetails {
   whisper_preferences: string;
 }
 
-// Map backend quote format to ChatQuote format
 function mapToQuoteCard(quote: any): ChatQuote {
-  // Handle the quotes_with_insights format from the API
   const originalQuote = quote.original_quote?.output || quote.original_quote || quote;
   const aiAnalysis = quote.ai_analysis || {};
   
@@ -75,22 +71,73 @@ function mapToQuoteCard(quote: any): ChatQuote {
   };
 }
 
+interface SpeechRecognitionEvent {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent {
+  error: string;
+  message?: string;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
+  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => any) | null;
+}
+
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognition;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: SpeechRecognitionConstructor;
+    webkitSpeechRecognition: SpeechRecognitionConstructor;
+  }
+}
+
 export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDialogProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakerEnabled, setSpeakerEnabled] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentUserTranscript, setCurrentUserTranscript] = useState("");
-  const [currentAssistantTranscript, setCurrentAssistantTranscript] = useState("");
   const [permissionError, setPermissionError] = useState<string | null>(null);
   
-  // Voice flow states
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<ChatQuote[]>([]);
   const [selectedInsurer, setSelectedInsurer] = useState<{ name: string; price: number } | null>(null);
-  const [showPaymentCard, setShowPaymentCard] = useState(false);  // When true, show payment confirmation UI
+  const [showPaymentCard, setShowPaymentCard] = useState(false);
   const [purchaseComplete, setPurchaseComplete] = useState(false);
   
-  // Quote flow states
   const [vehicleList, setVehicleList] = useState<VehicleForDisplay[]>([]);
   const [quoteDetails, setQuoteDetails] = useState<QuoteDetails | null>(null);
   const [isSearchingQuotes, setIsSearchingQuotes] = useState(false);
@@ -98,20 +145,9 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
   const { toast } = useToast();
 
   const wsRef = useRef<WebSocket | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordingAudioContextRef = useRef<AudioContext | null>(null);
-  const playbackAudioContextRef = useRef<AudioContext | null>(null);
-  const audioStreamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const audioQueueRef = useRef<AudioBufferSourceNode[]>([]);
-  const nextPlayTimeRef = useRef<number>(0);
-  const hasAudioDataRef = useRef<boolean>(false);
-  
-  // Use refs to track transcripts to avoid stale closure in WebSocket handler
-  const userTranscriptRef = useRef<string>("");
-  const assistantTranscriptRef = useRef<string>("");
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
@@ -119,9 +155,34 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         scrollContainer.scrollTop = scrollContainer.scrollHeight;
       }
     }
-  }, [messages, currentUserTranscript, currentAssistantTranscript, quotes, statusMessage]);
+  }, [messages, currentUserTranscript, quotes, statusMessage]);
 
-  // Initialize WebSocket connection when dialog opens
+  const speak = useCallback((text: string) => {
+    if (!speakerEnabled || !text) return;
+    
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-GB';
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    
+    const voices = window.speechSynthesis.getVoices();
+    const britishFemale = voices.find(v => 
+      v.lang.includes('en-GB') && v.name.toLowerCase().includes('female')
+    ) || voices.find(v => v.lang.includes('en-GB')) || voices[0];
+    
+    if (britishFemale) {
+      utterance.voice = britishFemale;
+    }
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    window.speechSynthesis.speak(utterance);
+  }, [speakerEnabled]);
+
   useEffect(() => {
     if (!open) return;
 
@@ -144,59 +205,23 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         console.log("[VoiceChat] Session ready");
       }
 
-      if (data.type === "user_transcript_delta") {
-        userTranscriptRef.current += data.delta;
-        setCurrentUserTranscript(userTranscriptRef.current);
-      }
-      
-      if (data.type === "assistant_transcript_delta") {
-        assistantTranscriptRef.current += data.delta;
-        setCurrentAssistantTranscript(assistantTranscriptRef.current);
-      }
-      
-      if (data.type === "turn_complete") {
-        const userText = data.userTranscript || userTranscriptRef.current;
-        const assistantText = data.assistantTranscript || assistantTranscriptRef.current;
-        
-        console.log(`[VoiceChat] Turn complete - User: "${userText}", Assistant: "${assistantText}"`);
-        
-        if (assistantText) {
-          if (userText) {
-            setMessages(prev => [
-              ...prev,
-              { role: "user", content: userText, timestamp: new Date() },
-              { role: "assistant", content: assistantText, timestamp: new Date() },
-            ]);
-          } else {
-            setMessages(prev => [
-              ...prev,
-              { role: "assistant", content: assistantText, timestamp: new Date() },
-            ]);
-          }
-        }
-        
-        userTranscriptRef.current = "";
-        assistantTranscriptRef.current = "";
-        setCurrentUserTranscript("");
-        setCurrentAssistantTranscript("");
+      if (data.type === "assistant_response" && data.text) {
+        console.log("[VoiceChat] Assistant:", data.text);
+        setMessages(prev => [
+          ...prev,
+          { role: "assistant", content: data.text, timestamp: new Date() }
+        ]);
+        speak(data.text);
       }
 
-      if (data.type === "audio" && data.audio) {
-        // Play audio response
-        await playAudioChunk(data.audio);
-      }
-      
-      // Handle status updates from voice flow
       if (data.type === "status_update") {
         setStatusMessage(data.status);
       }
       
-      // Handle quotes received (from server push, if any)
       if (data.type === "quotes_received") {
         const rawQuotes = data.quotes_with_insights || data.quotes || [];
-        console.log("[VoiceChat] Received quotes from server:", rawQuotes.length);
+        console.log("[VoiceChat] Received quotes:", rawQuotes.length);
         
-        // Sort by alfie_touch_score and take top 3
         const sortedQuotes = [...rawQuotes].sort((a: any, b: any) => {
           const scoreA = a.alfie_touch_score || a.ai_analysis?.alfie_touch_score || 0;
           const scoreB = b.alfie_touch_score || b.ai_analysis?.alfie_touch_score || 0;
@@ -211,7 +236,6 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         setQuotes(mappedQuotes);
         setStatusMessage(null);
         
-        // Send quote details to backend so AI agent can select quotes
         wsRef.current?.send(JSON.stringify({
           type: "quote_results",
           quotes: mappedQuotes.map(q => ({
@@ -221,67 +245,53 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         }));
       }
       
-      // Handle insurer selection (from server - voice detected selection)
       if (data.type === "insurer_selected" || data.type === "quote_selected") {
-        console.log("[VoiceChat] Insurer selected:", data.insurer, data.price);
+        console.log("[VoiceChat] Quote selected:", data.insurer, data.price);
         setSelectedInsurer({ name: data.insurer, price: data.price });
       }
       
-      // Handle selection cancelled
       if (data.type === "selection_cancelled" || data.type === "purchase_cancelled") {
-        console.log("[VoiceChat] Selection/purchase cancelled");
+        console.log("[VoiceChat] Cancelled");
         setSelectedInsurer(null);
         setShowPaymentCard(false);
       }
       
-      // Handle show payment card (user confirmed insurer selection, now show payment UI)
       if (data.type === "show_payment_card") {
-        console.log("[VoiceChat] Showing payment card for:", data.insurer, data.price);
+        console.log("[VoiceChat] Show payment:", data.insurer, data.price);
         setSelectedInsurer({ name: data.insurer, price: data.price });
         setShowPaymentCard(true);
       }
       
-      // Handle payment cancelled
       if (data.type === "payment_cancelled") {
-        console.log("[VoiceChat] Payment cancelled");
         setSelectedInsurer(null);
         setShowPaymentCard(false);
       }
       
-      // Handle purchase confirmed - start of purchase flow
       if (data.type === "purchase_confirmed") {
-        console.log("[VoiceChat] Purchase confirmed:", data.insurer, data.price);
         setStatusMessage("Processing your policy switch...");
       }
       
-      // Handle purchase status updates (animated flow)
       if (data.type === "purchase_status") {
-        console.log("[VoiceChat] Purchase status:", data.status, "step:", data.step);
         setStatusMessage(data.status);
       }
       
-      // Handle purchase error
       if (data.type === "purchase_error") {
-        console.log("[VoiceChat] Purchase error:", data.message);
         setStatusMessage(null);
         setSelectedInsurer(null);
         setShowPaymentCard(false);
         toast({
           title: "Purchase Failed",
-          description: data.message || "Something went wrong. Please try again.",
+          description: data.message || "Something went wrong.",
           variant: "destructive",
         });
       }
       
-      // Handle purchase complete
       if (data.type === "purchase_complete") {
-        console.log("[VoiceChat] Purchase complete:", data.insurer);
         setSelectedInsurer(null);
         setShowPaymentCard(false);
         setPurchaseComplete(true);
         setStatusMessage(null);
         
-        // Invalidate queries to refresh data
         queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
         
         toast({
@@ -289,35 +299,25 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
           description: `Your new ${data.insurer} policy is now active.`,
         });
         
-        // Reset quotes after successful purchase
         setTimeout(() => {
           setQuotes([]);
           setPurchaseComplete(false);
         }, 5000);
       }
       
-      // Handle vehicle list display
-      if (data.type === "show_vehicle_list") {
-        console.log("[VoiceChat] Showing vehicle list:", data.vehicles);
-        setVehicleList(data.vehicles);
-        setQuoteDetails(null);
+      if (data.type === "show_vehicle_selection") {
+        console.log("[VoiceChat] Vehicle selection:", data.vehicles);
+        setVehicleList(data.vehicles || []);
       }
       
-      // Handle quote details display for confirmation
       if (data.type === "show_quote_details") {
-        console.log("[VoiceChat] Showing quote details for confirmation:", data.details);
+        console.log("[VoiceChat] Quote details:", data.details);
         setQuoteDetails(data.details);
         setVehicleList([]);
       }
       
-      // Handle hide quote details
-      if (data.type === "hide_quote_details") {
-        setQuoteDetails(null);
-      }
-      
-      // Handle trigger quote search - call the API
       if (data.type === "trigger_quote_search") {
-        console.log("[VoiceChat] Triggering quote search for vehicle:", data.vehicle);
+        console.log("[VoiceChat] Triggering quote search");
         setIsSearchingQuotes(true);
         setStatusMessage("Searching for the best quotes...");
         setQuoteDetails(null);
@@ -351,13 +351,10 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
           
           if (response.ok) {
             const quotesData = await response.json();
-            console.log("[VoiceChat] Quote search results:", quotesData);
+            console.log("[VoiceChat] Quote results:", quotesData);
             
-            // Map and display quotes - use quotes_with_insights from API response
             const rawQuotes = quotesData.quotes_with_insights || quotesData.quotes || [];
-            console.log("[VoiceChat] Raw quotes from API:", rawQuotes.length, "quotes");
             
-            // Sort by alfie_touch_score (highest first) and take top 3
             const sortedQuotes = [...rawQuotes].sort((a, b) => {
               const scoreA = a.alfie_touch_score || a.ai_analysis?.alfie_touch_score || 0;
               const scoreB = b.alfie_touch_score || b.ai_analysis?.alfie_touch_score || 0;
@@ -365,23 +362,13 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
             });
             const topQuotes = sortedQuotes.slice(0, 3);
             
-            // Mark the top quote
             const mappedQuotes = topQuotes.map((q, idx) => ({
               ...mapToQuoteCard(q),
               isTopMatch: idx === 0
             }));
             
-            console.log("[VoiceChat] Top 3 quotes by alfie_touch_score:", mappedQuotes);
             setQuotes(mappedQuotes);
             
-            // Send results back to server
-            wsRef.current?.send(JSON.stringify({
-              type: "quote_search_results",
-              success: true,
-              quotesCount: mappedQuotes.length,
-            }));
-            
-            // Send quote details to backend so AI agent can select quotes
             wsRef.current?.send(JSON.stringify({
               type: "quote_results",
               quotes: mappedQuotes.map(q => ({
@@ -394,11 +381,6 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
           }
         } catch (error) {
           console.error("[VoiceChat] Quote search error:", error);
-          wsRef.current?.send(JSON.stringify({
-            type: "quote_search_results",
-            success: false,
-            error: String(error),
-          }));
           toast({
             title: "Search Failed",
             description: "Could not find quotes. Please try again.",
@@ -427,151 +409,130 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
     };
 
     return () => {
-      // Full cleanup when dialog closes
       cleanupSession();
     };
-  }, [open, userEmail]);
+  }, [open, userEmail, speak, toast]);
+
+  const sendMessage = useCallback((text: string) => {
+    if (!text.trim() || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    
+    console.log("[VoiceChat] Sending:", text);
+    
+    setMessages(prev => [
+      ...prev,
+      { role: "user", content: text.trim(), timestamp: new Date() }
+    ]);
+    
+    wsRef.current.send(JSON.stringify({
+      type: "user_message",
+      text: text.trim(),
+    }));
+  }, []);
 
   const startRecording = async () => {
     try {
-      // Clear any previous errors
       setPermissionError(null);
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioStreamRef.current = stream;
-
-      // Create audio context for recording at 16kHz (Gemini input format)
-      const audioContext = new AudioContext({ sampleRate: 16000 });
-      recordingAudioContextRef.current = audioContext;
-
-      // Initialize playback context if not already done (resume on user interaction)
-      if (!playbackAudioContextRef.current) {
-        playbackAudioContextRef.current = new AudioContext({ sampleRate: 24000 });
-        await playbackAudioContextRef.current.resume();
-      }
-
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-
-      source.connect(processor);
-      processor.connect(audioContext.destination);
-
-      // Reset audio buffer tracking
-      hasAudioDataRef.current = false;
-
-      processor.onaudioprocess = (e) => {
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-
-        const inputData = e.inputBuffer.getChannelData(0);
-        const pcm16 = convertFloat32ToPCM16(inputData);
-        const base64Audio = arrayBufferToBase64(pcm16);
-
-        // Mark that we have audio data
-        hasAudioDataRef.current = true;
-
-        wsRef.current.send(JSON.stringify({
-          type: "audio",
-          audio: base64Audio,
-        }));
-      };
-
-      setIsRecording(true);
-    } catch (error: any) {
-      console.error("[VoiceChat] Error starting recording:", error);
       
-      // Handle specific error cases
-      if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
-        setPermissionError(
-          "Microphone access was denied. Please allow microphone permissions in your browser settings and try again."
-        );
-      } else if (error.name === "NotFoundError") {
-        setPermissionError(
-          "No microphone found. Please connect a microphone and try again."
-        );
-      } else if (error.name === "NotReadableError") {
-        setPermissionError(
-          "Your microphone is being used by another application. Please close other apps using the microphone and try again."
-        );
-      } else {
-        setPermissionError(
-          "Unable to access microphone. Please check your browser settings and try again."
-        );
+      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+      
+      if (!SpeechRecognitionAPI) {
+        setPermissionError("Speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.");
+        return;
       }
+      
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-GB';
+      
+      recognition.onstart = () => {
+        console.log("[VoiceChat] Recognition started");
+        setIsRecording(true);
+      };
+      
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        setCurrentUserTranscript(interimTranscript || finalTranscript);
+        
+        if (finalTranscript) {
+          sendMessage(finalTranscript);
+          setCurrentUserTranscript("");
+        }
+      };
+      
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error("[VoiceChat] Recognition error:", event.error);
+        
+        if (event.error === 'not-allowed') {
+          setPermissionError("Microphone access was denied. Please allow microphone permissions.");
+        } else if (event.error === 'no-speech') {
+          console.log("[VoiceChat] No speech detected");
+        } else if (event.error !== 'aborted') {
+          setPermissionError(`Speech recognition error: ${event.error}`);
+        }
+        setIsRecording(false);
+      };
+      
+      recognition.onend = () => {
+        console.log("[VoiceChat] Recognition ended");
+        if (isRecording && recognitionRef.current === recognition) {
+          try {
+            recognition.start();
+          } catch (e) {
+            setIsRecording(false);
+          }
+        }
+      };
+      
+      recognitionRef.current = recognition;
+      recognition.start();
+      
+    } catch (error: any) {
+      console.error("[VoiceChat] Error starting recognition:", error);
+      setPermissionError("Unable to start speech recognition. Please check your browser settings.");
     }
   };
 
   const stopRecording = () => {
-    if (audioStreamRef.current) {
-      audioStreamRef.current.getTracks().forEach(track => track.stop());
-      audioStreamRef.current = null;
+    if (recognitionRef.current) {
+      recognitionRef.current.abort();
+      recognitionRef.current = null;
     }
-
-    if (recordingAudioContextRef.current) {
-      recordingAudioContextRef.current.close();
-      recordingAudioContextRef.current = null;
-    }
-
-    // Only commit if we actually have audio data
-    // Server VAD will automatically trigger response when speech ends
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && hasAudioDataRef.current) {
-      wsRef.current.send(JSON.stringify({
-        type: "input_audio_buffer.commit",
-      }));
-
-      // Reset flag
-      hasAudioDataRef.current = false;
-    }
-
     setIsRecording(false);
+    setCurrentUserTranscript("");
   };
 
   const cleanupSession = () => {
-    // Stop recording if active
     stopRecording();
-
-    // Stop all queued audio playback
-    audioQueueRef.current.forEach(source => {
-      try {
-        source.stop();
-      } catch (e) {
-        // Source may have already stopped
-      }
-    });
-    audioQueueRef.current = [];
-
-    // Close playback audio context to free resources
-    if (playbackAudioContextRef.current) {
-      playbackAudioContextRef.current.close();
-      playbackAudioContextRef.current = null;
-    }
-
-    // Reset play timer for next session
-    nextPlayTimeRef.current = 0;
-
-    // Clear all messages and transcripts for fresh start
+    window.speechSynthesis.cancel();
+    
     setMessages([]);
     setCurrentUserTranscript("");
-    setCurrentAssistantTranscript("");
-    userTranscriptRef.current = "";
-    assistantTranscriptRef.current = "";
-    
-    // Reset voice flow states
     setStatusMessage(null);
     setQuotes([]);
     setSelectedInsurer(null);
     setShowPaymentCard(false);
     setPurchaseComplete(false);
+    setVehicleList([]);
+    setQuoteDetails(null);
 
-    // Close WebSocket connection (any state except already CLOSED)
     if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
       wsRef.current.close();
     }
     wsRef.current = null;
 
-    // Reset connection state
     setIsConnecting(false);
-    
-    // Clear any error states
     setPermissionError(null);
 
     console.log("[VoiceChat] Session cleaned up");
@@ -585,55 +546,11 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
     }
   };
 
-  // Audio playback - convert PCM16 to Float32 and queue for playback
-  const playAudioChunk = async (base64Audio: string) => {
-    try {
-      if (!playbackAudioContextRef.current) {
-        playbackAudioContextRef.current = new AudioContext({ sampleRate: 24000 });
-        await playbackAudioContextRef.current.resume();
-      }
-
-      const audioContext = playbackAudioContextRef.current;
-      
-      // Decode base64 to PCM16 ArrayBuffer
-      const pcm16Buffer = base64ToArrayBuffer(base64Audio);
-      const pcm16Array = new Int16Array(pcm16Buffer);
-      
-      // Convert PCM16 to Float32
-      const float32Array = new Float32Array(pcm16Array.length);
-      for (let i = 0; i < pcm16Array.length; i++) {
-        float32Array[i] = pcm16Array[i] / (pcm16Array[i] < 0 ? 0x8000 : 0x7fff);
-      }
-      
-      // Create AudioBuffer
-      const audioBuffer = audioContext.createBuffer(1, float32Array.length, 24000);
-      audioBuffer.getChannelData(0).set(float32Array);
-      
-      // Create source and queue for playback
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
-      
-      // Schedule playback to avoid gaps/overlaps
-      const currentTime = audioContext.currentTime;
-      const startTime = Math.max(currentTime, nextPlayTimeRef.current);
-      source.start(startTime);
-      
-      // Update next play time
-      nextPlayTimeRef.current = startTime + audioBuffer.duration;
-      
-      audioQueueRef.current.push(source);
-      
-      // Clean up finished sources
-      source.onended = () => {
-        const index = audioQueueRef.current.indexOf(source);
-        if (index > -1) {
-          audioQueueRef.current.splice(index, 1);
-        }
-      };
-    } catch (error) {
-      console.error("[VoiceChat] Error playing audio:", error);
+  const toggleSpeaker = () => {
+    if (speakerEnabled) {
+      window.speechSynthesis.cancel();
     }
+    setSpeakerEnabled(!speakerEnabled);
   };
 
   return (
@@ -645,20 +562,29 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         <DialogHeader className="px-6 py-4 border-b shrink-0">
           <div className="flex items-center justify-between">
             <DialogTitle>Talk with AutoAnnie</DialogTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onOpenChange(false)}
-              data-testid="button-close-voice-chat"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleSpeaker}
+                data-testid="button-toggle-speaker"
+              >
+                {speakerEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onOpenChange(false)}
+                data-testid="button-close-voice-chat"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
         <ScrollArea className="flex-1 px-6" ref={scrollAreaRef}>
           <div className="space-y-4 py-4">
-            {/* Conversation messages */}
             {messages.map((msg, idx) => (
               <div
                 key={idx}
@@ -688,7 +614,6 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
               </div>
             ))}
 
-            {/* Current transcripts being built */}
             {currentUserTranscript && (
               <div className="flex gap-3 justify-end">
                 <div className="rounded-lg px-4 py-2 max-w-[75%] bg-primary/70 text-primary-foreground">
@@ -696,21 +621,7 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
                 </div>
               </div>
             )}
-
-            {currentAssistantTranscript && (
-              <div className="flex gap-3 justify-start">
-                <Avatar className="h-8 w-8 mt-1">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    AA
-                  </AvatarFallback>
-                </Avatar>
-                <div className="rounded-lg px-4 py-2 max-w-[75%] bg-muted/70">
-                  <p className="text-sm italic">{currentAssistantTranscript}</p>
-                </div>
-              </div>
-            )}
             
-            {/* Status message indicator */}
             <AnimatePresence mode="wait">
               {statusMessage && (
                 <motion.div
@@ -737,7 +648,6 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
               )}
             </AnimatePresence>
             
-            {/* Vehicle selection cards */}
             <AnimatePresence>
               {vehicleList.length > 0 && (
                 <motion.div
@@ -783,7 +693,6 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
               )}
             </AnimatePresence>
             
-            {/* Quote details confirmation panel - All 16 fields */}
             <AnimatePresence>
               {quoteDetails && (
                 <motion.div
@@ -792,55 +701,25 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
                   exit={{ opacity: 0, y: -10 }}
                   className="my-4 bg-card border rounded-lg p-4"
                 >
-                  <h4 className="font-semibold text-foreground mb-3">Quote Search Details (16 Fields)</h4>
+                  <h4 className="font-semibold text-foreground mb-3">Quote Search Details</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm max-h-64 overflow-y-auto">
-                    <div className="text-muted-foreground">1. Email:</div>
-                    <div className="text-foreground truncate">{quoteDetails.email_id}</div>
+                    <div className="text-muted-foreground">Vehicle:</div>
+                    <div className="text-foreground">{quoteDetails.vehicle_manufacturer_name} {quoteDetails.vehicle_model}</div>
                     
-                    <div className="text-muted-foreground">2. Driver Age:</div>
-                    <div className="text-foreground">{quoteDetails.driver_age}</div>
-                    
-                    <div className="text-muted-foreground">3. Registration:</div>
+                    <div className="text-muted-foreground">Registration:</div>
                     <div className="text-foreground">{quoteDetails.vehicle_registration_number}</div>
                     
-                    <div className="text-muted-foreground">4. Manufacturer:</div>
-                    <div className="text-foreground">{quoteDetails.vehicle_manufacturer_name}</div>
+                    <div className="text-muted-foreground">Driver Age:</div>
+                    <div className="text-foreground">{quoteDetails.driver_age}</div>
                     
-                    <div className="text-muted-foreground">5. Model:</div>
-                    <div className="text-foreground">{quoteDetails.vehicle_model}</div>
-                    
-                    <div className="text-muted-foreground">6. Year:</div>
-                    <div className="text-foreground">{quoteDetails.vehicle_year}</div>
-                    
-                    <div className="text-muted-foreground">7. Fuel Type:</div>
-                    <div className="text-foreground">{quoteDetails.type_of_fuel}</div>
-                    
-                    <div className="text-muted-foreground">8. Cover Type:</div>
+                    <div className="text-muted-foreground">Cover Type:</div>
                     <div className="text-foreground">{quoteDetails.type_of_cover_needed}</div>
                     
-                    <div className="text-muted-foreground">9. No Claims Bonus:</div>
+                    <div className="text-muted-foreground">No Claims Bonus:</div>
                     <div className="text-foreground">{quoteDetails.no_claim_bonus_years} years</div>
                     
-                    <div className="text-muted-foreground">10. Voluntary Excess:</div>
-                    <div className="text-foreground">£{quoteDetails.voluntary_excess}</div>
-                    
-                    <div className="text-muted-foreground">11. Current Provider:</div>
+                    <div className="text-muted-foreground">Current Provider:</div>
                     <div className="text-foreground">{quoteDetails.current_insurance_provider}</div>
-                    
-                    <div className="text-muted-foreground">12. Policy ID:</div>
-                    <div className="text-foreground truncate">{quoteDetails.policy_id}</div>
-                    
-                    <div className="text-muted-foreground">13. Policy Type:</div>
-                    <div className="text-foreground">{quoteDetails.policy_type}</div>
-                    
-                    <div className="text-muted-foreground">14. Policy Number:</div>
-                    <div className="text-foreground">{quoteDetails.policy_number}</div>
-                    
-                    <div className="text-muted-foreground">15. Policy Ends:</div>
-                    <div className="text-foreground">{quoteDetails.policy_end_date}</div>
-                    
-                    <div className="text-muted-foreground">16. Preferences:</div>
-                    <div className="text-foreground truncate">{quoteDetails.whisper_preferences || "None"}</div>
                   </div>
                   
                   <div className="flex gap-2 mt-4">
@@ -868,7 +747,6 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
               )}
             </AnimatePresence>
             
-            {/* Quote cards display */}
             {quotes.length > 0 && (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
@@ -888,7 +766,6 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
               </motion.div>
             )}
             
-            {/* Payment section - shown after insurer selection is confirmed, awaiting payment confirmation */}
             <AnimatePresence>
               {selectedInsurer && showPaymentCard && !purchaseComplete && (
                 <motion.div
@@ -908,7 +785,6 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
               )}
             </AnimatePresence>
             
-            {/* Insurer selected but awaiting confirmation (before payment card) */}
             <AnimatePresence>
               {selectedInsurer && !showPaymentCard && !purchaseComplete && (
                 <motion.div
@@ -927,7 +803,6 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
               )}
             </AnimatePresence>
             
-            {/* Purchase success indicator */}
             {purchaseComplete && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -979,7 +854,10 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
                 <Button
                   size="lg"
                   variant={isRecording ? "destructive" : "default"}
-                  className="rounded-full h-16 w-16"
+                  className={cn(
+                    "rounded-full h-16 w-16",
+                    isSpeaking && "ring-2 ring-primary ring-offset-2 animate-pulse"
+                  )}
                   onClick={toggleRecording}
                   disabled={isConnecting}
                   data-testid="button-toggle-recording"
@@ -994,12 +872,13 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
               <p className="text-center text-sm text-muted-foreground mt-3">
                 {isConnecting
                   ? "Connecting..."
+                  : isSpeaking
+                  ? "Annie is speaking..."
                   : isRecording
                   ? "Listening... Tap to stop"
                   : "Tap to speak"}
               </p>
               
-              {/* Voice flow hints */}
               {quotes.length > 0 && !selectedInsurer && (
                 <p className="text-center text-xs text-muted-foreground mt-2">
                   Say an insurer name like "Go with Admiral" to select
@@ -1021,32 +900,4 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
       </DialogContent>
     </Dialog>
   );
-}
-
-// Audio conversion utilities
-function convertFloat32ToPCM16(float32Array: Float32Array): ArrayBuffer {
-  const pcm16 = new Int16Array(float32Array.length);
-  for (let i = 0; i < float32Array.length; i++) {
-    const s = Math.max(-1, Math.min(1, float32Array[i]));
-    pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-  }
-  return pcm16.buffer;
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes.buffer;
 }
