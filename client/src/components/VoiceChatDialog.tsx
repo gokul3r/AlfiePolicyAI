@@ -87,6 +87,7 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<ChatQuote[]>([]);
   const [selectedInsurer, setSelectedInsurer] = useState<{ name: string; price: number } | null>(null);
+  const [showPaymentCard, setShowPaymentCard] = useState(false);  // When true, show payment confirmation UI
   const [purchaseComplete, setPurchaseComplete] = useState(false);
   
   // Quote flow states
@@ -230,6 +231,21 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
       if (data.type === "selection_cancelled" || data.type === "purchase_cancelled") {
         console.log("[VoiceChat] Selection/purchase cancelled");
         setSelectedInsurer(null);
+        setShowPaymentCard(false);
+      }
+      
+      // Handle show payment card (user confirmed insurer selection, now show payment UI)
+      if (data.type === "show_payment_card") {
+        console.log("[VoiceChat] Showing payment card for:", data.insurer, data.price);
+        setSelectedInsurer({ name: data.insurer, price: data.price });
+        setShowPaymentCard(true);
+      }
+      
+      // Handle payment cancelled
+      if (data.type === "payment_cancelled") {
+        console.log("[VoiceChat] Payment cancelled");
+        setSelectedInsurer(null);
+        setShowPaymentCard(false);
       }
       
       // Handle purchase confirmed - start of purchase flow
@@ -249,6 +265,7 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         console.log("[VoiceChat] Purchase error:", data.message);
         setStatusMessage(null);
         setSelectedInsurer(null);
+        setShowPaymentCard(false);
         toast({
           title: "Purchase Failed",
           description: data.message || "Something went wrong. Please try again.",
@@ -260,6 +277,7 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
       if (data.type === "purchase_complete") {
         console.log("[VoiceChat] Purchase complete:", data.insurer);
         setSelectedInsurer(null);
+        setShowPaymentCard(false);
         setPurchaseComplete(true);
         setStatusMessage(null);
         
@@ -541,6 +559,7 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
     setStatusMessage(null);
     setQuotes([]);
     setSelectedInsurer(null);
+    setShowPaymentCard(false);
     setPurchaseComplete(false);
 
     // Close WebSocket connection (any state except already CLOSED)
@@ -869,13 +888,42 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
               </motion.div>
             )}
             
-            {/* Payment section - shown when insurer is selected */}
+            {/* Payment section - shown after insurer selection is confirmed, awaiting payment confirmation */}
             <AnimatePresence>
-              {selectedInsurer && !purchaseComplete && (
-                <PaymentSection 
-                  totalAmount={selectedInsurer.price} 
-                  insurerName={selectedInsurer.name}
-                />
+              {selectedInsurer && showPaymentCard && !purchaseComplete && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-2"
+                >
+                  <p className="text-sm text-muted-foreground text-center">
+                    Please review and say "Confirm payment" or "Pay now" to complete:
+                  </p>
+                  <PaymentSection 
+                    totalAmount={selectedInsurer.price} 
+                    insurerName={selectedInsurer.name}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            {/* Insurer selected but awaiting confirmation (before payment card) */}
+            <AnimatePresence>
+              {selectedInsurer && !showPaymentCard && !purchaseComplete && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center"
+                >
+                  <p className="text-sm font-medium text-primary">
+                    Selected: {selectedInsurer.name} at £{selectedInsurer.price.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Say "Yes" to proceed or "No" to choose another
+                  </p>
+                </motion.div>
               )}
             </AnimatePresence>
             
@@ -957,9 +1005,14 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
                   Say an insurer name like "Go with Admiral" to select
                 </p>
               )}
-              {selectedInsurer && (
+              {selectedInsurer && !showPaymentCard && (
                 <p className="text-center text-xs text-muted-foreground mt-2">
-                  Say "Yes" or "Proceed" to confirm the purchase
+                  Say "Yes" to proceed or "No" to choose another
+                </p>
+              )}
+              {selectedInsurer && showPaymentCard && (
+                <p className="text-center text-xs text-muted-foreground mt-2">
+                  Say "Confirm payment" or "Pay now" to complete
                 </p>
               )}
             </>

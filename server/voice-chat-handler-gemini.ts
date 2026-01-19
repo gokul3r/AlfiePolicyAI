@@ -108,10 +108,15 @@ When quote results come back (user says "got results" or "quotes are in" or the 
 
 QUOTE SELECTION AND PURCHASE FLOW:
 When a user selects a quote (says things like "go with Admiral", "I want PAXA", "the first one", "cheapest one", etc.):
-- ALWAYS confirm before proceeding. Say something like: "Just to confirm - you'd like to go with [insurer name] for [price]? Say 'yes' to proceed or 'no' if you'd like to look at other options."
+- ALWAYS confirm before proceeding. Say something like: "Just to confirm - you'd like to go with [insurer name] at [price]? Say 'yes' to proceed or 'no' if you'd like to look at other options."
 - Wait for their confirmation.
-- If they say "yes", "proceed", "confirm", "go ahead" - say: "Brilliant! I'm processing your policy switch now. You'll see the progress on your screen..."
+- If they say "yes", "proceed", "confirm", "go ahead" - say: "Great choice! I'm showing the payment details on your screen now. Please review and say 'confirm payment' or 'pay now' when you're ready to complete the switch."
 - If they say "no", "cancel", or want to look at others - say: "No problem! Take your time looking through the quotes. Let me know when you've decided."
+
+PAYMENT CONFIRMATION FLOW:
+After showing payment details, wait for the user to confirm payment:
+- If they say "confirm payment", "pay now", "proceed with payment", "yes pay", "complete", "go ahead" - say: "Brilliant! I'm processing your policy switch now. You'll see the progress on your screen..."
+- If they say "cancel", "no", "wait", "stop" - say: "No worries! I've cancelled the payment. The quotes are still here if you'd like to choose a different option."
 
 If a user wants MORE quotes or isn't happy with the options:
 - Say: "I understand! This quick quote gives you a snapshot of available options. For a more comprehensive search with additional filters, you can use the Quote Search option from the home screen. Would you like me to help with anything else?"
@@ -132,7 +137,8 @@ type QuoteFlowState =
   | "awaiting_confirmation" 
   | "searching_quotes"
   | "quotes_displayed"
-  | "awaiting_purchase_confirmation"
+  | "awaiting_purchase_confirmation"  // User has selected a quote, waiting for "yes/no" to proceed
+  | "awaiting_payment_confirmation"   // User confirmed selection, now waiting for payment confirmation
   | "processing_purchase";
 
 // Known insurer names for detection
@@ -217,6 +223,56 @@ function detectPurchaseConfirmation(text: string): "confirm" | "reject" | "none"
   for (const pattern of rejectPatterns) {
     if (pattern.test(lowerText)) {
       return "reject";
+    }
+  }
+  
+  return "none";
+}
+
+// Detect payment confirmation (MUST be explicit - requires payment-related keywords)
+function detectPaymentConfirmation(text: string): "confirm" | "reject" | "none" {
+  const lowerText = text.toLowerCase();
+  
+  // Rejection patterns - check these FIRST as they're more safety-critical
+  const rejectPatterns = [
+    /\bcancel\b/, /\bno\b/, /\bnope\b/, /\bstop\b/, /\bwait\b/,
+    /\bhold\s*on\b/, /\bdon'?t\b/, /\bdo\s*not\b/, /\bback\b/,
+    /\bchanged\s*my\s*mind\b/, /\bnot\s*(now|yet|sure)\b/
+  ];
+  
+  for (const pattern of rejectPatterns) {
+    if (pattern.test(lowerText)) {
+      return "reject";
+    }
+  }
+  
+  // Check for explicit payment intent - MUST contain payment-related keywords
+  const hasPaymentKeyword = /\b(pay|payment|charge|complete|purchase|buy|switch)\b/.test(lowerText);
+  
+  // Explicit payment confirmation patterns
+  const explicitPaymentPatterns = [
+    /\bconfirm\s*(the\s*)?(payment|purchase)\b/,
+    /\bpay\s*(now|please|it)?\b/,
+    /\bproceed\s*(with\s*)?(the\s*)?(payment|purchase)\b/,
+    /\bcomplete\s*(the\s*)?(payment|purchase|switch)\b/,
+    /\bmake\s*(the\s*)?(payment|purchase)\b/,
+    /\byes\s*(,?\s*)?(pay|payment|purchase|complete)\b/,
+    /\bgo\s*ahead\s*(with\s*)?(the\s*)?(payment|purchase)?\b/,
+    /\bdo\s*it\b/,  // "do it" is clear intent after seeing payment card
+    /\blet'?s\s*(do\s*it|pay|complete|go)\b/
+  ];
+  
+  // Must match an explicit pattern AND have payment context (or be "do it"/"let's do it")
+  for (const pattern of explicitPaymentPatterns) {
+    if (pattern.test(lowerText)) {
+      // "do it" and "let's do it" are explicit enough after payment card is shown
+      if (/\bdo\s*it\b/.test(lowerText) || /\blet'?s\s*(do\s*it|go)\b/.test(lowerText)) {
+        return "confirm";
+      }
+      // Other patterns should have payment keyword for safety
+      if (hasPaymentKeyword) {
+        return "confirm";
+      }
     }
   }
   
@@ -572,13 +628,42 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
         break;
         
       case "awaiting_purchase_confirmation":
-        // Check if user confirmed or rejected the purchase
+        // Check if user confirmed or rejected the quote selection
         const purchaseDecision = detectPurchaseConfirmation(userText);
         console.log(`[VoiceChatGemini] Purchase confirmation detection: ${purchaseDecision}`);
         
         if (purchaseDecision === "confirm" && selectedQuoteForPurchase) {
+          // Move to payment confirmation state - show payment UI
+          quoteFlowState = "awaiting_payment_confirmation";
+          console.log(`[VoiceChatGemini] User confirmed selection of ${selectedQuoteForPurchase.insurer_name}, showing payment UI`);
+          
+          // Notify client to show payment card UI
+          clientWs.send(JSON.stringify({
+            type: "show_payment_card",
+            insurer: selectedQuoteForPurchase.insurer_name,
+            price: selectedQuoteForPurchase.policy_cost,
+          }));
+          // Annie will respond: "Great choice! I'm showing the payment details on your screen now..."
+        } else if (purchaseDecision === "reject") {
+          console.log("[VoiceChatGemini] User rejected selection, going back to quotes displayed");
+          quoteFlowState = "quotes_displayed";
+          selectedQuoteForPurchase = null;
+          
+          clientWs.send(JSON.stringify({
+            type: "purchase_cancelled",
+          }));
+          // Annie will respond: "No problem! Take your time..."
+        }
+        break;
+        
+      case "awaiting_payment_confirmation":
+        // Check if user confirmed or rejected the payment
+        const paymentDecision = detectPaymentConfirmation(userText);
+        console.log(`[VoiceChatGemini] Payment confirmation detection: ${paymentDecision}`);
+        
+        if (paymentDecision === "confirm" && selectedQuoteForPurchase) {
           quoteFlowState = "processing_purchase";
-          console.log(`[VoiceChatGemini] User confirmed purchase of ${selectedQuoteForPurchase.insurer_name}`);
+          console.log(`[VoiceChatGemini] User confirmed PAYMENT for ${selectedQuoteForPurchase.insurer_name}`);
           
           // Notify client that purchase is starting
           clientWs.send(JSON.stringify({
@@ -589,16 +674,16 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
           
           // Start the actual purchase process (async, with status updates)
           processPurchase(selectedQuoteForPurchase);
-          // Annie will respond naturally: "Brilliant! I'm processing your policy switch now..."
-        } else if (purchaseDecision === "reject") {
-          console.log("[VoiceChatGemini] User rejected purchase, going back to quotes displayed");
+          // Annie will respond: "Brilliant! I'm processing your policy switch now..."
+        } else if (paymentDecision === "reject") {
+          console.log("[VoiceChatGemini] User cancelled payment, going back to quotes displayed");
           quoteFlowState = "quotes_displayed";
           selectedQuoteForPurchase = null;
           
           clientWs.send(JSON.stringify({
-            type: "purchase_cancelled",
+            type: "payment_cancelled",
           }));
-          // Annie will respond naturally: "No problem! Take your time..."
+          // Annie will respond: "No worries! I've cancelled the payment..."
         }
         break;
         
