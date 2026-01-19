@@ -142,7 +142,20 @@ CRITICAL RULES:
 1. After STEP 3 confirmation, you MUST call show_payment - not just chat!
 2. After STEP 1 vehicle shown and user says "yes"/"proceed", you MUST call search_quotes
 3. Every affirmative after a question = call the next tool in the flow
-4. Do NOT just acknowledge with "ok" or "great" without calling the appropriate tool`;
+4. Do NOT just acknowledge with "ok" or "great" without calling the appropriate tool
+
+GENERAL UK INSURANCE QUESTIONS:
+You can also answer general questions about UK insurance at any point in the conversation. Examples:
+- "What is breakdown cover?" → Explain briefly in 3-4 sentences using simple language
+- "What does excess mean?" → Give a clear, jargon-free explanation
+- "What's a no-claims bonus?" → Explain how it works in plain English
+
+Rules for answering general questions:
+- Keep explanations to 3-4 sentences maximum
+- Use simple, everyday language - no jargon
+- Be helpful and informative
+- If you're not certain about something specific, say "I'd recommend checking with your insurer directly for the specifics"
+- After answering, gently offer to help with their insurance needs if appropriate`;
 
 export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string) {
   console.log(`[VoiceChatStable] New connection for ${emailId}`);
