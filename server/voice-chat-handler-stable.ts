@@ -31,7 +31,7 @@ const TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "search_quotes",
-    description: "Searches for insurance quotes. MUST call this when user confirms their vehicle details with phrases like 'yes', 'proceed', 'go ahead', 'that's right', 'correct', 'looks good', 'confirm'. After showing vehicle details, ANY affirmative response means call this.",
+    description: "Searches for insurance quotes. MUST call this when user confirms their vehicle details with phrases like 'yes', 'proceed', 'go ahead', 'that's right', 'yeah'. After showing vehicle details, these affirmative responses mean call this.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -68,7 +68,7 @@ const TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "show_payment",
-    description: "Shows the payment card UI for the selected quote. MUST call this immediately when user confirms their quote selection with 'yes', 'yeah', 'yep', 'correct', 'that's right', 'proceed', 'go ahead'. After asking 'Just to confirm - you'd like X?', ANY affirmative = call show_payment.",
+    description: "Shows the payment card UI ONLY after user EXPLICITLY confirms the quote. Call this ONLY when user says clear confirmation words like: 'yes', 'yeah', 'yep', 'correct', 'proceed', 'go ahead', 'that's right', 'confirm'. Do NOT call on partial speech, unclear audio, or ambiguous responses. If unsure, ask for confirmation again.",
     parameters: {
       type: Type.OBJECT,
       properties: {},
@@ -114,17 +114,19 @@ STEP 1: User mentions quotes/insurance/vehicle
 → Say: "Right, I'm pulling up your vehicle details now."
 → Vehicle details will appear on screen
 
-STEP 2: User confirms vehicle details with ANY affirmative ("yes", "proceed", "go ahead", "that's right", "looks good", "correct", "yeah")
+STEP 2: User confirms vehicle details with affirmative ("yes", "proceed", "go ahead", "that's right", "yeah")
 → IMMEDIATELY call search_quotes (do NOT just say "ok" or chat)
 → Say: "Searching for the best quotes for you..."
 → Quotes will appear on screen
 
 STEP 3: User selects a quote ("go with Admiral", "Admiral please", "choose the first one", "cheapest")
 → Call select_quote with their choice
-→ Say: "Just to confirm - you'd like [insurer] at £[price]?"
+→ You MUST then ask: "Just to confirm - you'd like [insurer] at £[price]?"
+→ Wait for their explicit confirmation before proceeding
 
-STEP 4: User confirms quote selection with ANY affirmative ("yes", "yeah", "yep", "correct", "proceed", "that's the one")
-→ IMMEDIATELY call show_payment (do NOT just acknowledge - you MUST call the tool)
+STEP 4: User gives EXPLICIT confirmation with clear words ("yes", "yeah", "yep", "proceed", "that's the one")
+→ ONLY then call show_payment
+→ Do NOT call show_payment on partial/unclear speech - ask for clarification instead
 → Say: "Brilliant, showing your payment details now."
 → Payment card will appear on screen
 
@@ -161,6 +163,7 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
   let displayedQuotes: { insurer_name: string; policy_cost: number }[] = [];
   let selectedQuote: { insurer_name: string; price: number } | null = null;
   let showingPaymentCard = false;
+  let awaitingQuoteConfirmation = false;
   let conversationHistory: Content[] = [];
   
   async function executeGetUserVehicles() {
@@ -330,6 +333,7 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
     }
     
     selectedQuote = { insurer_name: quote.insurer_name, price: quote.policy_cost };
+    awaitingQuoteConfirmation = true;
     
     clientWs.send(JSON.stringify({
       type: "quote_selected",
@@ -341,17 +345,22 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
       success: true,
       insurer_name: selectedQuote.insurer_name,
       price: selectedQuote.price,
-      message: `Selected ${selectedQuote.insurer_name} at £${selectedQuote.price}. Ask user to confirm: "Just to confirm - you'd like ${selectedQuote.insurer_name} at £${selectedQuote.price}?". If user says yes/yeah/yep/proceed, IMMEDIATELY call show_payment.`
+      message: `Selected ${selectedQuote.insurer_name} at £${selectedQuote.price}. You MUST ask user: "Just to confirm - you'd like ${selectedQuote.insurer_name} at £${selectedQuote.price}?". Wait for explicit yes/yeah/proceed before calling show_payment.`
     };
   }
   
   async function executeShowPayment() {
-    console.log(`[VoiceChatStable] show_payment, quote:`, selectedQuote);
+    console.log(`[VoiceChatStable] show_payment, quote:`, selectedQuote, "awaitingConfirmation:", awaitingQuoteConfirmation);
     
     if (!selectedQuote) {
       return { success: false, message: "No quote selected. Call select_quote first." };
     }
     
+    if (!awaitingQuoteConfirmation) {
+      return { success: false, message: "User has not confirmed the quote selection. Ask for confirmation first: 'Just to confirm - you'd like X at £Y?'" };
+    }
+    
+    awaitingQuoteConfirmation = false;
     showingPaymentCard = true;
     
     clientWs.send(JSON.stringify({
@@ -416,11 +425,14 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
       selectedQuote = null;
       displayedQuotes = [];
       showingPaymentCard = false;
+      awaitingQuoteConfirmation = false;
+      selectedVehicle = null;
+      availableVehicles = [];
       
       return { 
         success: true,
         policy_id: newPolicy.policy_id,
-        message: `Purchase complete! New policy with ${insurer} at £${amount}/year is now active. Congratulate the user.`
+        message: `Purchase complete! New policy with ${insurer} at £${amount}/year is now active. Congratulate the user and ask if they need anything else.`
       };
     } catch (error) {
       console.error("[VoiceChatStable] Purchase error:", error);
@@ -433,7 +445,11 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
     console.log("[VoiceChatStable] cancel_flow");
     clientWs.send(JSON.stringify({ type: "purchase_cancelled" }));
     selectedQuote = null;
+    displayedQuotes = [];
     showingPaymentCard = false;
+    awaitingQuoteConfirmation = false;
+    selectedVehicle = null;
+    availableVehicles = [];
     return { success: true, message: "Cancelled. Ask user what they'd like to do." };
   }
   
@@ -487,6 +503,7 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
       console.log(`[VoiceChatStable] Gemini response:`, JSON.stringify(response.candidates?.[0]?.content?.parts, null, 2));
       
       let assistantResponse = "";
+      let toolExecutedThisTurn = false;
       
       while (true) {
         const candidate = response.candidates?.[0];
@@ -504,6 +521,15 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
         }
         
         if (functionCalls.length === 0) {
+          if (toolExecutedThisTurn) {
+            assistantResponse = cleanResponseText(textParts.join(""));
+            conversationHistory.push({
+              role: "model",
+              parts: [{ text: assistantResponse }]
+            });
+            break;
+          }
+          
           const userLower = userText.toLowerCase();
           let forcedTool: string | null = null;
           let forcedArgs: Record<string, unknown> = {};
@@ -516,14 +542,13 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
             console.log(`[VoiceChatStable] FALLBACK: Forcing get_user_vehicles for "${userText}"`);
           } else if (selectedVehicle && displayedQuotes.length === 0 && 
               (userLower.includes("yes") || userLower.includes("proceed") || 
-               userLower.includes("go ahead") || userLower.includes("correct") ||
-               userLower.includes("confirm") || userLower.includes("that's right"))) {
+               userLower.includes("go ahead") || userLower.includes("that's right"))) {
             forcedTool = "search_quotes";
             console.log(`[VoiceChatStable] FALLBACK: Forcing search_quotes for "${userText}"`);
-          } else if (selectedQuote && !showingPaymentCard && 
+          } else if (selectedQuote && !showingPaymentCard && awaitingQuoteConfirmation && 
               (userLower.includes("yes") || userLower.includes("yeah") || 
                userLower.includes("yep") || userLower.includes("proceed") ||
-               userLower.includes("correct") || userLower.includes("that's the one"))) {
+               userLower.includes("that's the one"))) {
             forcedTool = "show_payment";
             console.log(`[VoiceChatStable] FALLBACK: Forcing show_payment for "${userText}"`);
           } else if (displayedQuotes.length > 0 && !selectedQuote) {
@@ -538,6 +563,7 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
           }
           
           if (forcedTool) {
+            toolExecutedThisTurn = true;
             const result = await executeTool(forcedTool, forcedArgs);
             
             conversationHistory.push({
@@ -603,6 +629,8 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
             }
           });
         }
+        
+        toolExecutedThisTurn = true;
         
         conversationHistory.push({
           role: "user",
@@ -712,6 +740,7 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
       if (message.type === "select_quote_from_client" && message.insurer && message.price) {
         console.log(`[VoiceChatStable] Client selected: ${message.insurer} at £${message.price}`);
         selectedQuote = { insurer_name: message.insurer, price: message.price };
+        awaitingQuoteConfirmation = true;
         clientWs.send(JSON.stringify({
           type: "quote_selected",
           insurer: message.insurer,
