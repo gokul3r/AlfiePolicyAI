@@ -452,6 +452,15 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
     }
   }
   
+  function cleanResponseText(text: string): string {
+    let cleaned = text
+      .replace(/```tool_outputs[\s\S]*?```/g, '')
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    return cleaned;
+  }
+  
   async function processUserMessage(userText: string): Promise<string> {
     console.log(`[VoiceChatStable] Processing: "${userText}"`);
     
@@ -531,12 +540,10 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
           if (forcedTool) {
             const result = await executeTool(forcedTool, forcedArgs);
             
-            if (textParts.length > 0 && textParts.join("").trim()) {
-              conversationHistory.push({
-                role: "model",
-                parts: [{ text: textParts.join("") }]
-              });
-            }
+            conversationHistory.push({
+              role: "model",
+              parts: [{ functionCall: { name: forcedTool, args: forcedArgs } }]
+            });
             
             conversationHistory.push({
               role: "user",
@@ -561,10 +568,12 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
                 }
               }
             });
+            
+            console.log(`[VoiceChatStable] Fallback follow-up:`, JSON.stringify(response.candidates?.[0]?.content?.parts, null, 2));
             continue;
           }
           
-          assistantResponse = textParts.join("");
+          assistantResponse = cleanResponseText(textParts.join(""));
           conversationHistory.push({
             role: "model",
             parts: [{ text: assistantResponse }]
@@ -573,7 +582,7 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
         }
         
         if (textParts.length > 0) {
-          assistantResponse += textParts.join("");
+          assistantResponse += cleanResponseText(textParts.join(""));
         }
         
         conversationHistory.push({
@@ -617,7 +626,9 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
         console.log(`[VoiceChatStable] Follow-up response:`, JSON.stringify(response.candidates?.[0]?.content?.parts, null, 2));
       }
       
-      return assistantResponse;
+      const finalResponse = cleanResponseText(assistantResponse);
+      console.log(`[VoiceChatStable] Final response: "${finalResponse}"`);
+      return finalResponse;
     } catch (error) {
       console.error("[VoiceChatStable] Error:", error);
       return "I'm sorry, I'm having trouble processing that. Could you please try again?";
