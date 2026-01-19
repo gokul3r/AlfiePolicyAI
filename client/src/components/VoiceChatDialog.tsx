@@ -209,17 +209,34 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         }));
         setQuotes(mappedQuotes);
         setStatusMessage(null);
+        
+        // Also send displayed quotes to server for selection tracking
+        wsRef.current?.send(JSON.stringify({
+          type: "displayed_quotes",
+          quotes: mappedQuotes.map(q => ({
+            insurer_name: q.insurer_name,
+            policy_cost: q.quote_price,
+          })),
+        }));
       }
       
-      // Handle insurer selection
-      if (data.type === "insurer_selected") {
+      // Handle insurer selection (from server - voice detected selection)
+      if (data.type === "insurer_selected" || data.type === "quote_selected") {
         console.log("[VoiceChat] Insurer selected:", data.insurer, data.price);
         setSelectedInsurer({ name: data.insurer, price: data.price });
       }
       
       // Handle selection cancelled
-      if (data.type === "selection_cancelled") {
+      if (data.type === "selection_cancelled" || data.type === "purchase_cancelled") {
+        console.log("[VoiceChat] Selection/purchase cancelled");
         setSelectedInsurer(null);
+      }
+      
+      // Handle purchase confirmed (Phase 2 will implement the actual purchase)
+      if (data.type === "purchase_confirmed") {
+        console.log("[VoiceChat] Purchase confirmed:", data.insurer, data.price);
+        setStatusMessage("Processing your policy switch...");
+        // Phase 2 will handle the actual purchase flow with status updates
       }
       
       // Handle purchase complete
@@ -322,11 +339,20 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
             console.log("[VoiceChat] Top 3 quotes by alfie_touch_score:", mappedQuotes);
             setQuotes(mappedQuotes);
             
-            // Send results back to server for Annie to announce
+            // Send results back to server
             wsRef.current?.send(JSON.stringify({
               type: "quote_search_results",
               success: true,
               quotesCount: mappedQuotes.length,
+            }));
+            
+            // Also send the quote details so server can track them for selection
+            wsRef.current?.send(JSON.stringify({
+              type: "displayed_quotes",
+              quotes: mappedQuotes.map(q => ({
+                insurer_name: q.insurer_name,
+                policy_cost: q.quote_price,
+              })),
             }));
           } else {
             throw new Error(`API error: ${response.status}`);

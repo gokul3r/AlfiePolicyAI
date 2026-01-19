@@ -104,7 +104,22 @@ When a user asks for insurance quotes (mentions "quote", "insurance", "price", "
 - If the user says "no vehicles" or mentions they don't have any registered, apologize and offer to help them add a policy first.
 
 When quote results come back (user says "got results" or "quotes are in" or the search completes):
-- Say something like "Wonderful! The quotes are showing on your screen now. Have a look through them and let me know if you'd like more details on any of them."
+- Say something like "Wonderful! The quotes are showing on your screen now. I've found some great options for you. Have a look and let me know which one catches your eye, or if you'd like more details on any of them."
+
+QUOTE SELECTION AND PURCHASE FLOW:
+When a user selects a quote (says things like "go with Admiral", "I want PAXA", "the first one", "cheapest one", etc.):
+- ALWAYS confirm before proceeding. Say something like: "Just to confirm - you'd like to go with [insurer name] for [price]? Say 'yes' to proceed or 'no' if you'd like to look at other options."
+- Wait for their confirmation.
+- If they say "yes", "proceed", "confirm", "go ahead" - say: "Brilliant! I'm processing your policy switch now. You'll see the progress on your screen..."
+- If they say "no", "cancel", or want to look at others - say: "No problem! Take your time looking through the quotes. Let me know when you've decided."
+
+If a user wants MORE quotes or isn't happy with the options:
+- Say: "I understand! This quick quote gives you a snapshot of available options. For a more comprehensive search with additional filters, you can use the Quote Search option from the home screen. Would you like me to help with anything else?"
+
+IMPORTANT RULES:
+- Always confirm with the customer before proceeding with any purchase
+- Be reassuring during the purchase process
+- If something goes wrong, apologize and offer to help
 
 For non-insurance questions, politely redirect the conversation back to insurance, explaining that you specialize in finding the best insurance deals.`;
 
@@ -115,7 +130,98 @@ type QuoteFlowState =
   | "idle" 
   | "awaiting_vehicle_selection" 
   | "awaiting_confirmation" 
-  | "searching_quotes";
+  | "searching_quotes"
+  | "quotes_displayed"
+  | "awaiting_purchase_confirmation"
+  | "processing_purchase";
+
+// Known insurer names for detection
+const KNOWN_INSURERS = [
+  "admiral", "paxa", "direct line", "directline", "aviva", "axa", 
+  "churchill", "hastings", "esure", "more than", "morethan", 
+  "tesco", "sainsbury", "rac", "aa", "confused", "compare the market",
+  "go compare", "moneysupermarket", "zurich", "allianz", "lloyds"
+];
+
+// Detect if user is selecting a provider from their message
+function detectProviderSelection(text: string): { detected: boolean; provider?: string; ordinal?: number } {
+  const lowerText = text.toLowerCase();
+  
+  // Selection verb indicators (make detection more confident but not required)
+  const hasSelectionVerb = /\b(go with|want|choose|select|take|switch to|let's do|i'll take|sounds good|please)\b/.test(lowerText);
+  
+  // Check for ordinal selection ("first one", "second option", "the third", "first", "the first")
+  const ordinalPatterns = [
+    { pattern: /\b(the\s+)?(first|1st)(\s+one|\s+option|\s+quote|\s+choice)?\b/, ordinal: 1 },
+    { pattern: /\b(the\s+)?(second|2nd)(\s+one|\s+option|\s+quote|\s+choice)?\b/, ordinal: 2 },
+    { pattern: /\b(the\s+)?(third|3rd)(\s+one|\s+option|\s+quote|\s+choice)?\b/, ordinal: 3 },
+    { pattern: /\bnumber\s*(one|1)\b/, ordinal: 1 },
+    { pattern: /\bnumber\s*(two|2)\b/, ordinal: 2 },
+    { pattern: /\bnumber\s*(three|3)\b/, ordinal: 3 },
+  ];
+  
+  for (const { pattern, ordinal } of ordinalPatterns) {
+    if (pattern.test(lowerText)) {
+      // Allow ordinal selection even without explicit verb (e.g., "the first one" is enough)
+      return { detected: true, ordinal };
+    }
+  }
+  
+  // Check for "cheapest", "lowest", "best" - these indicate selection
+  if (/\b(cheapest|lowest|best|top)\s*(one|option|quote|price)?\b/.test(lowerText)) {
+    return { detected: true, ordinal: 1 }; // Top quote is best/cheapest after sorting
+  }
+  
+  // Check for specific insurer names - allow with or without selection verbs
+  for (const insurer of KNOWN_INSURERS) {
+    if (lowerText.includes(insurer)) {
+      // If has selection verb or positive phrase, definitely selecting
+      if (hasSelectionVerb || /\b(please|sounds good|looks good|that one|ok|okay)\b/.test(lowerText)) {
+        return { detected: true, provider: insurer };
+      }
+      // Even just mentioning insurer name alone after quotes displayed likely means selection
+      // (e.g., user says "Admiral" or "Admiral please")
+      if (lowerText.trim().length < 50) { // Short utterances with insurer name = selection
+        return { detected: true, provider: insurer };
+      }
+    }
+  }
+  
+  return { detected: false };
+}
+
+// Detect purchase confirmation
+function detectPurchaseConfirmation(text: string): "confirm" | "reject" | "none" {
+  const lowerText = text.toLowerCase();
+  
+  // Confirmation patterns
+  const confirmPatterns = [
+    /\byes\b/, /\byeah\b/, /\byep\b/, /\bproceed\b/, /\bconfirm\b/, 
+    /\bgo ahead\b/, /\bdo it\b/, /\blet's go\b/, /\bsure\b/, /\bgo on\b/,
+    /\bthat's right\b/, /\bcorrect\b/, /\bplease\b/
+  ];
+  
+  // Rejection patterns
+  const rejectPatterns = [
+    /\bno\b/, /\bnope\b/, /\bcancel\b/, /\bstop\b/, /\bwait\b/,
+    /\bhold on\b/, /\bdon't\b/, /\bdo not\b/, /\bactually\b/,
+    /\bchanged my mind\b/, /\bother options\b/
+  ];
+  
+  for (const pattern of confirmPatterns) {
+    if (pattern.test(lowerText)) {
+      return "confirm";
+    }
+  }
+  
+  for (const pattern of rejectPatterns) {
+    if (pattern.test(lowerText)) {
+      return "reject";
+    }
+  }
+  
+  return "none";
+}
 
 export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
   console.log(`[VoiceChatGemini] New connection for ${emailId}`);
@@ -141,6 +247,15 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
   let quoteFlowState: QuoteFlowState = "idle";
   let availableVehicles: VehiclePolicyWithDetails[] = [];
   let selectedVehicle: VehiclePolicyWithDetails | null = null;
+  
+  // Quote selection state (for purchase flow)
+  interface DisplayedQuote {
+    insurer_name: string;
+    policy_cost: number;
+    quote_reference_number?: string;
+  }
+  let displayedQuotes: DisplayedQuote[] = [];
+  let selectedQuoteForPurchase: DisplayedQuote | null = null;
   
   // Fetch user's vehicles from database
   async function fetchUserVehicles(): Promise<VehiclePolicyWithDetails[]> {
@@ -341,6 +456,74 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
         
       case "searching_quotes":
         // Quotes are being searched, wait for results
+        break;
+        
+      case "quotes_displayed":
+        // Check if user is selecting a provider
+        const providerSelection = detectProviderSelection(userText);
+        console.log(`[VoiceChatGemini] Provider selection detection:`, providerSelection);
+        
+        if (providerSelection.detected) {
+          let selectedQuote: DisplayedQuote | null = null;
+          
+          if (providerSelection.ordinal !== undefined && providerSelection.ordinal <= displayedQuotes.length) {
+            // User selected by ordinal (first, second, third)
+            selectedQuote = displayedQuotes[providerSelection.ordinal - 1];
+            console.log(`[VoiceChatGemini] User selected by ordinal ${providerSelection.ordinal}: ${selectedQuote?.insurer_name}`);
+          } else if (providerSelection.provider) {
+            // User selected by provider name
+            selectedQuote = displayedQuotes.find(q => 
+              q.insurer_name.toLowerCase().includes(providerSelection.provider!)
+            ) || null;
+            console.log(`[VoiceChatGemini] User selected by name "${providerSelection.provider}": ${selectedQuote?.insurer_name}`);
+          }
+          
+          if (selectedQuote) {
+            selectedQuoteForPurchase = selectedQuote;
+            quoteFlowState = "awaiting_purchase_confirmation";
+            console.log(`[VoiceChatGemini] Quote selected for purchase: ${selectedQuote.insurer_name} at £${selectedQuote.policy_cost}`);
+            
+            // Notify client about the selection
+            clientWs.send(JSON.stringify({
+              type: "quote_selected",
+              insurer: selectedQuote.insurer_name,
+              price: selectedQuote.policy_cost,
+            }));
+            // Annie will ask for confirmation naturally via her system instruction
+          }
+        }
+        break;
+        
+      case "awaiting_purchase_confirmation":
+        // Check if user confirmed or rejected the purchase
+        const purchaseDecision = detectPurchaseConfirmation(userText);
+        console.log(`[VoiceChatGemini] Purchase confirmation detection: ${purchaseDecision}`);
+        
+        if (purchaseDecision === "confirm" && selectedQuoteForPurchase) {
+          quoteFlowState = "processing_purchase";
+          console.log(`[VoiceChatGemini] User confirmed purchase of ${selectedQuoteForPurchase.insurer_name}`);
+          
+          // Notify client to start purchase flow (Phase 2 will handle this)
+          clientWs.send(JSON.stringify({
+            type: "purchase_confirmed",
+            insurer: selectedQuoteForPurchase.insurer_name,
+            price: selectedQuoteForPurchase.policy_cost,
+          }));
+          // Annie will respond naturally: "Brilliant! I'm processing your policy switch now..."
+        } else if (purchaseDecision === "reject") {
+          console.log("[VoiceChatGemini] User rejected purchase, going back to quotes displayed");
+          quoteFlowState = "quotes_displayed";
+          selectedQuoteForPurchase = null;
+          
+          clientWs.send(JSON.stringify({
+            type: "purchase_cancelled",
+          }));
+          // Annie will respond naturally: "No problem! Take your time..."
+        }
+        break;
+        
+      case "processing_purchase":
+        // Purchase is being processed, wait for completion
         break;
     }
   }
@@ -550,10 +733,27 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       
       // Handle quote search results from client
       if (message.type === "quote_search_results") {
-        console.log("[VoiceChatGemini] Received quote search results");
-        quoteFlowState = "idle";
-        // Results are displayed on client - no need to inject into Gemini
-        // Annie doesn't need to announce results since they're shown visually
+        console.log("[VoiceChatGemini] Received quote search results, count:", message.quotesCount);
+        
+        if (message.success && message.quotesCount > 0) {
+          quoteFlowState = "quotes_displayed";
+          console.log("[VoiceChatGemini] Quotes displayed, ready for selection");
+        } else {
+          quoteFlowState = "idle";
+          console.log("[VoiceChatGemini] No quotes found or error, back to idle");
+        }
+        // Results are displayed on client - Annie's system instruction handles the response
+      }
+      
+      // Handle quote details from client (for tracking displayed quotes)
+      if (message.type === "displayed_quotes") {
+        console.log("[VoiceChatGemini] Received displayed quotes info:", message.quotes?.length);
+        displayedQuotes = (message.quotes || []).map((q: any) => ({
+          insurer_name: q.insurer_name || q.insurer || "Unknown",
+          policy_cost: q.policy_cost || q.quote_price || 0,
+          quote_reference_number: q.quote_reference_number,
+        }));
+        console.log("[VoiceChatGemini] Stored quotes for selection:", displayedQuotes.map(q => q.insurer_name));
       }
       
     } catch (error) {
