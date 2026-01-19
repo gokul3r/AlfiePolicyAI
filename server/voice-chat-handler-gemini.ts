@@ -200,29 +200,43 @@ function detectProviderSelection(text: string): { detected: boolean; provider?: 
 function detectPurchaseConfirmation(text: string): "confirm" | "reject" | "none" {
   const lowerText = text.toLowerCase();
   
-  // Confirmation patterns
-  const confirmPatterns = [
-    /\byes\b/, /\byeah\b/, /\byep\b/, /\bproceed\b/, /\bconfirm\b/, 
-    /\bgo ahead\b/, /\bdo it\b/, /\blet's go\b/, /\bsure\b/, /\bgo on\b/,
-    /\bthat's right\b/, /\bcorrect\b/, /\bplease\b/
+  // Rejection patterns - check these FIRST as they're more safety-critical
+  const rejectPatterns = [
+    /\bcancel\b/, /\bstop\b/, /\bwait\b/, /\bnope\b/,
+    /\bhold on\b/, /\bdon'?t\b/, /\bdo not\b/,
+    /\bchanged my mind\b/, /\bother options\b/, 
+    /\bnot\s*(sure|yet|now|ready)\b/,
+    /^no\b/,  // "no" at start of sentence is rejection
   ];
   
-  // Rejection patterns
-  const rejectPatterns = [
-    /\bno\b/, /\bnope\b/, /\bcancel\b/, /\bstop\b/, /\bwait\b/,
-    /\bhold on\b/, /\bdon't\b/, /\bdo not\b/, /\bactually\b/,
-    /\bchanged my mind\b/, /\bother options\b/
+  for (const pattern of rejectPatterns) {
+    if (pattern.test(lowerText)) {
+      return "reject";
+    }
+  }
+  
+  // Confirmation patterns - selection/commitment verbs and clear affirmatives
+  // Kept specific to avoid false positives on generic praise
+  const confirmPatterns = [
+    // Clear affirmative responses (when asked "do you want to proceed?")
+    /\byes\b/, /\byeah\b/, /\byep\b/, /\byup\b/, /\bsure\b/,
+    
+    // Action-oriented confirmations
+    /\bproceed\b/, /\bconfirm\b/, /\bgo ahead\b/, /\bdo it\b/, /\bgo on\b/,
+    /\blet'?s\s*(do\s*it|go|proceed)\b/,  // "let's do it", "let's go"
+    
+    // Selection/choice phrases - THE KEY PATTERNS for "go with that"
+    /\bgo with\s*(that|it|them|this|him|her)\b/,  // "go with that", "go with it"
+    /\bgo\s*for\s*(it|that|this)\b/,              // "go for it", "go for that"
+    /\bI'?ll\s*take\s*(it|that|this|them)\b/,     // "I'll take it"
+    /\bchoose\s*(that|this|it|them)\b/,           // "choose that"
+    /\bselect\s*(that|this|it|them)\b/,           // "select that"
+    /\bthat'?s\s*(the one|my choice)\b/,          // "that's the one"
   ];
   
   for (const pattern of confirmPatterns) {
     if (pattern.test(lowerText)) {
       return "confirm";
-    }
-  }
-  
-  for (const pattern of rejectPatterns) {
-    if (pattern.test(lowerText)) {
-      return "reject";
     }
   }
   
