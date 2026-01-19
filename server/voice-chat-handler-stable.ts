@@ -31,7 +31,7 @@ const TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "search_quotes",
-    description: "Searches for insurance quotes for a specific vehicle. Call this after the user has confirmed they want quotes for a vehicle.",
+    description: "Searches for insurance quotes. MUST call this when user confirms their vehicle details with phrases like 'yes', 'proceed', 'go ahead', 'that's right', 'correct', 'looks good', 'confirm'. After showing vehicle details, ANY affirmative response means call this.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -54,7 +54,7 @@ const TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "select_quote",
-    description: "Selects a specific insurance quote. Use insurer name OR ordinal (first, second, cheapest).",
+    description: "Selects a specific insurance quote. Use insurer name OR ordinal (first, second, cheapest). Call when user says 'go with X', 'choose X', 'I want X', 'X please'.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -68,7 +68,7 @@ const TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "show_payment",
-    description: "Shows the payment UI. Call after user confirms quote selection.",
+    description: "Shows the payment card UI for the selected quote. MUST call this immediately when user confirms their quote selection with 'yes', 'yeah', 'yep', 'correct', 'that's right', 'proceed', 'go ahead'. After asking 'Just to confirm - you'd like X?', ANY affirmative = call show_payment.",
     parameters: {
       type: Type.OBJECT,
       properties: {},
@@ -77,7 +77,7 @@ const TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "complete_purchase",
-    description: "Completes the purchase. Call ONLY after explicit payment confirmation ('confirm payment', 'pay now').",
+    description: "Completes the purchase and saves policy. Call ONLY after payment card is shown AND user says 'confirm payment', 'pay now', 'complete purchase', 'process payment'.",
     parameters: {
       type: Type.OBJECT,
       properties: {},
@@ -86,7 +86,7 @@ const TOOL_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "cancel_flow",
-    description: "Cancels the current operation.",
+    description: "Cancels the current operation when user says 'cancel', 'stop', 'never mind'.",
     parameters: {
       type: Type.OBJECT,
       properties: {},
@@ -102,31 +102,45 @@ PERSONALITY:
 - Professional but approachable
 - Uses British English
 
-YOUR TOOLS (always use these to take actions):
-- get_user_vehicles: Fetch user's vehicles - call when user mentions quotes/insurance
-- search_quotes: Search for quotes - call after user confirms vehicle
-- get_available_quotes: Get current quotes if you need to know options
-- select_quote(selection): Select a quote - pass insurer name or ordinal ("Admiral", "first", "cheapest")
-- show_payment: Show payment UI - call after user confirms selection ("yes", "proceed")
-- complete_purchase: Complete purchase - call ONLY after explicit payment confirmation
-- cancel_flow: Cancel current operation
-
 RESPONSE STYLE:
 - Keep responses concise (1-2 sentences)
 - Be conversational and warm
 - Avoid technical jargon
 
-FLOW:
-1. User asks for quotes → call get_user_vehicles → "I'm pulling up your vehicle details now."
-2. User confirms vehicle → call search_quotes → "Searching for the best quotes now..."
-3. User selects quote ("go with Admiral") → call select_quote → "Just to confirm - you'd like [insurer] at £[price]?"
-4. User confirms selection → call show_payment → "Showing payment details now."
-5. User confirms payment ("confirm payment", "pay now") → call complete_purchase → "Processing your policy..."
-6. User cancels → call cancel_flow → "No problem, I've cancelled that."
+CRITICAL FLOW - YOU MUST FOLLOW THIS EXACTLY:
 
-CRITICAL:
-- ALWAYS use tools to take actions
-- Payment confirmation requires explicit keywords ("pay", "purchase", "complete")`;
+STEP 1: User mentions quotes/insurance/vehicle
+→ Call get_user_vehicles
+→ Say: "Right, I'm pulling up your vehicle details now."
+→ Vehicle details will appear on screen
+
+STEP 2: User confirms vehicle details with ANY affirmative ("yes", "proceed", "go ahead", "that's right", "looks good", "correct", "yeah")
+→ IMMEDIATELY call search_quotes (do NOT just say "ok" or chat)
+→ Say: "Searching for the best quotes for you..."
+→ Quotes will appear on screen
+
+STEP 3: User selects a quote ("go with Admiral", "Admiral please", "choose the first one", "cheapest")
+→ Call select_quote with their choice
+→ Say: "Just to confirm - you'd like [insurer] at £[price]?"
+
+STEP 4: User confirms quote selection with ANY affirmative ("yes", "yeah", "yep", "correct", "proceed", "that's the one")
+→ IMMEDIATELY call show_payment (do NOT just acknowledge - you MUST call the tool)
+→ Say: "Brilliant, showing your payment details now."
+→ Payment card will appear on screen
+
+STEP 5: User explicitly confirms payment ("confirm payment", "pay now", "complete purchase", "process it")
+→ Call complete_purchase
+→ Say: "Processing your policy now..."
+
+STEP 6: User cancels ("cancel", "stop", "never mind")
+→ Call cancel_flow
+→ Say: "No problem, I've cancelled that for you."
+
+CRITICAL RULES:
+1. After STEP 3 confirmation, you MUST call show_payment - not just chat!
+2. After STEP 1 vehicle shown and user says "yes"/"proceed", you MUST call search_quotes
+3. Every affirmative after a question = call the next tool in the flow
+4. Do NOT just acknowledge with "ok" or "great" without calling the appropriate tool`;
 
 export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string) {
   console.log(`[VoiceChatStable] New connection for ${emailId}`);
@@ -166,7 +180,7 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
           vehicle_count: 1,
           selected_vehicle_id: selectedVehicle.policy_id,
           vehicles: [{ id: selectedVehicle.policy_id, description: `${selectedVehicle.details.vehicle_manufacturer_name} ${selectedVehicle.details.vehicle_model}` }],
-          message: `Found 1 vehicle: ${selectedVehicle.details.vehicle_manufacturer_name} ${selectedVehicle.details.vehicle_model}. Details shown on screen. When user confirms, call search_quotes.`
+          message: `Found 1 vehicle: ${selectedVehicle.details.vehicle_manufacturer_name} ${selectedVehicle.details.vehicle_model}. Details shown on screen. If user says yes/proceed/go ahead/looks good, IMMEDIATELY call search_quotes.`
         };
       }
       
@@ -326,7 +340,7 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
       success: true,
       insurer_name: selectedQuote.insurer_name,
       price: selectedQuote.price,
-      message: `Selected ${selectedQuote.insurer_name} at £${selectedQuote.price}. Confirm with user.`
+      message: `Selected ${selectedQuote.insurer_name} at £${selectedQuote.price}. Ask user to confirm: "Just to confirm - you'd like ${selectedQuote.insurer_name} at £${selectedQuote.price}?". If user says yes/yeah/yep/proceed, IMMEDIATELY call show_payment.`
     };
   }
   
