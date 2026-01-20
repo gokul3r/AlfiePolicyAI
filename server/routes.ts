@@ -1135,6 +1135,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Quote History endpoints
+  app.get("/api/quote-history/:email", async (req, res) => {
+    try {
+      const email = req.params.email.toLowerCase().trim();
+      const quotes = await storage.getQuoteHistoryByEmail(email);
+      res.json(quotes);
+    } catch (error) {
+      console.error("Error fetching quote history:", error);
+      res.status(500).json({ error: "Failed to fetch quote history" });
+    }
+  });
+
+  app.get("/api/quote-history/:email/:status", async (req, res) => {
+    try {
+      const email = req.params.email.toLowerCase().trim();
+      const status = req.params.status as 'matched' | 'rejected';
+      
+      if (status !== 'matched' && status !== 'rejected') {
+        return res.status(400).json({ error: "Status must be 'matched' or 'rejected'" });
+      }
+      
+      const quotes = await storage.getQuoteHistoryByStatus(email, status);
+      res.json(quotes);
+    } catch (error) {
+      console.error("Error fetching quote history by status:", error);
+      res.status(500).json({ error: "Failed to fetch quote history" });
+    }
+  });
+
+  app.post("/api/quote-history", async (req, res) => {
+    try {
+      const { email_id, insurance_provider_name, vehicle_number, price_of_quote, features, status, date_of_quote } = req.body;
+      
+      if (!email_id || !insurance_provider_name || !vehicle_number || price_of_quote === undefined || !features) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      const result = await storage.createQuoteHistory({
+        email_id: email_id.toLowerCase().trim(),
+        insurance_provider_name,
+        vehicle_number,
+        price_of_quote,
+        features,
+        status: status || 'matched',
+        date_of_quote: date_of_quote ? new Date(date_of_quote) : new Date(),
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error creating quote history:", error);
+      res.status(500).json({ error: "Failed to create quote history" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for voice chat

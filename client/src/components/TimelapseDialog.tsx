@@ -55,8 +55,12 @@ export function TimelapseDialog({
   const [policyEndDate, setPolicyEndDate] = useState<Date | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [vehicleName, setVehicleName] = useState<string>("");
+  const [vehicleRegNumber, setVehicleRegNumber] = useState<string>("");
   const [showNotification, setShowNotification] = useState(false);
   const [currentInsuranceProvider, setCurrentInsuranceProvider] = useState<string>("");
+  // Quote history tracking
+  const [matchedCount, setMatchedCount] = useState<number>(0);
+  const [rejectedCount, setRejectedCount] = useState<number>(0);
   const { toast } = useToast();
 
   // Calculate next search date based on frequency
@@ -183,9 +187,10 @@ export function TimelapseDialog({
       const endDate = new Date(currentPolicy.policy_end_date);
       setPolicyEndDate(endDate);
 
-      // Extract vehicle name for notifications
+      // Extract vehicle name and registration for notifications
       const vehicleDisplayName = `${currentPolicy.vehicle_manufacturer_name} ${currentPolicy.vehicle_model}`;
       setVehicleName(vehicleDisplayName);
+      setVehicleRegNumber(currentPolicy.vehicle_registration_number || "");
 
       console.log(`[Timelapse] Using real policy end date: ${endDate.toISOString().split("T")[0]}`);
 
@@ -209,11 +214,46 @@ export function TimelapseDialog({
     setState("match_found");
   };
 
-  const handleConfirmPurchase = () => {
+  // Helper to store quote in history
+  const saveQuoteToHistory = async (match: MatchData, status: 'matched' | 'rejected') => {
+    if (!userEmail || !vehicleRegNumber) return;
+    
+    try {
+      await apiRequest("POST", "/api/quote-history", {
+        email_id: userEmail,
+        insurance_provider_name: match.financial_breakdown.new_quote_insurer,
+        vehicle_number: vehicleRegNumber,
+        price_of_quote: match.financial_breakdown.new_quote_price,
+        features: match.features,
+        status,
+      });
+      
+      if (status === 'matched') {
+        setMatchedCount(prev => prev + 1);
+      } else {
+        setRejectedCount(prev => prev + 1);
+      }
+    } catch (error) {
+      console.error(`[Timelapse] Failed to save quote as ${status}:`, error);
+    }
+  };
+
+  const handleConfirmPurchase = async () => {
+    // Save as matched quote
+    const currentMatch = currentWeekMatches[currentMatchIndex];
+    if (currentMatch) {
+      await saveQuoteToHistory(currentMatch, 'matched');
+    }
     setState("confirming_purchase");
   };
 
   const handleKeepSearching = async () => {
+    // Save current match as rejected
+    const currentMatch = currentWeekMatches[currentMatchIndex];
+    if (currentMatch) {
+      await saveQuoteToHistory(currentMatch, 'rejected');
+    }
+    
     // Check if there are more matches in current week results
     if (currentMatchIndex + 1 < currentWeekMatches.length) {
       // Show next match from the same week
@@ -260,7 +300,11 @@ export function TimelapseDialog({
     setPolicyEndDate(null);
     setIsSearching(false);
     setVehicleName("");
+    setVehicleRegNumber("");
     setShowNotification(false);
+    // Reset quote history counters
+    setMatchedCount(0);
+    setRejectedCount(0);
     onOpenChange(false);
   };
 
@@ -295,6 +339,24 @@ export function TimelapseDialog({
               <p className="text-lg text-muted-foreground max-w-2xl">
                 Watch as Auto-Annie searches for the best insurance quotes {frequency} until a match is found
               </p>
+            </div>
+
+            {/* Quote History Counters */}
+            <div className="flex gap-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
+              <div className="flex flex-col items-center">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  <span className="text-2xl font-bold text-foreground" data-testid="text-matched-count">{matchedCount}</span>
+                </div>
+                <span className="text-sm text-muted-foreground">Quotes Matched</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <div className="flex items-center gap-2">
+                  <XCircle className="w-5 h-5 text-red-500" />
+                  <span className="text-2xl font-bold text-foreground" data-testid="text-rejected-count">{rejectedCount}</span>
+                </div>
+                <span className="text-sm text-muted-foreground">Rejected</span>
+              </div>
             </div>
 
             <Button
