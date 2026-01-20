@@ -376,3 +376,32 @@ export type TrustPilotData = z.infer<typeof trustPilotDataSchema>;
 export type DefactoRatings = z.infer<typeof defactoRatingsSchema>;
 export type InsertCustomRatings = z.infer<typeof insertCustomRatingsSchema>;
 export type CustomRatings = typeof customRatings.$inferSelect;
+
+// Quote History table - tracks matched/rejected quotes from Time Lapse
+export const quoteHistory = pgTable("quote_history", {
+  quote_id: text("quote_id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  email_id: text("email_id").notNull().references(() => users.email_id),
+  insurance_provider_name: text("insurance_provider_name").notNull(),
+  vehicle_number: text("vehicle_number").notNull(),
+  date_of_quote: timestamp("date_of_quote").notNull().defaultNow(),
+  price_of_quote: real("price_of_quote").notNull(),
+  features: text("features").array().notNull(),
+  status: text("status").notNull().default("matched"), // matched, rejected
+  created_at: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertQuoteHistorySchema = createInsertSchema(quoteHistory).omit({
+  quote_id: true,
+  created_at: true,
+}).extend({
+  email_id: z.string().email("Invalid email address").toLowerCase().trim(),
+  insurance_provider_name: z.string().min(1, "Provider name is required").trim(),
+  vehicle_number: z.string().min(1, "Vehicle number is required").trim(),
+  date_of_quote: z.date().optional(),
+  price_of_quote: z.number().min(0, "Price must be positive"),
+  features: z.array(z.string()),
+  status: z.enum(["matched", "rejected"]).default("matched"),
+});
+
+export type InsertQuoteHistory = z.infer<typeof insertQuoteHistorySchema>;
+export type QuoteHistory = typeof quoteHistory.$inferSelect;

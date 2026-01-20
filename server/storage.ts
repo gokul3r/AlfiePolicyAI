@@ -7,7 +7,8 @@ import {
   chatMessages, 
   personalizations, 
   notifications, 
-  customRatings 
+  customRatings,
+  quoteHistory 
 } from "@shared/schema";
 import { 
   type User, 
@@ -23,7 +24,9 @@ import {
   type Notification, 
   type InsertNotification, 
   type CustomRatings, 
-  type InsertCustomRatings 
+  type InsertCustomRatings,
+  type QuoteHistory,
+  type InsertQuoteHistory 
 } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 
@@ -55,6 +58,11 @@ export interface IStorage {
   dismissNotification(id: number): Promise<void>;
   getCustomRatings(email: string): Promise<CustomRatings | undefined>;
   saveCustomRatings(email: string, ratings: Omit<InsertCustomRatings, 'email_id'>): Promise<CustomRatings>;
+  // Quote History methods
+  createQuoteHistory(data: Omit<InsertQuoteHistory, 'date_of_quote'> & { date_of_quote?: Date }): Promise<QuoteHistory>;
+  getQuoteHistoryByEmail(email: string): Promise<QuoteHistory[]>;
+  getQuoteHistoryByStatus(email: string, status: 'matched' | 'rejected'): Promise<QuoteHistory[]>;
+  updateQuoteHistoryStatus(quoteId: string, status: 'matched' | 'rejected'): Promise<QuoteHistory>;
 }
 
 export class DbStorage implements IStorage {
@@ -381,6 +389,42 @@ export class DbStorage implements IStorage {
         .returning();
       return result[0];
     }
+  }
+
+  // Quote History methods
+  async createQuoteHistory(data: Omit<InsertQuoteHistory, 'date_of_quote'> & { date_of_quote?: Date }): Promise<QuoteHistory> {
+    const result = await db.insert(quoteHistory).values({
+      ...data,
+      date_of_quote: data.date_of_quote || new Date(),
+    }).returning();
+    return result[0];
+  }
+
+  async getQuoteHistoryByEmail(email: string): Promise<QuoteHistory[]> {
+    return await db.select()
+      .from(quoteHistory)
+      .where(eq(quoteHistory.email_id, email))
+      .orderBy(desc(quoteHistory.date_of_quote));
+  }
+
+  async getQuoteHistoryByStatus(email: string, status: 'matched' | 'rejected'): Promise<QuoteHistory[]> {
+    return await db.select()
+      .from(quoteHistory)
+      .where(
+        and(
+          eq(quoteHistory.email_id, email),
+          eq(quoteHistory.status, status)
+        )
+      )
+      .orderBy(desc(quoteHistory.date_of_quote));
+  }
+
+  async updateQuoteHistoryStatus(quoteId: string, status: 'matched' | 'rejected'): Promise<QuoteHistory> {
+    const result = await db.update(quoteHistory)
+      .set({ status })
+      .where(eq(quoteHistory.quote_id, quoteId))
+      .returning();
+    return result[0];
   }
 }
 
