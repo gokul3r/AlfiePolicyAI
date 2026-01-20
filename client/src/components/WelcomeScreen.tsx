@@ -25,6 +25,7 @@ import { ComingSoonDialog } from "./ComingSoonDialog";
 import { OpenBankingDialog } from "./OpenBankingDialog";
 import { InsuranceTypeSelectorDialog } from "./InsuranceTypeSelectorDialog";
 import { CancelPolicyDialog } from "./CancelPolicyDialog";
+import { QuoteHistoryDialog } from "./QuoteHistoryDialog";
 import { InfoBadge } from "./InfoBadge";
 import logoImage from "@assets/generated_images/autoannie_ai_insurance_assistant_icon.png";
 import { AnimatedMic } from "./AnimatedMic";
@@ -70,6 +71,7 @@ export default function WelcomeScreen({
   const [showInsuranceTypeSelector, setShowInsuranceTypeSelector] = useState(false);
   const [showCancelPolicy, setShowCancelPolicy] = useState(false);
   const [showOpenBanking, setShowOpenBanking] = useState(false);
+  const [showQuoteHistory, setShowQuoteHistory] = useState(false);
   const [scheduleFrequency, setScheduleFrequency] = useState<"monthly" | "weekly">("monthly");
   const [aiInputMessage, setAiInputMessage] = useState("");
   const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>(undefined);
@@ -169,6 +171,12 @@ export default function WelcomeScreen({
                 data-testid="menu-item-openbanking"
               >
                 Enroll - OpenBanking
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => setShowQuoteHistory(true)}
+                data-testid="menu-item-quote-history"
+              >
+                Quote History
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={handleLogout}
@@ -429,6 +437,11 @@ export default function WelcomeScreen({
       <OpenBankingDialog
         open={showOpenBanking}
         onOpenChange={setShowOpenBanking}
+      />
+
+      <QuoteHistoryDialog
+        open={showQuoteHistory}
+        onOpenChange={setShowQuoteHistory}
       />
 
       {/* Fixed Configure AutoAnnie Link at Bottom */}
