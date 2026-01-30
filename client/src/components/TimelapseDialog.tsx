@@ -101,10 +101,9 @@ export function TimelapseDialog({
       }
 
       // Filter matches based on minimum savings threshold
-      // Net annual savings = annual_premium_delta - cancellation_fee
+      // annual_premium_delta already includes cancellation fee (subtracted in backend)
       const matches = allMatches.filter((match) => {
-        const netAnnualSavings = match.financial_breakdown.annual_premium_delta - match.financial_breakdown.cancellation_fee;
-        return netAnnualSavings >= minSavingsThreshold;
+        return match.financial_breakdown.annual_premium_delta >= minSavingsThreshold;
       });
 
       console.log(`[Timelapse] Week ${dateStr}: ${allMatches.length} total matches, ${matches.length} above £${minSavingsThreshold} threshold`);
@@ -390,8 +389,8 @@ export function TimelapseDialog({
               showNotification={showNotification}
               notificationData={{
                 vehicle: vehicleName,
-                // Show net annual savings (after cancellation fee) to match the filtering threshold
-                savings: currentWeekMatches[currentMatchIndex].financial_breakdown.annual_premium_delta - currentWeekMatches[currentMatchIndex].financial_breakdown.cancellation_fee,
+                // annual_premium_delta already includes cancellation fee (subtracted in backend)
+                savings: currentWeekMatches[currentMatchIndex].financial_breakdown.annual_premium_delta,
                 provider: currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_insurer,
               }}
               onNotificationTap={handleNotificationTap}
@@ -607,10 +606,14 @@ function MatchFoundState({
             </div>
             <div className="flex justify-between">
               <span>New annual premium</span>
-              <span>£{financial_breakdown.new_quote_price.toFixed(2)}</span>
+              <span className="text-red-600 dark:text-red-400">- £{financial_breakdown.new_quote_price.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Cancellation fee</span>
+              <span className="text-red-600 dark:text-red-400">- £{financial_breakdown.cancellation_fee.toFixed(2)}</span>
             </div>
             <div className="border-t border-border pt-2 mt-2 flex justify-between font-medium text-foreground">
-              <span>Annual {financial_breakdown.annual_premium_delta > 0 ? "savings" : "increase"}</span>
+              <span>Net annual {financial_breakdown.annual_premium_delta > 0 ? "savings" : "increase"}</span>
               <span className={financial_breakdown.annual_premium_delta > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
                 = £{Math.abs(financial_breakdown.annual_premium_delta).toFixed(2)}
               </span>

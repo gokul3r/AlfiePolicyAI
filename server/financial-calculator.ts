@@ -82,10 +82,11 @@ export function calculateFinancialBreakdown(
   // Negative = pay money upfront
   const upfront_impact = refund - cancellationFee - newPolicyCost;
   
-  // Annual premium delta = current_cost - new_quote_price
+  // Annual premium delta = current_cost - new_quote_price - cancellation_fee
+  // Cancellation fee is subtracted because it's a real cost when switching
   // Positive = saving
   // Negative = paying more
-  const annual_premium_delta = currentPolicyCost - newQuotePrice;
+  const annual_premium_delta = currentPolicyCost - newQuotePrice - cancellationFee;
   
   return {
     new_quote_price: Math.round(newQuotePrice * 100) / 100,
