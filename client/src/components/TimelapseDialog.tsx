@@ -33,7 +33,7 @@ interface MatchData {
     cancellation_fee: number;
     pro_rata_refund: number;
     days_remaining: number;
-    pro_rated_new_price: number;
+    new_policy_cost: number;
     upfront_impact: number;
     annual_premium_delta: number;
   };
@@ -577,8 +577,8 @@ function MatchFoundState({
               <span className="text-red-600 dark:text-red-400">- £{financial_breakdown.cancellation_fee.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span>New policy cost (pro-rated for {financial_breakdown.days_remaining} days)</span>
-              <span className="text-red-600 dark:text-red-400">- £{financial_breakdown.pro_rated_new_price.toFixed(2)}</span>
+              <span>New policy cost (12 months)</span>
+              <span className="text-red-600 dark:text-red-400">- £{financial_breakdown.new_policy_cost.toFixed(2)}</span>
             </div>
             <div className="border-t border-border pt-2 mt-2 flex justify-between font-medium text-foreground">
               <span>Net upfront impact</span>

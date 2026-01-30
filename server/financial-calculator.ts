@@ -9,7 +9,7 @@ export interface FinancialBreakdown {
   cancellation_fee: number;
   pro_rata_refund: number;
   days_remaining: number;
-  pro_rated_new_price: number; // New quote price adjusted for remaining days
+  new_policy_cost: number; // Full 12-month new policy cost (UK policies are always annual)
   upfront_impact: number; // Positive = receive back, Negative = pay extra
   annual_premium_delta: number; // Positive = saving, Negative = paying more
 }
@@ -73,14 +73,14 @@ export function calculateFinancialBreakdown(
     switchDate
   );
   
-  // Pro-rate the new quote price for remaining days only
-  // Uses the same totalDays base as the refund calculation for consistency
-  const proRatedNewPrice = (newQuotePrice / totalDays) * daysRemaining;
+  // UK insurance: New policies are always 12 months (full annual premium)
+  // You pay the full annual price for the new policy, not pro-rated
+  const newPolicyCost = newQuotePrice;
   
-  // Upfront impact = refund - cancellation_fee - pro_rated_new_price
+  // Upfront impact = refund - cancellation_fee - new_policy_cost (full 12 months)
   // Positive = receive money back
   // Negative = pay money upfront
-  const upfront_impact = refund - cancellationFee - proRatedNewPrice;
+  const upfront_impact = refund - cancellationFee - newPolicyCost;
   
   // Annual premium delta = current_cost - new_quote_price
   // Positive = saving
@@ -94,7 +94,7 @@ export function calculateFinancialBreakdown(
     cancellation_fee: Math.round(cancellationFee * 100) / 100,
     pro_rata_refund: Math.round(refund * 100) / 100,
     days_remaining: daysRemaining,
-    pro_rated_new_price: Math.round(proRatedNewPrice * 100) / 100,
+    new_policy_cost: Math.round(newPolicyCost * 100) / 100,
     upfront_impact: Math.round(upfront_impact * 100) / 100,
     annual_premium_delta: Math.round(annual_premium_delta * 100) / 100,
   };
