@@ -18,7 +18,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { Calendar, Sparkles } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
-import { TimelapseDialog } from "./TimelapseDialog";
+import { TimelapseDialog, RejectedQuoteData } from "./TimelapseDialog";
 
 interface ScheduleQuoteDialogProps {
   open: boolean;
@@ -42,14 +42,16 @@ export function ScheduleQuoteDialog({
   // Session-based quote counters (reset on page refresh)
   const [quotesMatched, setQuotesMatched] = useState<number>(0);
   const [quotesRejected, setQuotesRejected] = useState<number>(0);
+  const [rejectedQuotes, setRejectedQuotes] = useState<RejectedQuoteData[]>([]);
   
   // Callbacks for TimelapseDialog to increment counters
   const handleQuoteMatched = (count: number = 1) => {
     setQuotesMatched(prev => prev + count);
   };
   
-  const handleQuoteRejected = (count: number = 1) => {
-    setQuotesRejected(prev => prev + count);
+  const handleQuoteRejected = (quoteData: RejectedQuoteData) => {
+    setQuotesRejected(prev => prev + 1);
+    setRejectedQuotes(prev => [...prev, quoteData]);
   };
   
   // Store both the validated number and the raw text for editing
@@ -243,7 +245,13 @@ export function ScheduleQuoteDialog({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setTimelapseOpen(true)}
+                onClick={() => {
+                  // Reset session counters for new timelapse run
+                  setQuotesMatched(0);
+                  setQuotesRejected(0);
+                  setRejectedQuotes([]);
+                  setTimelapseOpen(true);
+                }}
                 className="group relative overflow-visible hover-elevate active-elevate-2"
                 data-testid="button-timelapse"
               >
@@ -315,6 +323,7 @@ export function ScheduleQuoteDialog({
           onQuoteRejected={handleQuoteRejected}
           quotesMatched={quotesMatched}
           quotesRejected={quotesRejected}
+          rejectedQuotes={rejectedQuotes}
         />
       </DialogContent>
     </Dialog>

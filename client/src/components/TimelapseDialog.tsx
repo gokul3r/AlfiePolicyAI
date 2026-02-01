@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogClose, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { X, Sparkles, Search, CheckCircle2, XCircle, Star, StarHalf, Shield, ThumbsUp, Scale, Gavel, Car, Wrench, Globe, Phone, Users, FileCheck, Heart, Umbrella, Zap, AlertTriangle, Award, BadgeCheck } from "lucide-react";
 import { useState, useEffect } from "react";
 import { flushSync } from "react-dom";
@@ -7,6 +8,12 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { IPhoneMockup } from "./IPhoneMockup";
 import { AIThinkingStep } from "./AIThinkingStep";
+
+export interface RejectedQuoteData {
+  provider: string;
+  cost: number;
+  date: string;
+}
 
 interface TimelapseDialogProps {
   open: boolean;
@@ -16,9 +23,10 @@ interface TimelapseDialogProps {
   userEmail: string | null;
   minSavingsThreshold?: number;
   onQuoteMatched?: (count?: number) => void;
-  onQuoteRejected?: (count?: number) => void;
+  onQuoteRejected?: (quoteData: RejectedQuoteData) => void;
   quotesMatched: number;
   quotesRejected: number;
+  rejectedQuotes: RejectedQuoteData[];
 }
 
 type TimelapseState = "intro" | "searching_with_phone" | "notification_slide" | "match_found" | "no_match" | "confirming_purchase" | "celebration";
@@ -54,6 +62,7 @@ export function TimelapseDialog({
   onQuoteRejected,
   quotesMatched,
   quotesRejected,
+  rejectedQuotes,
 }: TimelapseDialogProps) {
   const [state, setState] = useState<TimelapseState>("intro");
   const [currentDate, setCurrentDate] = useState<string>("");
@@ -244,7 +253,11 @@ export function TimelapseDialog({
       if (status === 'matched') {
         onQuoteMatched?.(1);
       } else {
-        onQuoteRejected?.(1);
+        onQuoteRejected?.({
+          provider: match.financial_breakdown.new_quote_insurer,
+          cost: match.financial_breakdown.new_quote_price,
+          date: currentDate,
+        });
       }
     } catch (error) {
       console.error(`[Timelapse] Failed to save quote as ${status}:`, error);
@@ -405,6 +418,7 @@ export function TimelapseDialog({
             frequency={frequency}
             quotesMatched={quotesMatched}
             quotesRejected={quotesRejected}
+            rejectedQuotes={rejectedQuotes}
           />
         )}
 
@@ -462,6 +476,7 @@ function MatchFoundState({
   frequency,
   quotesMatched,
   quotesRejected,
+  rejectedQuotes,
 }: {
   matchData: MatchData;
   matchNumber: number;
@@ -473,6 +488,7 @@ function MatchFoundState({
   frequency: "weekly" | "monthly";
   quotesMatched: number;
   quotesRejected: number;
+  rejectedQuotes: RejectedQuoteData[];
 }) {
   const { insurer, price, ai_insight, financial_breakdown } = matchData;
 
@@ -779,12 +795,38 @@ function MatchFoundState({
               Quotes Matched: <span className="text-green-600 dark:text-green-400">{quotesMatched}</span>
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <XCircle className="w-4 h-4 text-red-500" />
-            <span className="text-sm font-medium" data-testid="text-quotes-rejected">
-              Quotes Rejected: <span className="text-red-600 dark:text-red-400">{quotesRejected}</span>
-            </span>
-          </div>
+          <HoverCard openDelay={200} closeDelay={100}>
+            <HoverCardTrigger asChild>
+              <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity" data-testid="hover-quotes-rejected">
+                <XCircle className="w-4 h-4 text-red-500" />
+                <span className="text-sm font-medium" data-testid="text-quotes-rejected">
+                  Quotes Rejected: <span className="text-red-600 dark:text-red-400">{quotesRejected}</span>
+                </span>
+              </div>
+            </HoverCardTrigger>
+            <HoverCardContent className="w-72" align="center" side="top">
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-foreground">Rejected Quotes This Session</h4>
+                {rejectedQuotes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No quotes rejected yet</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {rejectedQuotes.map((quote, index) => (
+                      <div 
+                        key={index} 
+                        className="flex justify-between items-center text-xs py-1.5 px-2 bg-muted/50 rounded"
+                        data-testid={`rejected-quote-row-${index}`}
+                      >
+                        <span className="font-medium truncate max-w-[120px]">{quote.provider}</span>
+                        <span className="text-muted-foreground">{quote.date}</span>
+                        <span className="font-semibold text-red-600 dark:text-red-400">£{quote.cost.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </HoverCardContent>
+          </HoverCard>
         </div>
 
         {/* Action Buttons */}
