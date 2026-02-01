@@ -17,6 +17,8 @@ interface TimelapseDialogProps {
   minSavingsThreshold?: number;
   onQuoteMatched?: (count?: number) => void;
   onQuoteRejected?: (count?: number) => void;
+  quotesMatched: number;
+  quotesRejected: number;
 }
 
 type TimelapseState = "intro" | "searching_with_phone" | "notification_slide" | "match_found" | "no_match" | "confirming_purchase" | "celebration";
@@ -50,6 +52,8 @@ export function TimelapseDialog({
   minSavingsThreshold = 50,
   onQuoteMatched,
   onQuoteRejected,
+  quotesMatched,
+  quotesRejected,
 }: TimelapseDialogProps) {
   const [state, setState] = useState<TimelapseState>("intro");
   const [currentDate, setCurrentDate] = useState<string>("");
@@ -399,6 +403,8 @@ export function TimelapseDialog({
             hasMoreMatchesThisMonth={currentMatchIndex + 1 < currentWeekMatches.length}
             canSearchMoreMonths={policyEndDate ? calculateNextDate(new Date(currentDate), frequency) <= policyEndDate : false}
             frequency={frequency}
+            quotesMatched={quotesMatched}
+            quotesRejected={quotesRejected}
           />
         )}
 
@@ -454,6 +460,8 @@ function MatchFoundState({
   hasMoreMatchesThisMonth,
   canSearchMoreMonths,
   frequency,
+  quotesMatched,
+  quotesRejected,
 }: {
   matchData: MatchData;
   matchNumber: number;
@@ -463,6 +471,8 @@ function MatchFoundState({
   hasMoreMatchesThisMonth: boolean;
   canSearchMoreMonths: boolean;
   frequency: "weekly" | "monthly";
+  quotesMatched: number;
+  quotesRejected: number;
 }) {
   const { insurer, price, ai_insight, financial_breakdown } = matchData;
 
@@ -760,6 +770,22 @@ function MatchFoundState({
             </div>
           </div>
         )}
+
+        {/* Session Quote Counters */}
+        <div className="flex justify-center gap-6 py-3 mt-4 border-t border-border">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-500" />
+            <span className="text-sm font-medium" data-testid="text-quotes-matched">
+              Quotes Matched: <span className="text-green-600 dark:text-green-400">{quotesMatched}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <XCircle className="w-4 h-4 text-red-500" />
+            <span className="text-sm font-medium" data-testid="text-quotes-rejected">
+              Quotes Rejected: <span className="text-red-600 dark:text-red-400">{quotesRejected}</span>
+            </span>
+          </div>
+        </div>
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 pt-6">
