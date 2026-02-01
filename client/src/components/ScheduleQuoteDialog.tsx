@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
-import { Calendar, Sparkles } from "lucide-react";
+import { Calendar, Sparkles, CheckCircle2, XCircle } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
 import { TimelapseDialog } from "./TimelapseDialog";
 
@@ -38,6 +38,19 @@ export function ScheduleQuoteDialog({
   const [selectedVehicle, setSelectedVehicle] = useState<string>("");
   const [frequency, setFrequency] = useState<"monthly" | "weekly">(initialFrequency);
   const [timelapseOpen, setTimelapseOpen] = useState(false);
+  
+  // Session-based quote counters (reset on page refresh)
+  const [quotesMatched, setQuotesMatched] = useState<number>(0);
+  const [quotesRejected, setQuotesRejected] = useState<number>(0);
+  
+  // Callbacks for TimelapseDialog to increment counters
+  const handleQuoteMatched = (count: number = 1) => {
+    setQuotesMatched(prev => prev + count);
+  };
+  
+  const handleQuoteRejected = (count: number = 1) => {
+    setQuotesRejected(prev => prev + count);
+  };
   
   // Store both the validated number and the raw text for editing
   const [minSavingsThreshold, setMinSavingsThreshold] = useState<number>(() => {
@@ -182,6 +195,22 @@ export function ScheduleQuoteDialog({
           </DialogTitle>
         </DialogHeader>
 
+        {/* Session Quote Counters */}
+        <div className="flex justify-center gap-6 py-2 border-b border-border mb-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-500" />
+            <span className="text-sm font-medium" data-testid="text-quotes-matched">
+              Quotes Matched: <span className="text-green-600 dark:text-green-400">{quotesMatched}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <XCircle className="w-4 h-4 text-red-500" />
+            <span className="text-sm font-medium" data-testid="text-quotes-rejected">
+              Quotes Rejected: <span className="text-red-600 dark:text-red-400">{quotesRejected}</span>
+            </span>
+          </div>
+        </div>
+
         <div className="grid md:grid-cols-2 gap-6 py-4">
           {/* Left Column: Vehicle Selector */}
           <div className="space-y-2">
@@ -298,6 +327,8 @@ export function ScheduleQuoteDialog({
           frequency={frequency}
           userEmail={userEmail}
           minSavingsThreshold={minSavingsThreshold}
+          onQuoteMatched={handleQuoteMatched}
+          onQuoteRejected={handleQuoteRejected}
         />
       </DialogContent>
     </Dialog>

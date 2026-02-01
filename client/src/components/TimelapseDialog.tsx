@@ -15,6 +15,8 @@ interface TimelapseDialogProps {
   frequency: "weekly" | "monthly";
   userEmail: string | null;
   minSavingsThreshold?: number;
+  onQuoteMatched?: (count?: number) => void;
+  onQuoteRejected?: (count?: number) => void;
 }
 
 type TimelapseState = "intro" | "searching_with_phone" | "notification_slide" | "match_found" | "no_match" | "confirming_purchase" | "celebration";
@@ -46,6 +48,8 @@ export function TimelapseDialog({
   frequency,
   userEmail,
   minSavingsThreshold = 50,
+  onQuoteMatched,
+  onQuoteRejected,
 }: TimelapseDialogProps) {
   const [state, setState] = useState<TimelapseState>("intro");
   const [currentDate, setCurrentDate] = useState<string>("");
@@ -58,9 +62,6 @@ export function TimelapseDialog({
   const [vehicleRegNumber, setVehicleRegNumber] = useState<string>("");
   const [showNotification, setShowNotification] = useState(false);
   const [currentInsuranceProvider, setCurrentInsuranceProvider] = useState<string>("");
-  // Quote history tracking
-  const [matchedCount, setMatchedCount] = useState<number>(0);
-  const [rejectedCount, setRejectedCount] = useState<number>(0);
   const { toast } = useToast();
 
   // Calculate next search date based on frequency
@@ -167,6 +168,14 @@ export function TimelapseDialog({
     setShowNotification(false);
 
     try {
+      // Clear previous session's quote history (session-based, not cumulative)
+      try {
+        await apiRequest("DELETE", `/api/quote-history/${encodeURIComponent(userEmail)}`);
+        console.log("[Timelapse] Cleared previous quote history for new session");
+      } catch (clearError) {
+        console.warn("[Timelapse] Failed to clear previous quote history, continuing anyway:", clearError);
+      }
+
       // Fetch the actual policy to get the real end date and vehicle name
       const policyResponse = await apiRequest("GET", `/api/vehicle-policies/${userEmail}`);
       const policies = await policyResponse.json();
@@ -227,10 +236,11 @@ export function TimelapseDialog({
         status,
       });
       
+      // Call parent callbacks to update session counters
       if (status === 'matched') {
-        setMatchedCount(prev => prev + 1);
+        onQuoteMatched?.(1);
       } else {
-        setRejectedCount(prev => prev + 1);
+        onQuoteRejected?.(1);
       }
     } catch (error) {
       console.error(`[Timelapse] Failed to save quote as ${status}:`, error);
@@ -301,9 +311,6 @@ export function TimelapseDialog({
     setVehicleName("");
     setVehicleRegNumber("");
     setShowNotification(false);
-    // Reset quote history counters
-    setMatchedCount(0);
-    setRejectedCount(0);
     onOpenChange(false);
   };
 
@@ -340,29 +347,11 @@ export function TimelapseDialog({
               </p>
             </div>
 
-            {/* Quote History Counters */}
-            <div className="flex gap-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
-              <div className="flex flex-col items-center">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-green-500" />
-                  <span className="text-2xl font-bold text-foreground" data-testid="text-matched-count">{matchedCount}</span>
-                </div>
-                <span className="text-sm text-muted-foreground">Quotes Matched</span>
-              </div>
-              <div className="flex flex-col items-center">
-                <div className="flex items-center gap-2">
-                  <XCircle className="w-5 h-5 text-red-500" />
-                  <span className="text-2xl font-bold text-foreground" data-testid="text-rejected-count">{rejectedCount}</span>
-                </div>
-                <span className="text-sm text-muted-foreground">Rejected</span>
-              </div>
-            </div>
-
             <Button
               size="lg"
               onClick={handleStartTimelapse}
               disabled={!selectedVehicleId || isSearching}
-              className="px-12 py-7 text-xl animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300"
+              className="px-12 py-7 text-xl animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150"
               data-testid="button-start-timelapse"
             >
               <Sparkles className="mr-2 h-5 w-5" />

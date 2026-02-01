@@ -1189,6 +1189,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete all quote history for a user (used when starting new timelapse session)
+  app.delete("/api/quote-history/:email", async (req, res) => {
+    try {
+      const email = req.params.email.toLowerCase().trim();
+      const deletedCount = await storage.deleteQuoteHistoryByEmail(email);
+      res.json({ success: true, deletedCount });
+    } catch (error) {
+      console.error("Error deleting quote history:", error);
+      res.status(500).json({ error: "Failed to delete quote history" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for voice chat

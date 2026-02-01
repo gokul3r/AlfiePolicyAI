@@ -63,6 +63,7 @@ export interface IStorage {
   getQuoteHistoryByEmail(email: string): Promise<QuoteHistory[]>;
   getQuoteHistoryByStatus(email: string, status: 'matched' | 'rejected'): Promise<QuoteHistory[]>;
   updateQuoteHistoryStatus(quoteId: string, status: 'matched' | 'rejected'): Promise<QuoteHistory>;
+  deleteQuoteHistoryByEmail(email: string): Promise<number>;
 }
 
 export class DbStorage implements IStorage {
@@ -425,6 +426,13 @@ export class DbStorage implements IStorage {
       .where(eq(quoteHistory.quote_id, quoteId))
       .returning();
     return result[0];
+  }
+
+  async deleteQuoteHistoryByEmail(email: string): Promise<number> {
+    const result = await db.delete(quoteHistory)
+      .where(eq(quoteHistory.email_id, email))
+      .returning();
+    return result.length;
   }
 }
 
