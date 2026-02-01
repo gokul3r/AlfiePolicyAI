@@ -5,14 +5,33 @@ import { MouseEvent } from "react";
 interface AnimatedMicProps {
   onClick?: () => void;
   className?: string;
+  disabled?: boolean;
 }
 
-export function AnimatedMic({ onClick, className = "" }: AnimatedMicProps) {
+export function AnimatedMic({ onClick, className = "", disabled = false }: AnimatedMicProps) {
   const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    onClick?.();
+    if (!disabled) {
+      onClick?.();
+    }
   };
+
+  if (disabled) {
+    return (
+      <button
+        type="button"
+        className={`cursor-not-allowed border-0 bg-transparent opacity-40 ${className}`}
+        disabled
+        data-testid="button-voice-mic"
+        title="Voice chat temporarily unavailable"
+      >
+        <div className="relative">
+          <Mic className="h-5 w-5 text-muted-foreground" />
+        </div>
+      </button>
+    );
+  }
 
   return (
     <motion.button

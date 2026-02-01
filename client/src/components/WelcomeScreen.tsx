@@ -217,6 +217,7 @@ export default function WelcomeScreen({
                 <AnimatedMic 
                   onClick={() => setShowVoiceChat(true)}
                   className="p-2"
+                  disabled={true}
                 />
                 <Button
                   type="submit"
