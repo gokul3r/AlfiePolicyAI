@@ -490,8 +490,24 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
     return cleaned;
   }
   
+  const MAX_TOOL_CALLS_PER_TURN = 3;
+  const MAX_CONVERSATION_HISTORY = 10;
+  let isProcessing = false;
+  
   async function processUserMessage(userText: string): Promise<string> {
+    if (isProcessing) {
+      console.log(`[VoiceChatStable] Already processing, skipping: "${userText}"`);
+      return "";
+    }
+    
+    isProcessing = true;
     console.log(`[VoiceChatStable] Processing: "${userText}"`);
+    
+    if (conversationHistory.length > MAX_CONVERSATION_HISTORY) {
+      const greeting = conversationHistory[0];
+      conversationHistory = [greeting, ...conversationHistory.slice(-MAX_CONVERSATION_HISTORY + 1)];
+      console.log(`[VoiceChatStable] Trimmed conversation history to ${conversationHistory.length} messages`);
+    }
     
     conversationHistory.push({
       role: "user",
@@ -517,8 +533,9 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
       
       let assistantResponse = "";
       let toolExecutedThisTurn = false;
+      let toolCallCount = 0;
       
-      while (true) {
+      while (toolCallCount < MAX_TOOL_CALLS_PER_TURN) {
         const candidate = response.candidates?.[0];
         if (!candidate?.content?.parts) break;
         
@@ -633,6 +650,18 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
         
         for (const fc of functionCalls) {
           console.log(`[VoiceChatStable] Tool call: ${fc.name}`, fc.args);
+          
+          if (fc.name === "search_quotes" && displayedQuotes.length > 0) {
+            console.log(`[VoiceChatStable] BLOCKED: search_quotes - quotes already displayed`);
+            functionResponses.push({
+              functionResponse: {
+                name: fc.name!,
+                response: { success: false, message: "Quotes are already displayed on screen. Please help the user select one." }
+              }
+            });
+            continue;
+          }
+          
           const args = (fc.args || {}) as Record<string, unknown>;
           const result = await executeTool(fc.name!, args);
           functionResponses.push({
@@ -644,6 +673,7 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
         }
         
         toolExecutedThisTurn = true;
+        toolCallCount += functionCalls.length;
         
         conversationHistory.push({
           role: "user",
@@ -673,6 +703,8 @@ export async function handleVoiceChatStable(clientWs: WebSocket, emailId: string
     } catch (error) {
       console.error("[VoiceChatStable] Error:", error);
       return "I'm sorry, I'm having trouble processing that. Could you please try again?";
+    } finally {
+      isProcessing = false;
     }
   }
   

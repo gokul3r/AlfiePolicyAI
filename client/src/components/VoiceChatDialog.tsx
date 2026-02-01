@@ -149,6 +149,9 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const isRecordingRef = useRef<boolean>(false);
   const sessionIdRef = useRef<number>(0);
+  const isProcessingRef = useRef<boolean>(false);
+  const pendingMessageRef = useRef<string>("");
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -214,6 +217,27 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
           { role: "assistant", content: data.text, timestamp: new Date() }
         ]);
         speak(data.text);
+        
+        isProcessingRef.current = false;
+        
+        if (pendingMessageRef.current && wsRef.current?.readyState === WebSocket.OPEN) {
+          const pending = pendingMessageRef.current;
+          pendingMessageRef.current = "";
+          setTimeout(() => {
+            if (!isProcessingRef.current) {
+              isProcessingRef.current = true;
+              console.log("[VoiceChat] Sending queued message:", pending);
+              setMessages(prev => [
+                ...prev,
+                { role: "user", content: pending, timestamp: new Date() }
+              ]);
+              wsRef.current?.send(JSON.stringify({
+                type: "user_message",
+                text: pending,
+              }));
+            }
+          }, 100);
+        }
       }
 
       if (data.type === "status_update") {
@@ -418,6 +442,13 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
   const sendMessage = useCallback((text: string) => {
     if (!text.trim() || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     
+    if (isProcessingRef.current) {
+      console.log("[VoiceChat] Already processing, queueing:", text);
+      pendingMessageRef.current = text.trim();
+      return;
+    }
+    
+    isProcessingRef.current = true;
     console.log("[VoiceChat] Sending:", text);
     
     setMessages(prev => [
@@ -495,8 +526,16 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
         setCurrentUserTranscript(interimTranscript || finalTranscript);
         
         if (finalTranscript) {
-          sendMessage(finalTranscript);
-          setCurrentUserTranscript("");
+          if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+          }
+          
+          const textToSend = finalTranscript.trim();
+          debounceTimerRef.current = setTimeout(() => {
+            sendMessage(textToSend);
+            setCurrentUserTranscript("");
+            debounceTimerRef.current = null;
+          }, 300);
         }
       };
       
@@ -559,6 +598,14 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
   const cleanupSession = () => {
     stopRecording();
     window.speechSynthesis.cancel();
+    
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    
+    isProcessingRef.current = false;
+    pendingMessageRef.current = "";
     
     setMessages([]);
     setCurrentUserTranscript("");
