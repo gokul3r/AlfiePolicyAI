@@ -339,20 +339,29 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
   }, [messages, agentStatus]);
 
   // Extract quotes from messages when they arrive (for purchase flow)
+  // Only consider messages from current session to prevent stale quote data from triggering payment flows
   useEffect(() => {
-    if (messages.length > 0) {
-      // Look at the last assistant message for quote cards
-      for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].role === "assistant") {
-          const parsed = parseQuoteCards(messages[i].content);
-          if (parsed.isQuoteCards && parsed.data?.quotes) {
-            setLastQuotes(parsed.data.quotes);
-            break;
-          }
+    // Wait until session boundary is established
+    if (sessionStartMessageId === null) {
+      return;
+    }
+    
+    // Only look at messages from CURRENT session (id > sessionStartMessageId)
+    // When sessionStartMessageId is 0, all messages are considered current session (fresh user)
+    const currentSessionMessages = messages.filter(m => m.id > sessionStartMessageId);
+    
+    // Look at the last assistant message for quote cards within current session only
+    for (let i = currentSessionMessages.length - 1; i >= 0; i--) {
+      if (currentSessionMessages[i].role === "assistant") {
+        const parsed = parseQuoteCards(currentSessionMessages[i].content);
+        if (parsed.isQuoteCards && parsed.data?.quotes) {
+          setLastQuotes(parsed.data.quotes);
+          return; // Found quotes in current session
         }
       }
     }
-  }, [messages]);
+    // No quotes found in current session - keep lastQuotes empty (already reset on dialog close)
+  }, [messages, sessionStartMessageId]);
 
   // Auto-send initial message when dialog opens
   useEffect(() => {
@@ -417,11 +426,19 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
     }
   }, [open, initialMessage, hasProcessedInitialMessage, isLoading]);
 
+  // Clear stale quotes immediately when dialog opens (before messages load)
+  // This is the primary defense against stale quote data triggering payment flows
+  useEffect(() => {
+    if (open) {
+      setLastQuotes([]);
+    }
+  }, [open]);
+
   // Set session start point when dialog opens (record the last message ID at that time)
   useEffect(() => {
-    if (open && messages.length > 0 && sessionStartMessageId === null) {
-      // Mark the session start as the ID of the last message when dialog opened
-      const lastMessageId = messages[messages.length - 1]?.id ?? 0;
+    if (open && sessionStartMessageId === null) {
+      // Set session boundary: use last message id, or 0 if no messages yet
+      const lastMessageId = messages.length > 0 ? messages[messages.length - 1]?.id ?? 0 : 0;
       setSessionStartMessageId(lastMessageId);
     }
   }, [open, messages, sessionStartMessageId]);
@@ -469,7 +486,20 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
     }
 
     // Check if this is a purchase intent (e.g., "Go with Admiral")
-    if (purchaseIntent.isPurchase && purchaseIntent.insurerName) {
+    // Only process if we have quotes from the CURRENT session (lastQuotes is populated)
+    if (purchaseIntent.isPurchase && purchaseIntent.insurerName && lastQuotes.length > 0) {
+      // Find the quote price from last shown quotes (current session only)
+      const matchingQuote = lastQuotes.find(
+        q => q.insurer_name.toLowerCase() === purchaseIntent.insurerName!.toLowerCase()
+      );
+      
+      // Only proceed if we found a matching quote from current session
+      if (!matchingQuote) {
+        // No matching quote found - treat as regular message, let AI respond
+        await sendMessageMutation.mutateAsync(trimmedMessage);
+        return;
+      }
+      
       // Save user message
       await apiRequest("POST", "/api/chat/save-user-message", {
         email_id: userEmail,
@@ -477,11 +507,7 @@ export default function ChatDialog({ open, onOpenChange, userEmail, initialMessa
       });
       queryClient.invalidateQueries({ queryKey: ["/api/chat/messages", userEmail] });
       
-      // Find the quote price from last shown quotes
-      const matchingQuote = lastQuotes.find(
-        q => q.insurer_name.toLowerCase() === purchaseIntent.insurerName!.toLowerCase()
-      );
-      const quotePrice = matchingQuote?.quote_price ?? 0;
+      const quotePrice = matchingQuote.quote_price ?? 0;
       
       // Set pending purchase with full data
       setPendingPurchase({
