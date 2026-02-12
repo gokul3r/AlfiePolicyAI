@@ -215,19 +215,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const quoteRequestBody = {
           insurance_details: {
             email_id: policy.email_id,
+            current_date: dateStr,
             current_insurance_provider: policy.current_insurance_provider,
             policy_id: policy.policy_id,
             policy_type: policy.policy_type,
-            // Vehicle details with API's required capitalization
             driver_age: policy.details.driver_age,
             vehicle_registration_number: policy.details.vehicle_registration_number,
             vehicle_manufacturer_name: policy.details.vehicle_manufacturer_name,
             vehicle_model: policy.details.vehicle_model,
             vehicle_year: policy.details.vehicle_year,
             type_of_fuel: policy.details.type_of_fuel,
-            type_of_Cover_needed: policy.details.type_of_cover_needed,  // Capital C required by API
-            No_Claim_bonus_years: policy.details.no_claim_bonus_years,  // Capital N and C required by API
-            Voluntary_Excess: policy.details.voluntary_excess,           // Capital V and E required by API
+            type_of_Cover_needed: policy.details.type_of_cover_needed,
+            No_Claim_bonus_years: policy.details.no_claim_bonus_years,
+            Voluntary_Excess: policy.details.voluntary_excess,
           },
           user_preferences: whisperText,
           conversation_history: [],
@@ -417,6 +417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quoteRequestBody = {
         insurance_details: {
           email_id: policy.email_id,
+          current_date: search_date,
           current_insurance_provider: policy.current_insurance_provider,
           policy_id: policy.policy_id,
           policy_type: policy.policy_type,
@@ -921,18 +922,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[Chat] Using whisper_preferences: "${whisperPreferences}"`);
           
           // Build quote search request with case-sensitive field names
+          const chatCurrentDate = new Date().toISOString().split("T")[0];
           const quoteRequestBody = {
             insurance_details: {
               email_id: policy.email_id,
+              current_date: chatCurrentDate,
               driver_age: policy.details.driver_age,
               vehicle_registration_number: policy.details.vehicle_registration_number,
               vehicle_manufacturer_name: policy.details.vehicle_manufacturer_name,
               vehicle_model: policy.details.vehicle_model,
               vehicle_year: policy.details.vehicle_year,
               type_of_fuel: policy.details.type_of_fuel,
-              type_of_Cover_needed: policy.details.type_of_cover_needed,  // Capital C required by API
-              No_Claim_bonus_years: policy.details.no_claim_bonus_years,  // Capital N and C required by API
-              Voluntary_Excess: policy.details.voluntary_excess,  // Capital V and E required by API
+              type_of_Cover_needed: policy.details.type_of_cover_needed,
+              No_Claim_bonus_years: policy.details.no_claim_bonus_years,
+              Voluntary_Excess: policy.details.voluntary_excess,
               current_insurance_provider: policy.current_insurance_provider,
               policy_id: policy.policy_id,
               policy_type: policy.policy_type

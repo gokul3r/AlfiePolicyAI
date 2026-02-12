@@ -249,18 +249,20 @@ export async function handleVoiceChat(clientWs: WebSocket, emailId: string) {
       
       // Build the full request body EXACTLY matching text chat format from routes.ts
       // All field names and casing must match the API requirements
+      const voiceCurrentDate = new Date().toISOString().split("T")[0];
       const quoteRequestBody = {
         insurance_details: {
           email_id: policy.email_id,
+          current_date: voiceCurrentDate,
           driver_age: driverAge,
           vehicle_registration_number: vehicleReg,
           vehicle_manufacturer_name: (details as any)?.vehicle_manufacturer_name,
           vehicle_model: (details as any)?.vehicle_model,
           vehicle_year: vehicleYear,
           type_of_fuel: (details as any)?.type_of_fuel,
-          type_of_Cover_needed: (details as any)?.type_of_cover_needed,  // Capital C required by API
-          No_Claim_bonus_years: (details as any)?.no_claim_bonus_years,  // Capital N and C required by API
-          Voluntary_Excess: (details as any)?.voluntary_excess,  // Capital V and E required by API
+          type_of_Cover_needed: (details as any)?.type_of_cover_needed,
+          No_Claim_bonus_years: (details as any)?.no_claim_bonus_years,
+          Voluntary_Excess: (details as any)?.voluntary_excess,
           current_insurance_provider: policy.current_insurance_provider,
           policy_id: policy.policy_id,
           policy_type: policy.policy_type

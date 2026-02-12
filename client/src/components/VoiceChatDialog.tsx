@@ -353,6 +353,7 @@ export function VoiceChatDialog({ open, onOpenChange, userEmail }: VoiceChatDial
           const requestPayload = {
             insurance_details: {
               email_id: vehicle.email_id || userEmail,
+              current_date: new Date().toISOString().split("T")[0],
               driver_age: vehicle.details.driver_age,
               vehicle_registration_number: vehicle.details.vehicle_registration_number,
               vehicle_manufacturer_name: vehicle.details.vehicle_manufacturer_name,

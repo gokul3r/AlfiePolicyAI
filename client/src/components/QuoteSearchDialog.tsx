@@ -42,9 +42,11 @@ export default function QuoteSearchDialog({
 
     try {
       // Prepare the base request payload
+      const currentDate = new Date().toISOString().split("T")[0];
       const requestPayload: any = {
         insurance_details: {
           email_id: vehicle.email_id,
+          current_date: currentDate,
           driver_age: vehicle.driver_age,
           vehicle_registration_number: vehicle.vehicle_registration_number,
           vehicle_manufacturer_name: vehicle.vehicle_manufacturer_name,

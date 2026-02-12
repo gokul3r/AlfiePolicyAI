@@ -69,6 +69,11 @@ Database Schema includes:
   - Current month & year displayed in the match found header
   - Backend updated to pass `requested_features` and `missing_features` from the Quote API's feature matching data
   - Note: Current strict matching logic means only quotes with ALL requested features appear. Relaxed matching is in backlog.
+- **5.1.4**: Added required `current_date` field (YYYY-MM-DD format) to all Quote Search API call sites in `insurance_details`:
+  - Frontend: QuoteSearchDialog (manual search), VoiceChatDialog (voice chat trigger) - uses today's date
+  - Backend: `/api/timelapse-search` (old timelapse) uses simulated iteration date, `/api/timelapse-search-week` uses simulated `search_date`
+  - Backend: `/api/chat/send-message` (text chat) and `voice-chat-handler.ts` (old voice handler) - uses today's date
+  - Total: 6 call sites updated across 4 files
 
 ## External Dependencies
 
