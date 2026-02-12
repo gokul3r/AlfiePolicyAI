@@ -57,6 +57,19 @@ Database Schema includes:
 - `personalizations`: Gmail integration details.
 - `custom_ratings`: User-defined insurance provider ratings.
 
+## Recent Changes
+
+### Release 5.1 (February 2026)
+- **5.1.1**: Scheduled quote search screen - changed "Continue Searching" button text to "Continue Demo"
+- **5.1.2**: Scheduled quote search screen - changed "Confirm Purchase" button text to "Switch Policy"
+- **5.1.3**: Scheduled quote search match found screen - redesigned "Coverage Included" section with Option C:
+  - Smart summary header showing "X of Y requested features matched" count
+  - Subsection 1: "Features You Requested" - always visible, shows whisper-requested features with green tick (matched) or red cross (missing)
+  - Subsection 2: "All Quote Features" - collapsible accordion (collapsed by default), click to expand full quote feature list
+  - Current month & year displayed in the match found header
+  - Backend updated to pass `requested_features` and `missing_features` from the Quote API's feature matching data
+  - Note: Current strict matching logic means only quotes with ALL requested features appear. Relaxed matching is in backlog.
+
 ## External Dependencies
 
 - **Neon Serverless PostgreSQL**: Database service.

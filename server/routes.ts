@@ -307,6 +307,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               price: quotePrice,
               insurer: insurerName,
               features: availableFeatures,
+              requested_features: matchedRequired,
+              missing_features: missingRequired,
               trustpilot_rating: quote.trust_pilot_context?.rating || quote.original_quote?.output?.trustpilot_rating,
               ai_insight: quote.alfie_message || quote.original_quote?.output?.ai_driven_insight,
               full_quote_data: quote,
@@ -483,6 +485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Use API's pre-computed feature matching
         const missingRequired = quote.features_matching_requirements?.missing_required || [];
+        const matchedRequired = quote.features_matching_requirements?.matched_required || [];
         if (missingRequired.length > 0) {
           console.log(`[Timelapse Week] ❌ ${insurerName}: Missing required features: ${missingRequired.join(', ')}`);
           continue;
@@ -506,6 +509,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           price: quotePrice,
           insurer: insurerName,
           features: availableFeatures,
+          requested_features: matchedRequired,
+          missing_features: missingRequired,
           trustpilot_rating: quote.trust_pilot_context?.rating || quote.original_quote?.output?.trustpilot_rating,
           ai_insight: quote.alfie_message || quote.original_quote?.output?.ai_driven_insight,
           full_quote_data: quote,

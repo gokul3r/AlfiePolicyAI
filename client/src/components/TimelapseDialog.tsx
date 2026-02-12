@@ -34,6 +34,9 @@ import {
   AlertTriangle,
   Award,
   BadgeCheck,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { flushSync } from "react-dom";
@@ -75,6 +78,8 @@ interface MatchData {
   price: number;
   insurer: string;
   features: string[];
+  requested_features: string[];
+  missing_features: string[];
   trustpilot_rating: number;
   ai_insight: string;
   full_quote_data: any;
@@ -509,6 +514,7 @@ export function TimelapseDialog({
             quotesMatched={quotesMatched}
             quotesRejected={quotesRejected}
             rejectedQuotes={rejectedQuotes}
+            searchDate={currentDate}
           />
         )}
 
@@ -622,6 +628,7 @@ function MatchFoundState({
   quotesMatched,
   quotesRejected,
   rejectedQuotes,
+  searchDate,
 }: {
   matchData: MatchData;
   matchNumber: number;
@@ -634,8 +641,12 @@ function MatchFoundState({
   quotesMatched: number;
   quotesRejected: number;
   rejectedQuotes: RejectedQuoteData[];
+  searchDate: string;
 }) {
   const { insurer, price, ai_insight, financial_breakdown } = matchData;
+  const [showAllFeatures, setShowAllFeatures] = useState(false);
+  const requestedFeatures = matchData.requested_features ?? [];
+  const missingFeatures = matchData.missing_features ?? [];
 
   const getFeatureConfig = (feature: string) => {
     return (
@@ -688,6 +699,15 @@ function MatchFoundState({
         <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
           Quote Match Found!
         </h2>
+        <div className="flex items-center justify-center gap-2 text-muted-foreground mb-1">
+          <Calendar className="w-4 h-4" />
+          <span className="text-base font-medium" data-testid="text-search-month-year">
+            {(() => {
+              const d = searchDate ? new Date(searchDate) : new Date();
+              return d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+            })()}
+          </span>
+        </div>
         <p className="text-lg text-muted-foreground">
           Auto-Annie found a great deal for you
         </p>
@@ -847,43 +867,132 @@ function MatchFoundState({
           </div>
         </div>
 
-        {/* ENHANCED: Features Section with Green Gradient Panel */}
+        {/* Features Section - Option C: Smart Summary + Requested Features + Collapsible Full Coverage */}
         <div
           className="rounded-lg overflow-hidden border border-green-200 dark:border-green-800"
           data-testid="features-section"
         >
-          <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-3 flex items-center gap-2">
+          {/* Smart Summary Header */}
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-3 flex items-center gap-3">
             <CheckCircle2 className="w-5 h-5 text-white" />
             <span className="text-sm font-semibold text-white">
-              Coverage Included
+              Feature Coverage
             </span>
-            <div className="ml-auto bg-white/20 px-2 py-0.5 rounded-full">
-              <span className="text-xs font-medium text-white">
-                {matchData.features.length} features
-              </span>
-            </div>
+            {requestedFeatures.length > 0 && (
+              <div className="ml-auto flex items-center gap-2">
+                <div className="bg-white/20 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-white" data-testid="text-feature-match-count">
+                    {requestedFeatures.length} of {requestedFeatures.length + missingFeatures.length}
+                  </span>
+                  <span className="text-xs text-white/80">requested matched</span>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-green-950/50 dark:via-background dark:to-emerald-950/50 p-4">
-            <div className="grid grid-cols-2 gap-2">
-              {matchData.features.map((feature, idx) => {
-                const config = getFeatureConfig(feature);
-                const IconComponent = config.icon;
-                return (
-                  <div
-                    key={idx}
-                    className={`flex items-center gap-2 ${config.bgColor} rounded-lg px-3 py-2`}
-                  >
-                    <IconComponent
-                      className={`w-4 h-4 ${config.color} shrink-0`}
-                    />
-                    <span
-                      className={`text-xs font-medium ${config.color} truncate`}
-                    >
-                      {feature}
-                    </span>
-                  </div>
-                );
-              })}
+
+          <div className="bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-green-950/50 dark:via-background dark:to-emerald-950/50 p-4 space-y-4">
+            {/* Subsection 1: Features You Requested */}
+            {requestedFeatures.length > 0 && (
+              <div data-testid="requested-features-section">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                  Features You Requested
+                </p>
+                <div className="space-y-2">
+                  {requestedFeatures.map((feature, idx) => {
+                    const config = getFeatureConfig(feature);
+                    const IconComponent = config.icon;
+                    return (
+                      <div
+                        key={`req-${idx}`}
+                        className="flex items-center gap-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2.5"
+                        data-testid={`requested-feature-${idx}`}
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                        <IconComponent className={`w-4 h-4 ${config.color} shrink-0`} />
+                        <span className="text-sm font-medium text-foreground">
+                          {feature}
+                        </span>
+                        <span className="ml-auto text-xs text-green-600 dark:text-green-400 font-medium">
+                          Included
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {missingFeatures.map((feature, idx) => {
+                    const config = getFeatureConfig(feature);
+                    const IconComponent = config.icon;
+                    return (
+                      <div
+                        key={`miss-${idx}`}
+                        className="flex items-center gap-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2.5"
+                        data-testid={`missing-feature-${idx}`}
+                      >
+                        <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+                        <IconComponent className={`w-4 h-4 ${config.color} shrink-0`} />
+                        <span className="text-sm font-medium text-foreground">
+                          {feature}
+                        </span>
+                        <span className="ml-auto text-xs text-red-600 dark:text-red-400 font-medium">
+                          Not included
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {requestedFeatures.length === 0 && (
+              <div className="text-center py-2">
+                <p className="text-sm text-muted-foreground">
+                  No specific features were requested via whisper
+                </p>
+              </div>
+            )}
+
+            {/* Subsection 2: Full Quote Coverage - Collapsible */}
+            <div className="border-t border-green-200 dark:border-green-800 pt-3">
+              <button
+                onClick={() => setShowAllFeatures(!showAllFeatures)}
+                className="flex items-center justify-between w-full text-left group"
+                data-testid="button-toggle-all-features"
+              >
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  All Quote Features ({matchData.features.length})
+                </span>
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <span className="text-xs">{showAllFeatures ? "Hide" : "Show"}</span>
+                  {showAllFeatures ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </div>
+              </button>
+              {showAllFeatures && (
+                <div className="grid grid-cols-2 gap-2 mt-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                  {matchData.features.map((feature, idx) => {
+                    const config = getFeatureConfig(feature);
+                    const IconComponent = config.icon;
+                    return (
+                      <div
+                        key={idx}
+                        className={`flex items-center gap-2 ${config.bgColor} rounded-lg px-3 py-2`}
+                        data-testid={`quote-feature-${idx}`}
+                      >
+                        <IconComponent
+                          className={`w-4 h-4 ${config.color} shrink-0`}
+                        />
+                        <span
+                          className={`text-xs font-medium ${config.color} truncate`}
+                        >
+                          {feature}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
