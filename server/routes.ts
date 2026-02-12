@@ -237,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Call NEW enriched Quote API
         const quoteResponse = await fetch(
-          "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
+          "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis",
           {
             method: "POST",
             headers: {
@@ -439,7 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Call Quote API
       const quoteResponse = await fetch(
-        "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
+        "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis",
         {
           method: "POST",
           headers: {
@@ -463,7 +463,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const quoteData = await quoteResponse.json();
       const quotes = quoteData.quotes_with_insights || [];
-
       console.log(`[Timelapse Week] Received ${quotes.length} quotes from API`);
 
       // Find all matching quotes (not just best one) using API's pre-computed matching data
@@ -955,7 +954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const timeoutId = setTimeout(() => controller.abort(), 30000);
             
             const quoteResponse = await fetch(
-              "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
+              "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis",
               {
                 method: "POST",
                 headers: {

@@ -6,7 +6,7 @@ import { detectVoiceIntent, generateVoiceResponse, generateGeneralResponse, type
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_REALTIME_URL = "wss://api.openai.com/v1/realtime?model=gpt-realtime-mini";
 // Use the same API endpoint as the text chat (alfie-agent complete-analysis)
-const QUOTE_SEARCH_API = "https://alfie-657860957693.europe-west4.run.app/complete-analysis";
+const QUOTE_SEARCH_API = "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis";
 
 // Set to false to enable OpenAI Realtime TTS voice responses
 // Set to true to disable voice and use text-only mode for debugging
