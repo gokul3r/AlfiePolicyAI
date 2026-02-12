@@ -56,6 +56,9 @@ export default function QuoteSearchDialog({
           type_of_Cover_needed: vehicle.type_of_cover_needed,
           No_Claim_bonus_years: vehicle.no_claim_bonus_years,
           Voluntary_Excess: vehicle.voluntary_excess,
+          current_insurance_provider: (vehicle as any).current_insurance_provider || "",
+          policy_id: (vehicle as any).policy_id || (vehicle as any).vehicle_id || "",
+          policy_type: (vehicle as any).policy_type || "car",
         },
         user_preferences: vehicle.whisper_preferences || "",
       };
