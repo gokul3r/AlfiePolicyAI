@@ -129,7 +129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Forward request to Google Cloud Run Quote Search API (OLD URL for home quote search)
       const response = await fetch(
-        "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis",
+        "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
         {
           method: "POST",
           headers: {
@@ -237,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Call NEW enriched Quote API
         const quoteResponse = await fetch(
-          "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis",
+          "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
           {
             method: "POST",
             headers: {
@@ -439,7 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Call Quote API
       const quoteResponse = await fetch(
-        "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis",
+        "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
         {
           method: "POST",
           headers: {
@@ -954,7 +954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const timeoutId = setTimeout(() => controller.abort(), 30000);
             
             const quoteResponse = await fetch(
-              "https://alfie-agent-657860957693.europe-west4.run.app/complete-analysis",
+              "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
               {
                 method: "POST",
                 headers: {
