@@ -1,0 +1,66 @@
+gokul@Workstation-G MINGW64 ~/Documents/Dadu/Alfie
+$ curl.exe -v https://alfie-657860957693.europe-west4.run.app/health
+* Host alfie-657860957693.europe-west4.run.app:443 was resolved.
+* IPv6: (none)
+* IPv4: 34.143.76.2, 34.143.74.2, 34.143.75.2, 34.143.77.2, 34.143.79.2, 34.143.78.2, 34.143.73.2, 34.143.72.2
+*   Trying 34.143.76.2:443...
+* Connected to alfie-657860957693.europe-west4.run.app (34.143.76.2) port 443
+* schannel: disabled automatic use of client certificate
+* using HTTP/1.x
+> GET /health HTTP/1.1
+> Host: alfie-657860957693.europe-west4.run.app
+> User-Agent: curl/8.6.0
+> Accept: */*
+> 
+* schannel: remote party requests renegotiation
+* schannel: renegotiating SSL/TLS connection
+* schannel: SSL/TLS connection renegotiated
+< HTTP/1.1 200 OK
+< content-type: application/json
+< x-cloud-trace-context: f8a93ad972cb2a5085ac7825bff93b15;o=1
+< date: Thu, 12 Feb 2026 22:57:26 GMT
+< server: Google Frontend
+< Content-Length: 183
+< Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+<
+{"status":"healthy","service":"alfie-agent","version":"2.3.0-final","gemini_configured":true,"default_data":{"trust_pilot_providers":10,"total_reviews":641349,"defacto_providers":10}}* Connection #0 to host alfie-657860957693.europe-west4.run.app left intact
+(.venv) 
+gokul@Workstation-G MINGW64 ~/Documents/Dadu/Alfie
+$ curl.exe -v -X POST "https://alfie-657860957693.europe-west4.run.app/complete-analysis" -H "Content-Type: application/json" --data-binary "@InsureThat/auto_annie/ai_agent/sample_request_complete.json" > output_cloud.json    
+Note: Unnecessary use of -X or --request, POST is already inferred.
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0* Host alfie-657860957693.europe-west4.run.app:443 was resolved.
+* IPv6: (none)
+* IPv4: 34.143.76.2, 34.143.74.2, 34.143.75.2, 34.143.77.2, 34.143.79.2, 34.143.78.2, 34.143.73.2, 34.143.72.2   
+*   Trying 34.143.76.2:443...
+* Connected to alfie-657860957693.europe-west4.run.app (34.143.76.2) port 443
+* schannel: disabled automatic use of client certificate
+* using HTTP/1.x
+> POST /complete-analysis HTTP/1.1
+> Host: alfie-657860957693.europe-west4.run.app
+> User-Agent: curl/8.6.0
+> Accept: */*
+> Content-Type: application/json
+> Content-Length: 717
+>
+} [717 bytes data]
+100   717    0     0  100   717      0     26  0:00:27  0:00:26  0:00:01     0* schannel: remote party requests renegotiation
+* schannel: renegotiating SSL/TLS connection
+* schannel: SSL/TLS connection renegotiated
+* schannel: failed to decrypt data, need more data
+* schannel: failed to decrypt data, need more data
+< HTTP/1.1 200 OK
+< content-type: application/json
+< x-cloud-trace-context: 197c5a504554f14910640840388682bb;o=1
+< date: Thu, 12 Feb 2026 22:58:22 GMT
+< server: Google Frontend
+< Content-Length: 26679
+< Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+<
+{ [17447 bytes data]
+100 27396  100 26679  100   717    983     26  0:00:27  0:00:27 --:--:--  7425
+* Connection #0 to host alfie-657860957693.europe-west4.run.app left intact
+(.venv) 
+gokul@Workstation-G MINGW64 ~/Documents/Dadu/Alfie
+$
