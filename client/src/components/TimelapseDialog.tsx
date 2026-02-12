@@ -1101,7 +1101,7 @@ function MatchFoundState({
             className="flex-1 text-lg py-6"
             data-testid="button-confirm-purchase"
           >
-            Confirm purchase
+            Switch Policy
           </Button>
           <Button
             size="lg"
@@ -1114,7 +1114,7 @@ function MatchFoundState({
             {hasMoreMatchesThisMonth
               ? "Show next match"
               : canSearchMoreMonths
-                ? "Continue searching"
+                ? "Continue Demo"
                 : "End of policy period"}
           </Button>
         </div>
