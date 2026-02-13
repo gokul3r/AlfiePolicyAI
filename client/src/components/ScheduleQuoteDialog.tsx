@@ -94,17 +94,22 @@ export function ScheduleQuoteDialog({
     }
   }, [open]);
 
-  // Calculate next scheduled search date
+  // Calculate next scheduled search date based on policy start date + 1 interval
   const calculateNextSearchDate = (): string => {
-    const now = new Date();
-    const next = new Date(now);
-    
+    const selectedPolicy = policies.find(
+      (p) => String(p.id) === selectedVehicle,
+    );
+    const baseDate = selectedPolicy?.policy_start_date
+      ? new Date(selectedPolicy.policy_start_date)
+      : new Date();
+    const next = new Date(baseDate);
+
     if (frequency === "weekly") {
-      next.setDate(now.getDate() + 7);
+      next.setDate(baseDate.getDate() + 7);
     } else {
-      next.setMonth(now.getMonth() + 1);
+      next.setMonth(baseDate.getMonth() + 1);
     }
-    
+
     return next.toLocaleDateString("en-GB", {
       weekday: "long",
       year: "numeric",
