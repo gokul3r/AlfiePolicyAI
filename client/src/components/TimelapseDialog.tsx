@@ -645,6 +645,8 @@ function MatchFoundState({
 }) {
   const { insurer, price, ai_insight, financial_breakdown } = matchData;
   const [showAllFeatures, setShowAllFeatures] = useState(false);
+  const [showUpfrontBreakdown, setShowUpfrontBreakdown] = useState(false);
+  const [showDeltaBreakdown, setShowDeltaBreakdown] = useState(false);
   const requestedFeatures = matchData.requested_features ?? [];
   const missingFeatures = matchData.missing_features ?? [];
 
@@ -771,41 +773,57 @@ function MatchFoundState({
             </span>
           </div>
 
-          {/* Upfront Impact Calculation Breakdown */}
-          <div className="bg-muted/50 rounded-lg px-4 py-3 text-xs text-muted-foreground space-y-1">
-            <p className="font-medium text-foreground mb-2">
-              How this is calculated:
-            </p>
-            <div className="flex justify-between">
-              <span>Pro-rata refund from old policy</span>
-              <span className="text-green-600 dark:text-green-400">
-                + £{financial_breakdown.pro_rata_refund.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>Cancellation fee</span>
-              <span className="text-red-600 dark:text-red-400">
-                - £{financial_breakdown.cancellation_fee.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>New policy cost (12 months)</span>
-              <span className="text-red-600 dark:text-red-400">
-                - £{financial_breakdown.new_policy_cost.toFixed(2)}
-              </span>
-            </div>
-            <div className="border-t border-border pt-2 mt-2 flex justify-between font-medium text-foreground">
-              <span>Net upfront impact</span>
-              <span
-                className={
-                  financial_breakdown.upfront_impact > 0
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-red-600 dark:text-red-400"
-                }
-              >
-                = £{financial_breakdown.upfront_impact.toFixed(2)}
-              </span>
-            </div>
+          {/* Upfront Impact Calculation Breakdown - Collapsible */}
+          <div className="bg-muted/50 rounded-lg px-4 py-3 text-xs text-muted-foreground">
+            <button
+              onClick={() => setShowUpfrontBreakdown(!showUpfrontBreakdown)}
+              className="flex items-center justify-between w-full text-left"
+              data-testid="button-toggle-upfront-breakdown"
+            >
+              <span className="font-medium text-foreground">How this is calculated</span>
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <span className="text-xs">{showUpfrontBreakdown ? "Hide" : "Show"}</span>
+                {showUpfrontBreakdown ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </div>
+            </button>
+            {showUpfrontBreakdown && (
+              <div className="space-y-1 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex justify-between">
+                  <span>Pro-rata refund from old policy</span>
+                  <span className="text-green-600 dark:text-green-400">
+                    + £{financial_breakdown.pro_rata_refund.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Cancellation fee</span>
+                  <span className="text-red-600 dark:text-red-400">
+                    - £{financial_breakdown.cancellation_fee.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>New policy cost (12 months)</span>
+                  <span className="text-red-600 dark:text-red-400">
+                    - £{financial_breakdown.new_policy_cost.toFixed(2)}
+                  </span>
+                </div>
+                <div className="border-t border-border pt-2 mt-2 flex justify-between font-medium text-foreground">
+                  <span>Net upfront impact</span>
+                  <span
+                    className={
+                      financial_breakdown.upfront_impact > 0
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400"
+                    }
+                  >
+                    = £{financial_breakdown.upfront_impact.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-between items-center py-3 bg-primary/10 rounded-lg px-4">
@@ -825,45 +843,61 @@ function MatchFoundState({
             </span>
           </div>
 
-          {/* Annual Premium Delta Calculation Breakdown */}
-          <div className="bg-muted/50 rounded-lg px-4 py-3 text-xs text-muted-foreground space-y-1">
-            <p className="font-medium text-foreground mb-2">
-              How this is calculated:
-            </p>
-            <div className="flex justify-between">
-              <span>Current annual premium</span>
-              <span>£{financial_breakdown.current_cost.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>New annual premium</span>
-              <span className="text-red-600 dark:text-red-400">
-                - £{financial_breakdown.new_quote_price.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>Cancellation fee</span>
-              <span className="text-red-600 dark:text-red-400">
-                - £{financial_breakdown.cancellation_fee.toFixed(2)}
-              </span>
-            </div>
-            <div className="border-t border-border pt-2 mt-2 flex justify-between font-medium text-foreground">
-              <span>
-                Net annual{" "}
-                {financial_breakdown.annual_premium_delta > 0
-                  ? "savings"
-                  : "increase"}
-              </span>
-              <span
-                className={
-                  financial_breakdown.annual_premium_delta > 0
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-red-600 dark:text-red-400"
-                }
-              >
-                = £
-                {Math.abs(financial_breakdown.annual_premium_delta).toFixed(2)}
-              </span>
-            </div>
+          {/* Annual Premium Delta Calculation Breakdown - Collapsible */}
+          <div className="bg-muted/50 rounded-lg px-4 py-3 text-xs text-muted-foreground">
+            <button
+              onClick={() => setShowDeltaBreakdown(!showDeltaBreakdown)}
+              className="flex items-center justify-between w-full text-left"
+              data-testid="button-toggle-delta-breakdown"
+            >
+              <span className="font-medium text-foreground">How this is calculated</span>
+              <div className="flex items-center gap-1 text-muted-foreground">
+                <span className="text-xs">{showDeltaBreakdown ? "Hide" : "Show"}</span>
+                {showDeltaBreakdown ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </div>
+            </button>
+            {showDeltaBreakdown && (
+              <div className="space-y-1 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="flex justify-between">
+                  <span>Current annual premium</span>
+                  <span>£{financial_breakdown.current_cost.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>New annual premium</span>
+                  <span className="text-red-600 dark:text-red-400">
+                    - £{financial_breakdown.new_quote_price.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Cancellation fee</span>
+                  <span className="text-red-600 dark:text-red-400">
+                    - £{financial_breakdown.cancellation_fee.toFixed(2)}
+                  </span>
+                </div>
+                <div className="border-t border-border pt-2 mt-2 flex justify-between font-medium text-foreground">
+                  <span>
+                    Net annual{" "}
+                    {financial_breakdown.annual_premium_delta > 0
+                      ? "savings"
+                      : "increase"}
+                  </span>
+                  <span
+                    className={
+                      financial_breakdown.annual_premium_delta > 0
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400"
+                    }
+                  >
+                    = £
+                    {Math.abs(financial_breakdown.annual_premium_delta).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
