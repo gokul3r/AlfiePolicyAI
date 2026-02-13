@@ -289,9 +289,13 @@ export function TimelapseDialog({
         `[Timelapse] Using real policy end date: ${endDate.toISOString().split("T")[0]}`,
       );
 
-      // Start searching from today, passing endDate as parameter to avoid async state issues
-      const today = new Date();
-      await searchWeek(today, endDate);
+      // Start searching from policy start date + 1 interval (1 week or 1 month)
+      const policyStartDate = new Date(currentPolicy.policy_start_date);
+      const firstSearchDate = calculateNextDate(policyStartDate, frequency);
+      console.log(
+        `[Timelapse] Policy start: ${policyStartDate.toISOString().split("T")[0]}, first search: ${firstSearchDate.toISOString().split("T")[0]} (${frequency})`,
+      );
+      await searchWeek(firstSearchDate, endDate);
     } catch (error: any) {
       console.error("[Timelapse] Error fetching policy:", error);
       toast({
