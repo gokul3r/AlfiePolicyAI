@@ -618,7 +618,7 @@ export function TimelapseDialog({
 
         {/* Timelapse Complete - Keep chart visible with summary banner */}
         {state === "timelapse_complete" && (
-          <div className="flex flex-col items-center justify-center h-full p-8">
+          <div className="flex flex-col items-center h-full overflow-y-auto p-8 pt-4">
             <IPhoneMockup
               showNotification={false}
               searchDate={currentDate}
@@ -626,7 +626,7 @@ export function TimelapseDialog({
               priceHistory={priceHistory}
               currentPolicyPrice={currentPolicyPrice}
             />
-            <div className="w-full max-w-md mt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="w-full max-w-md mt-6 pb-4 shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="rounded-md border border-border bg-muted/50 p-4 text-center space-y-3">
                 <div className="flex items-center justify-center gap-2">
                   <Calendar className="w-5 h-5 text-muted-foreground" />
