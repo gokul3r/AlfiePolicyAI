@@ -347,6 +347,24 @@ export function TimelapseDialog({
     if (currentMatch) {
       await saveQuoteToHistory(currentMatch, "matched");
     }
+
+    // Update the policy in the database with the new insurer
+    if (currentMatch && userEmail && vehicleRegNumber) {
+      try {
+        await apiRequest("POST", "/api/purchase-policy", {
+          email_id: userEmail,
+          vehicle_registration_number: vehicleRegNumber,
+          insurer_name: currentMatch.insurer,
+          policy_cost: currentMatch.price,
+        });
+        console.log(
+          `[Timelapse] DB updated: policy switched to ${currentMatch.insurer} at £${currentMatch.price}`,
+        );
+      } catch (purchaseError) {
+        console.error("[Timelapse] Failed to update policy in DB:", purchaseError);
+      }
+    }
+
     setState("confirming_purchase");
   };
 
@@ -541,6 +559,9 @@ export function TimelapseDialog({
                 .new_quote_insurer
             }
             onClose={handleClose}
+            onContinueTimelapse={() => {
+              console.log("[Timelapse] Continue Timelapse clicked (dummy)");
+            }}
           />
         )}
       </DialogContent>
@@ -1381,9 +1402,11 @@ function ConfirmingPurchaseState({
 function CelebrationState({
   provider,
   onClose,
+  onContinueTimelapse,
 }: {
   provider: string;
   onClose: () => void;
+  onContinueTimelapse: () => void;
 }) {
   useEffect(() => {
     // Create confetti particles
@@ -1455,14 +1478,25 @@ function CelebrationState({
         </p>
       </div>
 
-      <Button
-        size="lg"
-        onClick={onClose}
-        className="px-12 py-7 text-xl z-20 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500"
-        data-testid="button-close-celebration"
-      >
-        Close
-      </Button>
+      <div className="flex flex-col sm:flex-row gap-4 z-20 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500">
+        <Button
+          size="lg"
+          onClick={onContinueTimelapse}
+          variant="outline"
+          className="px-8 py-7 text-xl"
+          data-testid="button-continue-timelapse"
+        >
+          Continue Timelapse
+        </Button>
+        <Button
+          size="lg"
+          onClick={onClose}
+          className="px-12 py-7 text-xl"
+          data-testid="button-close-celebration"
+        >
+          Close
+        </Button>
+      </div>
     </div>
   );
 }
