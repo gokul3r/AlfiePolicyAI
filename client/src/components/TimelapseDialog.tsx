@@ -121,6 +121,10 @@ export function TimelapseDialog({
   const [showNotification, setShowNotification] = useState(false);
   const [currentInsuranceProvider, setCurrentInsuranceProvider] =
     useState<string>("");
+  const [priceHistory, setPriceHistory] = useState<
+    { month: string; lowestPrice: number | null }[]
+  >([]);
+  const [currentPolicyPrice, setCurrentPolicyPrice] = useState<number>(0);
   const { toast } = useToast();
 
   // Calculate next search date based on frequency
@@ -178,6 +182,27 @@ export function TimelapseDialog({
       console.log(
         `[Timelapse] Week ${dateStr}: ${allMatches.length} total matches, ${matches.length} above £${minSavingsThreshold} threshold`,
       );
+
+      // Track price data for the live graph - aggregate per month+year
+      const monthLabel = searchDate.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
+      const lowestPrice = allMatches.length > 0 ? Math.min(...allMatches.map((m) => m.price)) : null;
+
+      setPriceHistory((prev) => {
+        const existing = prev.find((p) => p.month === monthLabel);
+        if (existing) {
+          // Same month - update with lower price if found
+          if (lowestPrice !== null) {
+            const currentBest = existing.lowestPrice;
+            if (currentBest === null || lowestPrice < currentBest) {
+              return prev.map((p) =>
+                p.month === monthLabel ? { ...p, lowestPrice } : p,
+              );
+            }
+          }
+          return prev;
+        }
+        return [...prev, { month: monthLabel, lowestPrice }];
+      });
 
       if (matches.length > 0) {
         // Match found above threshold! Show notification on iPhone
@@ -238,6 +263,8 @@ export function TimelapseDialog({
     setCurrentWeekMatches([]);
     setIsSearching(true);
     setShowNotification(false);
+    setPriceHistory([]);
+    setCurrentPolicyPrice(0);
 
     try {
       // Clear previous session's quote history (session-based, not cumulative)
@@ -280,10 +307,13 @@ export function TimelapseDialog({
       const endDate = new Date(currentPolicy.policy_end_date);
       setPolicyEndDate(endDate);
 
-      // Extract vehicle name and registration for notifications
+      // Extract vehicle name, registration, and current price for notifications + chart
       const vehicleDisplayName = `${currentPolicy.vehicle_manufacturer_name} ${currentPolicy.vehicle_model}`;
       setVehicleName(vehicleDisplayName);
       setVehicleRegNumber(currentPolicy.vehicle_registration_number || "");
+      if (currentPolicy.current_policy_cost) {
+        setCurrentPolicyPrice(Number(currentPolicy.current_policy_cost));
+      }
 
       console.log(
         `[Timelapse] Using real policy end date: ${endDate.toISOString().split("T")[0]}`,
@@ -462,6 +492,8 @@ export function TimelapseDialog({
     setVehicleName("");
     setVehicleRegNumber("");
     setShowNotification(false);
+    setPriceHistory([]);
+    setCurrentPolicyPrice(0);
     onOpenChange(false);
   };
 
@@ -523,6 +555,8 @@ export function TimelapseDialog({
               showNotification={false}
               searchDate={currentDate}
               caption="Auto-Annie is searching in the background..."
+              priceHistory={priceHistory}
+              currentPolicyPrice={currentPolicyPrice}
             />
           </div>
         )}
@@ -544,6 +578,8 @@ export function TimelapseDialog({
               }}
               onNotificationTap={handleNotificationTap}
               caption="Tap the notification to view details"
+              priceHistory={priceHistory}
+              currentPolicyPrice={currentPolicyPrice}
             />
           </div>
         )}
