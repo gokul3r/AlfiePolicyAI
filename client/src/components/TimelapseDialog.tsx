@@ -36,6 +36,8 @@ import {
   BadgeCheck,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Calendar,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -412,20 +414,12 @@ export function TimelapseDialog({
   };
 
   const handleKeepSearching = async () => {
-    // Save current match as rejected
-    const currentMatch = currentWeekMatches[currentMatchIndex];
-    if (currentMatch) {
-      await saveQuoteToHistory(currentMatch, "rejected");
+    // Save all matches from this period as rejected (user chose to move on)
+    for (const match of currentWeekMatches) {
+      await saveQuoteToHistory(match, "rejected");
     }
 
-    // Check if there are more matches in current week results
-    if (currentMatchIndex + 1 < currentWeekMatches.length) {
-      // Show next match from the same week
-      setCurrentMatchIndex(currentMatchIndex + 1);
-      return;
-    }
-
-    // No more matches in current week - continue to next week
+    // Continue to next search period
     setIsSearching(true);
     setCurrentMatchIndex(0);
     setCurrentWeekMatches([]);
@@ -600,9 +594,8 @@ export function TimelapseDialog({
             totalMatches={currentWeekMatches.length}
             onConfirmPurchase={handleConfirmPurchase}
             onKeepSearching={handleKeepSearching}
-            hasMoreMatchesThisMonth={
-              currentMatchIndex + 1 < currentWeekMatches.length
-            }
+            onPreviousMatch={() => setCurrentMatchIndex((prev) => Math.max(0, prev - 1))}
+            onNextMatch={() => setCurrentMatchIndex((prev) => Math.min(currentWeekMatches.length - 1, prev + 1))}
             canSearchMoreMonths={
               policyEndDate
                 ? calculateNextDate(new Date(currentDate), frequency) <=
@@ -722,7 +715,8 @@ function MatchFoundState({
   totalMatches,
   onConfirmPurchase,
   onKeepSearching,
-  hasMoreMatchesThisMonth,
+  onPreviousMatch,
+  onNextMatch,
   canSearchMoreMonths,
   frequency,
   quotesMatched,
@@ -735,7 +729,8 @@ function MatchFoundState({
   totalMatches: number;
   onConfirmPurchase: () => void;
   onKeepSearching: () => void;
-  hasMoreMatchesThisMonth: boolean;
+  onPreviousMatch: () => void;
+  onNextMatch: () => void;
   canSearchMoreMonths: boolean;
   frequency: "weekly" | "monthly";
   quotesMatched: number;
@@ -814,9 +809,29 @@ function MatchFoundState({
           Auto-Annie found a great deal for you
         </p>
         {totalMatches > 1 && (
-          <p className="text-sm text-muted-foreground mt-2">
-            Showing match {matchNumber} of {totalMatches}
-          </p>
+          <div className="flex items-center justify-center gap-3 mt-3" data-testid="match-navigation">
+            <Button
+              size="icon"
+              variant="outline"
+              onClick={onPreviousMatch}
+              disabled={matchNumber <= 1}
+              data-testid="button-previous-match"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <span className="text-sm font-medium text-muted-foreground min-w-[100px] text-center">
+              Match {matchNumber} of {totalMatches}
+            </span>
+            <Button
+              size="icon"
+              variant="outline"
+              onClick={onNextMatch}
+              disabled={matchNumber >= totalMatches}
+              data-testid="button-next-match"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         )}
       </div>
 
@@ -1350,15 +1365,13 @@ function MatchFoundState({
             size="lg"
             variant="outline"
             onClick={onKeepSearching}
-            disabled={!hasMoreMatchesThisMonth && !canSearchMoreMonths}
+            disabled={!canSearchMoreMonths}
             className="flex-1 text-lg py-6"
             data-testid="button-keep-searching"
           >
-            {hasMoreMatchesThisMonth
-              ? "Show next match"
-              : canSearchMoreMonths
-                ? "Continue Demo"
-                : "End of policy period"}
+            {canSearchMoreMonths
+              ? "Continue Demo"
+              : "End of policy period"}
           </Button>
         </div>
       </div>
