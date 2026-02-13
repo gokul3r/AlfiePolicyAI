@@ -60,9 +60,9 @@ interface TimelapseDialogProps {
   frequency: "weekly" | "monthly";
   userEmail: string | null;
   minSavingsThreshold?: number;
-  onQuoteMatched?: (count?: number) => void;
+  onQuoteAccepted?: (count?: number) => void;
   onQuoteRejected?: (quoteData: RejectedQuoteData) => void;
-  quotesMatched: number;
+  quotesAccepted: number;
   quotesRejected: number;
   rejectedQuotes: RejectedQuoteData[];
 }
@@ -105,9 +105,9 @@ export function TimelapseDialog({
   frequency,
   userEmail,
   minSavingsThreshold = 50,
-  onQuoteMatched,
+  onQuoteAccepted,
   onQuoteRejected,
-  quotesMatched,
+  quotesAccepted,
   quotesRejected,
   rejectedQuotes,
 }: TimelapseDialogProps) {
@@ -357,6 +357,17 @@ export function TimelapseDialog({
     match: MatchData,
     status: "matched" | "rejected",
   ) => {
+    // Always update session counters regardless of API success
+    if (status === "matched") {
+      onQuoteAccepted?.(1);
+    } else {
+      onQuoteRejected?.({
+        provider: match.financial_breakdown.new_quote_insurer,
+        cost: match.financial_breakdown.new_quote_price,
+        date: currentDate,
+      });
+    }
+
     if (!userEmail || !vehicleRegNumber) return;
 
     try {
@@ -368,27 +379,21 @@ export function TimelapseDialog({
         features: match.features,
         status,
       });
-
-      // Call parent callbacks to update session counters
-      if (status === "matched") {
-        onQuoteMatched?.(1);
-      } else {
-        onQuoteRejected?.({
-          provider: match.financial_breakdown.new_quote_insurer,
-          cost: match.financial_breakdown.new_quote_price,
-          date: currentDate,
-        });
-      }
     } catch (error) {
       console.error(`[Timelapse] Failed to save quote as ${status}:`, error);
     }
   };
 
   const handleConfirmPurchase = async () => {
-    // Save as matched quote
+    // Save selected match as matched, and all others as rejected
     const currentMatch = currentWeekMatches[currentMatchIndex];
     if (currentMatch) {
       await saveQuoteToHistory(currentMatch, "matched");
+    }
+    for (let i = 0; i < currentWeekMatches.length; i++) {
+      if (i !== currentMatchIndex) {
+        await saveQuoteToHistory(currentWeekMatches[i], "rejected");
+      }
     }
 
     // Update the policy in the database with the new insurer
@@ -603,7 +608,7 @@ export function TimelapseDialog({
                 : false
             }
             frequency={frequency}
-            quotesMatched={quotesMatched}
+            quotesAccepted={quotesAccepted}
             quotesRejected={quotesRejected}
             rejectedQuotes={rejectedQuotes}
             searchDate={currentDate}
@@ -719,7 +724,7 @@ function MatchFoundState({
   onNextMatch,
   canSearchMoreMonths,
   frequency,
-  quotesMatched,
+  quotesAccepted,
   quotesRejected,
   rejectedQuotes,
   searchDate,
@@ -733,7 +738,7 @@ function MatchFoundState({
   onNextMatch: () => void;
   canSearchMoreMonths: boolean;
   frequency: "weekly" | "monthly";
-  quotesMatched: number;
+  quotesAccepted: number;
   quotesRejected: number;
   rejectedQuotes: RejectedQuoteData[];
   searchDate: string;
@@ -1290,11 +1295,11 @@ function MatchFoundState({
             <CheckCircle2 className="w-4 h-4 text-green-500" />
             <span
               className="text-sm font-medium"
-              data-testid="text-quotes-matched"
+              data-testid="text-quotes-accepted"
             >
-              Quotes Matched:{" "}
+              Quotes Accepted:{" "}
               <span className="text-green-600 dark:text-green-400">
-                {quotesMatched}
+                {quotesAccepted}
               </span>
             </span>
           </div>

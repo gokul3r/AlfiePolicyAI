@@ -40,13 +40,13 @@ export function ScheduleQuoteDialog({
   const [timelapseOpen, setTimelapseOpen] = useState(false);
   
   // Session-based quote counters (reset on page refresh)
-  const [quotesMatched, setQuotesMatched] = useState<number>(0);
+  const [quotesAccepted, setQuotesAccepted] = useState<number>(0);
   const [quotesRejected, setQuotesRejected] = useState<number>(0);
   const [rejectedQuotes, setRejectedQuotes] = useState<RejectedQuoteData[]>([]);
   
   // Callbacks for TimelapseDialog to increment counters
-  const handleQuoteMatched = (count: number = 1) => {
-    setQuotesMatched(prev => prev + count);
+  const handleQuoteAccepted = (count: number = 1) => {
+    setQuotesAccepted(prev => prev + count);
   };
   
   const handleQuoteRejected = (quoteData: RejectedQuoteData) => {
@@ -247,7 +247,7 @@ export function ScheduleQuoteDialog({
                 size="sm"
                 onClick={() => {
                   // Reset session counters for new timelapse run
-                  setQuotesMatched(0);
+                  setQuotesAccepted(0);
                   setQuotesRejected(0);
                   setRejectedQuotes([]);
                   setTimelapseOpen(true);
@@ -319,9 +319,9 @@ export function ScheduleQuoteDialog({
           frequency={frequency}
           userEmail={userEmail}
           minSavingsThreshold={minSavingsThreshold}
-          onQuoteMatched={handleQuoteMatched}
+          onQuoteAccepted={handleQuoteAccepted}
           onQuoteRejected={handleQuoteRejected}
-          quotesMatched={quotesMatched}
+          quotesAccepted={quotesAccepted}
           quotesRejected={quotesRejected}
           rejectedQuotes={rejectedQuotes}
         />
