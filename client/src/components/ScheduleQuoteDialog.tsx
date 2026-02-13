@@ -97,7 +97,7 @@ export function ScheduleQuoteDialog({
   // Calculate next scheduled search date based on policy start date + 1 interval
   const calculateNextSearchDate = (): string => {
     const selectedPolicy = policies.find(
-      (p) => String(p.id) === selectedVehicle,
+      (p) => p.vehicle_id === selectedVehicle,
     );
     const baseDate = selectedPolicy?.policy_start_date
       ? new Date(selectedPolicy.policy_start_date)
