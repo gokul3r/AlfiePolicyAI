@@ -69,6 +69,13 @@ Database Schema includes:
   - Current month & year displayed in the match found header
   - Backend updated to pass `requested_features` and `missing_features` from the Quote API's feature matching data
   - Note: Current strict matching logic means only quotes with ALL requested features appear. Relaxed matching is in backlog.
+- **5.1.12**: Interactive price chart with color-coded dots and tooltips:
+  - Chart dots are now color-coded: green = purchased/switched, blue = feature-matched, grey = market (unmatched)
+  - Click/tap any dot to see tooltip with insurer name, price, and included features
+  - Green dots show a checkmark icon and legend updates to show "Switched" when a purchase is made
+  - On purchase, the chart dot updates to reflect the actual selected match's price/insurer/features
+  - Backend `/api/timelapse-search-week` now returns `all_quotes_basic` array with insurer, price, and features for market quotes
+  - PriceDataPoint interface extended with status, insurer, features, marketInsurer, marketFeatures fields
 - **5.1.9**: Price chart improvements:
   - "Your Price" reference line now updates after policy switch (was stuck at original price)
   - Dual-line chart: grey line = market lowest (all quotes), blue line = feature-matched lowest

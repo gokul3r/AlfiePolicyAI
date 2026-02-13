@@ -465,8 +465,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quotes = quoteData.quotes_with_insights || [];
       console.log(`[Timelapse Week] Received ${quotes.length} quotes from API`);
 
-      // Collect ALL valid quote prices for market trend (grey line on chart)
+      // Collect ALL valid quote prices and basic info for market trend (grey line on chart)
       const allQuotePrices: number[] = [];
+      const allQuotesBasic: { insurer: string; price: number; features: string[] }[] = [];
 
       // Find all matching quotes (not just best one) using API's pre-computed matching data
       const matches: any[] = [];
@@ -479,8 +480,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
 
-        // Track all valid prices for market trend regardless of feature matching
+        // Track all valid prices and basic info for market trend regardless of feature matching
         allQuotePrices.push(quotePrice);
+        allQuotesBasic.push({ insurer: insurerName, price: quotePrice, features: availableFeatures });
 
         // Use API's pre-computed budget check
         const withinBudget = quote.price_analysis?.within_budget ?? true;
@@ -534,6 +536,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         match_found: matches.length > 0,
         matches,
         all_quote_prices: allQuotePrices,
+        all_quotes_basic: allQuotesBasic,
         current_insurance_provider: policy.current_insurance_provider,
         total_quotes_searched: quotes.length,
         parsed_preferences: parsedPrefs,

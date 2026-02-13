@@ -46,6 +46,11 @@ interface PriceDataPoint {
   month: string;
   lowestPrice: number | null;
   marketLowestPrice: number | null;
+  status?: "purchased" | "matched" | "market";
+  insurer?: string;
+  features?: string[];
+  marketInsurer?: string;
+  marketFeatures?: string[];
 }
 
 function buildLineSegments(
@@ -80,6 +85,15 @@ function LivePriceChart({
   priceHistory: PriceDataPoint[];
   currentPolicyPrice: number;
 }) {
+  const [activeTooltip, setActiveTooltip] = useState<{
+    x: number;
+    y: number;
+    price: number;
+    insurer?: string;
+    features?: string[];
+    type: "purchased" | "matched" | "market";
+  } | null>(null);
+
   const width = 260;
   const height = 120;
   const paddingLeft = 35;
@@ -120,11 +134,11 @@ function LivePriceChart({
   const matchedSegments = buildLineSegments(priceHistory, (p) => p.lowestPrice, getX, getY);
 
   const marketDots = priceHistory
-    .map((p, i) => (p.marketLowestPrice !== null ? { x: getX(i), y: getY(p.marketLowestPrice), price: p.marketLowestPrice, index: i } : null))
+    .map((p, i) => (p.marketLowestPrice !== null ? { x: getX(i), y: getY(p.marketLowestPrice), price: p.marketLowestPrice, index: i, insurer: p.marketInsurer, features: p.marketFeatures } : null))
     .filter((p): p is NonNullable<typeof p> => p !== null);
 
   const matchedDots = priceHistory
-    .map((p, i) => (p.lowestPrice !== null ? { x: getX(i), y: getY(p.lowestPrice), price: p.lowestPrice, index: i } : null))
+    .map((p, i) => (p.lowestPrice !== null ? { x: getX(i), y: getY(p.lowestPrice), price: p.lowestPrice, index: i, status: p.status || "matched", insurer: p.insurer, features: p.features } : null))
     .filter((p): p is NonNullable<typeof p> => p !== null);
 
   const refLineY = currentPolicyPrice > 0 ? getY(currentPolicyPrice) : null;
@@ -135,113 +149,256 @@ function LivePriceChart({
     return Math.round(price);
   });
 
+  const handleDotClick = (
+    x: number,
+    y: number,
+    price: number,
+    type: "purchased" | "matched" | "market",
+    insurer?: string,
+    features?: string[],
+  ) => {
+    if (activeTooltip && activeTooltip.x === x && activeTooltip.y === y) {
+      setActiveTooltip(null);
+    } else {
+      setActiveTooltip({ x, y, price, insurer, features, type });
+    }
+  };
+
+  const getMatchedDotColor = (status: string, isLast: boolean) => {
+    if (status === "purchased") return "#16a34a";
+    return isLast ? "#2563eb" : "#3b82f6";
+  };
+
+  const getMatchedLineColor = (hasAnyPurchased: boolean) => {
+    return "#3b82f6";
+  };
+
+  const hasPurchased = priceHistory.some((p) => p.status === "purchased");
+
   return (
-    <svg width={width} height={height} className="w-full" viewBox={`0 0 ${width} ${height}`} data-testid="price-chart-svg">
-      {/* Legend */}
-      <circle cx={paddingLeft + 2} cy={6} r={3} fill="#9ca3af" />
-      <text x={paddingLeft + 8} y={9} fontSize="6" className="fill-gray-500">Market</text>
-      <circle cx={paddingLeft + 42} cy={6} r={3} fill="#3b82f6" />
-      <text x={paddingLeft + 48} y={9} fontSize="6" className="fill-blue-600">Matched</text>
-      {currentPolicyPrice > 0 && (
-        <>
-          <line x1={paddingLeft + 88} y1={6} x2={paddingLeft + 98} y2={6} stroke="#f97316" strokeWidth={1} strokeDasharray="2 1" />
-          <text x={paddingLeft + 101} y={9} fontSize="6" className="fill-orange-500">Your price</text>
-        </>
-      )}
-
-      {/* Y-axis tick labels */}
-      {tickValues.map((val) => (
-        <text key={val} x={paddingLeft - 4} y={getY(val) + 3} textAnchor="end" className="fill-gray-400" fontSize="8">
-          £{val}
-        </text>
-      ))}
-
-      {/* Grid lines */}
-      {tickValues.map((val) => (
-        <line
-          key={`grid-${val}`}
-          x1={paddingLeft}
-          y1={getY(val)}
-          x2={width - paddingRight}
-          y2={getY(val)}
-          stroke="#e5e7eb"
-          strokeWidth={0.5}
-        />
-      ))}
-
-      {/* Current policy price reference line */}
-      {refLineY !== null && (
-        <line
-          x1={paddingLeft}
-          y1={refLineY}
-          x2={width - paddingRight}
-          y2={refLineY}
-          stroke="#f97316"
-          strokeWidth={1}
-          strokeDasharray="4 3"
-          opacity={0.8}
-        />
-      )}
-
-      {/* Grey market line segments */}
-      {marketSegments.map((segment, i) => (
-        <path key={`market-${i}`} d={segment} fill="none" stroke="#9ca3af" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />
-      ))}
-
-      {/* Grey market dots */}
-      {marketDots.map((point, i) => (
-        <circle
-          key={`market-dot-${i}`}
-          cx={point.x}
-          cy={point.y}
-          r={2.5}
-          fill="#9ca3af"
-          stroke="white"
-          strokeWidth={1}
-          opacity={0.8}
-        />
-      ))}
-
-      {/* Blue matched line segments */}
-      {matchedSegments.map((segment, i) => (
-        <path key={`matched-${i}`} d={segment} fill="none" stroke="#3b82f6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      ))}
-
-      {/* Blue matched dots */}
-      {matchedDots.map((point, i) => (
-        <g key={`matched-dot-${i}`}>
-          <circle
-            cx={point.x}
-            cy={point.y}
-            r={i === matchedDots.length - 1 ? 4 : 3}
-            fill={i === matchedDots.length - 1 ? "#2563eb" : "#3b82f6"}
-            stroke="white"
-            strokeWidth={1.5}
-          >
-            {i === matchedDots.length - 1 && (
-              <animate attributeName="r" values="4;6;4" dur="1.5s" repeatCount="indefinite" />
+    <div className="relative" style={{ width: "100%" }}>
+      <svg width={width} height={height} className="w-full" viewBox={`0 0 ${width} ${height}`} data-testid="price-chart-svg"
+        onClick={(e) => {
+          if ((e.target as SVGElement).tagName === 'svg') setActiveTooltip(null);
+        }}
+      >
+        {/* Legend */}
+        <circle cx={paddingLeft + 2} cy={6} r={3} fill="#9ca3af" />
+        <text x={paddingLeft + 8} y={9} fontSize="6" className="fill-gray-500">Market</text>
+        {hasPurchased ? (
+          <>
+            <circle cx={paddingLeft + 42} cy={6} r={3} fill="#16a34a" />
+            <text x={paddingLeft + 48} y={9} fontSize="6" fill="#16a34a">Switched</text>
+            <circle cx={paddingLeft + 88} cy={6} r={3} fill="#3b82f6" />
+            <text x={paddingLeft + 94} y={9} fontSize="6" className="fill-blue-600">Matched</text>
+            {currentPolicyPrice > 0 && (
+              <>
+                <line x1={paddingLeft + 130} y1={6} x2={paddingLeft + 140} y2={6} stroke="#f97316" strokeWidth={1} strokeDasharray="2 1" />
+                <text x={paddingLeft + 143} y={9} fontSize="5.5" className="fill-orange-500">Your price</text>
+              </>
             )}
-          </circle>
-          <text x={point.x} y={point.y - 7} textAnchor="middle" fontSize="7" className="fill-blue-600" fontWeight="600">
-            £{Math.round(point.price)}
-          </text>
-        </g>
-      ))}
+          </>
+        ) : (
+          <>
+            <circle cx={paddingLeft + 42} cy={6} r={3} fill="#3b82f6" />
+            <text x={paddingLeft + 48} y={9} fontSize="6" className="fill-blue-600">Matched</text>
+            {currentPolicyPrice > 0 && (
+              <>
+                <line x1={paddingLeft + 88} y1={6} x2={paddingLeft + 98} y2={6} stroke="#f97316" strokeWidth={1} strokeDasharray="2 1" />
+                <text x={paddingLeft + 101} y={9} fontSize="6" className="fill-orange-500">Your price</text>
+              </>
+            )}
+          </>
+        )}
 
-      {/* X-axis month labels */}
-      {priceHistory.map((p, i) => (
-        <text
-          key={i}
-          x={getX(i)}
-          y={height - 4}
-          textAnchor="middle"
-          fontSize="7"
-          className="fill-gray-500"
+        {/* Y-axis tick labels */}
+        {tickValues.map((val) => (
+          <text key={val} x={paddingLeft - 4} y={getY(val) + 3} textAnchor="end" className="fill-gray-400" fontSize="8">
+            £{val}
+          </text>
+        ))}
+
+        {/* Grid lines */}
+        {tickValues.map((val) => (
+          <line
+            key={`grid-${val}`}
+            x1={paddingLeft}
+            y1={getY(val)}
+            x2={width - paddingRight}
+            y2={getY(val)}
+            stroke="#e5e7eb"
+            strokeWidth={0.5}
+          />
+        ))}
+
+        {/* Current policy price reference line */}
+        {refLineY !== null && (
+          <line
+            x1={paddingLeft}
+            y1={refLineY}
+            x2={width - paddingRight}
+            y2={refLineY}
+            stroke="#f97316"
+            strokeWidth={1}
+            strokeDasharray="4 3"
+            opacity={0.8}
+          />
+        )}
+
+        {/* Grey market line segments */}
+        {marketSegments.map((segment, i) => (
+          <path key={`market-${i}`} d={segment} fill="none" stroke="#9ca3af" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />
+        ))}
+
+        {/* Grey market dots - clickable */}
+        {marketDots.map((point, i) => (
+          <g key={`market-dot-${i}`}>
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={6}
+              fill="transparent"
+              style={{ cursor: "pointer" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDotClick(point.x, point.y, point.price, "market", point.insurer, point.features);
+              }}
+            />
+            <circle
+              cx={point.x}
+              cy={point.y}
+              r={2.5}
+              fill="#9ca3af"
+              stroke="white"
+              strokeWidth={1}
+              opacity={0.8}
+              style={{ pointerEvents: "none" }}
+            />
+          </g>
+        ))}
+
+        {/* Matched line segments */}
+        {matchedSegments.map((segment, i) => (
+          <path key={`matched-${i}`} d={segment} fill="none" stroke={getMatchedLineColor(hasPurchased)} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        ))}
+
+        {/* Matched/Purchased dots - clickable with color coding */}
+        {matchedDots.map((point, i) => {
+          const isPurchased = point.status === "purchased";
+          const isLast = i === matchedDots.length - 1;
+          const dotColor = getMatchedDotColor(point.status, isLast);
+          const dotRadius = isPurchased ? 4.5 : (isLast ? 4 : 3);
+
+          return (
+            <g key={`matched-dot-${i}`}>
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r={8}
+                fill="transparent"
+                style={{ cursor: "pointer" }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDotClick(point.x, point.y, point.price, isPurchased ? "purchased" : "matched", point.insurer, point.features);
+                }}
+              />
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r={dotRadius}
+                fill={dotColor}
+                stroke="white"
+                strokeWidth={1.5}
+                style={{ pointerEvents: "none" }}
+              >
+                {isLast && !isPurchased && (
+                  <animate attributeName="r" values="4;6;4" dur="1.5s" repeatCount="indefinite" />
+                )}
+              </circle>
+              {isPurchased && (
+                <text x={point.x} y={point.y + 0.5} textAnchor="middle" fontSize="5" fill="white" fontWeight="700" style={{ pointerEvents: "none" }}>
+                  &#10003;
+                </text>
+              )}
+              <text x={point.x} y={point.y - 7} textAnchor="middle" fontSize="7" fill={dotColor} fontWeight="600" style={{ pointerEvents: "none" }}>
+                £{Math.round(point.price)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* X-axis month labels */}
+        {priceHistory.map((p, i) => (
+          <text
+            key={i}
+            x={getX(i)}
+            y={height - 4}
+            textAnchor="middle"
+            fontSize="7"
+            className="fill-gray-500"
+          >
+            {p.month}
+          </text>
+        ))}
+      </svg>
+
+      {/* Tooltip overlay */}
+      {activeTooltip && (
+        <div
+          className="absolute z-50 pointer-events-none"
+          style={{
+            left: `${(activeTooltip.x / width) * 100}%`,
+            top: `${(activeTooltip.y / height) * 100 - 5}%`,
+            transform: "translate(-50%, -100%)",
+          }}
         >
-          {p.month}
-        </text>
-      ))}
-    </svg>
+          <div
+            className="bg-gray-900 text-white rounded-lg px-2.5 py-1.5 shadow-lg text-left pointer-events-auto"
+            style={{ minWidth: "100px", maxWidth: "150px" }}
+            onClick={() => setActiveTooltip(null)}
+            data-testid="chart-tooltip"
+          >
+            <div className="flex items-center gap-1 mb-0.5">
+              <div
+                className="w-2 h-2 rounded-full shrink-0"
+                style={{
+                  backgroundColor:
+                    activeTooltip.type === "purchased" ? "#16a34a" :
+                    activeTooltip.type === "matched" ? "#3b82f6" : "#9ca3af",
+                }}
+              />
+              <span className="text-[8px] font-semibold uppercase tracking-wide"
+                style={{
+                  color:
+                    activeTooltip.type === "purchased" ? "#4ade80" :
+                    activeTooltip.type === "matched" ? "#93c5fd" : "#d1d5db",
+                }}
+              >
+                {activeTooltip.type === "purchased" ? "Switched" :
+                 activeTooltip.type === "matched" ? "Matched" : "Market"}
+              </span>
+            </div>
+            {activeTooltip.insurer && (
+              <p className="text-[9px] font-semibold text-white truncate">{activeTooltip.insurer}</p>
+            )}
+            <p className="text-[10px] font-bold text-white">£{Math.round(activeTooltip.price)}/yr</p>
+            {activeTooltip.features && activeTooltip.features.length > 0 && (
+              <div className="mt-0.5 border-t border-gray-700 pt-0.5">
+                {activeTooltip.features.slice(0, 4).map((f, i) => (
+                  <p key={i} className="text-[7px] text-gray-300 leading-tight truncate">
+                    {f.replace(/_included$/, "").replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                  </p>
+                ))}
+                {activeTooltip.features.length > 4 && (
+                  <p className="text-[7px] text-gray-400">+{activeTooltip.features.length - 4} more</p>
+                )}
+              </div>
+            )}
+            <div className="absolute left-1/2 -translate-x-1/2 -bottom-1 w-2 h-2 bg-gray-900 rotate-45" />
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

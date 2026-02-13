@@ -125,7 +125,7 @@ export function TimelapseDialog({
   const [currentInsuranceProvider, setCurrentInsuranceProvider] =
     useState<string>("");
   const [priceHistory, setPriceHistory] = useState<
-    { month: string; lowestPrice: number | null; marketLowestPrice: number | null }[]
+    { month: string; lowestPrice: number | null; marketLowestPrice: number | null; status?: "purchased" | "matched" | "market"; insurer?: string; features?: string[]; marketInsurer?: string; marketFeatures?: string[] }[]
   >([]);
   const [currentPolicyPrice, setCurrentPolicyPrice] = useState<number>(0);
   const { toast } = useToast();
@@ -192,6 +192,23 @@ export function TimelapseDialog({
       const allQuotePrices: number[] = response.all_quote_prices || [];
       const marketLowestPrice = allQuotePrices.length > 0 ? Math.min(...allQuotePrices) : null;
 
+      const bestMatch = allMatches.length > 0
+        ? allMatches.reduce((best, m) => (m.price < best.price ? m : best), allMatches[0])
+        : null;
+      const matchedInsurer = bestMatch?.insurer || bestMatch?.financial_breakdown?.new_quote_insurer;
+      const matchedFeatures = bestMatch?.features;
+
+      const marketQuotes = response.all_quotes_basic || [];
+      const cheapestMarketQuote = marketQuotes.length > 0
+        ? marketQuotes.reduce((best: any, q: any) => {
+            const price = q.price || q.annual_premium;
+            const bestPrice = best.price || best.annual_premium;
+            return price < bestPrice ? q : best;
+          }, marketQuotes[0])
+        : null;
+      const marketInsurerName = cheapestMarketQuote?.insurer || cheapestMarketQuote?.insurer_name;
+      const marketQuoteFeatures = cheapestMarketQuote?.features;
+
       setPriceHistory((prev) => {
         const existing = prev.find((p) => p.month === monthLabel);
         if (existing) {
@@ -199,11 +216,16 @@ export function TimelapseDialog({
           if (lowestPrice !== null) {
             if (updatedEntry.lowestPrice === null || lowestPrice < updatedEntry.lowestPrice) {
               updatedEntry.lowestPrice = lowestPrice;
+              updatedEntry.insurer = matchedInsurer;
+              updatedEntry.features = matchedFeatures;
+              updatedEntry.status = "matched";
             }
           }
           if (marketLowestPrice !== null) {
             if (updatedEntry.marketLowestPrice === null || marketLowestPrice < updatedEntry.marketLowestPrice) {
               updatedEntry.marketLowestPrice = marketLowestPrice;
+              updatedEntry.marketInsurer = marketInsurerName;
+              updatedEntry.marketFeatures = marketQuoteFeatures;
             }
           }
           if (updatedEntry.lowestPrice !== existing.lowestPrice || updatedEntry.marketLowestPrice !== existing.marketLowestPrice) {
@@ -211,7 +233,16 @@ export function TimelapseDialog({
           }
           return prev;
         }
-        return [...prev, { month: monthLabel, lowestPrice, marketLowestPrice }];
+        return [...prev, {
+          month: monthLabel,
+          lowestPrice,
+          marketLowestPrice,
+          status: lowestPrice !== null ? "matched" as const : undefined,
+          insurer: matchedInsurer,
+          features: matchedFeatures,
+          marketInsurer: marketInsurerName,
+          marketFeatures: marketQuoteFeatures,
+        }];
       });
 
       if (matches.length > 0) {
@@ -410,6 +441,21 @@ export function TimelapseDialog({
           `[Timelapse] DB updated: policy switched to ${currentMatch.insurer} at £${currentMatch.price}`,
         );
         setCurrentPolicyPrice(currentMatch.price);
+
+        // Mark the corresponding price history entry as "purchased" (green dot)
+        // Update price, insurer, and features to reflect the actual selected match
+        const purchaseMonthLabel = new Date(currentDate).toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
+        const purchasedInsurer = currentMatch.insurer || currentMatch.financial_breakdown.new_quote_insurer;
+        const purchasedPrice = currentMatch.price;
+        const purchasedFeatures = currentMatch.features;
+        setPriceHistory((prev) =>
+          prev.map((p) =>
+            p.month === purchaseMonthLabel
+              ? { ...p, status: "purchased" as const, lowestPrice: purchasedPrice, insurer: purchasedInsurer, features: purchasedFeatures }
+              : p
+          )
+        );
+
         queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
       } catch (purchaseError) {
         console.error("[Timelapse] Failed to update policy in DB:", purchaseError);
