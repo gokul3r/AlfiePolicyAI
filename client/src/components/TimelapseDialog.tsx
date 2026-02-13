@@ -364,6 +364,7 @@ export function TimelapseDialog({
         console.log(
           `[Timelapse] DB updated: policy switched to ${currentMatch.insurer} at £${currentMatch.price}`,
         );
+        queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
       } catch (purchaseError) {
         console.error("[Timelapse] Failed to update policy in DB:", purchaseError);
       }
