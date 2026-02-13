@@ -418,6 +418,38 @@ export function TimelapseDialog({
     await searchWeek(nextDate, policyEndDate);
   };
 
+  const handleContinueTimelapse = async () => {
+    if (!policyEndDate) {
+      console.error("[Timelapse] policyEndDate is null in handleContinueTimelapse");
+      setState("no_match");
+      return;
+    }
+
+    // Calculate next search date from where the match was found
+    const nextDate = calculateNextDate(new Date(currentDate), frequency);
+    setWeekIndex((prev) => prev + 1);
+
+    console.log(
+      `[Timelapse] Continuing timelapse from ${nextDate.toISOString().split("T")[0]}, end date: ${policyEndDate.toISOString().split("T")[0]}`,
+    );
+
+    // Check if we've passed the original policy end date
+    if (nextDate > policyEndDate) {
+      console.log("[Timelapse] Reached policy end date after continuing timelapse.");
+      flushSync(() => {
+        setState("no_match");
+        setIsSearching(false);
+      });
+      return;
+    }
+
+    // Reset match state and resume searching
+    setCurrentMatchIndex(0);
+    setCurrentWeekMatches([]);
+    setIsSearching(true);
+    await searchWeek(nextDate, policyEndDate);
+  };
+
   const handleClose = () => {
     setState("intro");
     setCurrentDate("");
@@ -563,9 +595,7 @@ export function TimelapseDialog({
                 .new_quote_insurer
             }
             onClose={handleClose}
-            onContinueTimelapse={() => {
-              console.log("[Timelapse] Continue Timelapse clicked (dummy)");
-            }}
+            onContinueTimelapse={handleContinueTimelapse}
           />
         )}
       </DialogContent>
