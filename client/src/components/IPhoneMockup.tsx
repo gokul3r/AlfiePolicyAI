@@ -45,6 +45,32 @@ function IPhoneNotification({ vehicle, savings, provider, onTap }: IPhoneNotific
 interface PriceDataPoint {
   month: string;
   lowestPrice: number | null;
+  marketLowestPrice: number | null;
+}
+
+function buildLineSegments(
+  priceHistory: PriceDataPoint[],
+  getValue: (p: PriceDataPoint) => number | null,
+  getX: (i: number) => number,
+  getY: (price: number) => number,
+): string[] {
+  const segments: string[] = [];
+  let current: { x: number; y: number }[] = [];
+  priceHistory.forEach((p, i) => {
+    const val = getValue(p);
+    if (val !== null) {
+      current.push({ x: getX(i), y: getY(val) });
+    } else {
+      if (current.length > 1) {
+        segments.push(current.map((pt, j) => `${j === 0 ? "M" : "L"} ${pt.x} ${pt.y}`).join(" "));
+      }
+      current = [];
+    }
+  });
+  if (current.length > 1) {
+    segments.push(current.map((pt, j) => `${j === 0 ? "M" : "L"} ${pt.x} ${pt.y}`).join(" "));
+  }
+  return segments;
 }
 
 function LivePriceChart({
@@ -55,19 +81,19 @@ function LivePriceChart({
   currentPolicyPrice: number;
 }) {
   const width = 260;
-  const height = 100;
+  const height = 120;
   const paddingLeft = 35;
   const paddingRight = 10;
-  const paddingTop = 12;
+  const paddingTop = 18;
   const paddingBottom = 20;
   const chartWidth = width - paddingLeft - paddingRight;
   const chartHeight = height - paddingTop - paddingBottom;
 
-  const pricesWithValues = priceHistory
-    .map((p) => p.lowestPrice)
-    .filter((p): p is number => p !== null);
+  const matchedPrices = priceHistory.map((p) => p.lowestPrice).filter((p): p is number => p !== null);
+  const marketPrices = priceHistory.map((p) => p.marketLowestPrice).filter((p): p is number => p !== null);
+  const allPricesForScale = [...matchedPrices, ...marketPrices];
 
-  if (pricesWithValues.length === 0) {
+  if (allPricesForScale.length === 0) {
     return (
       <div className="flex items-center justify-center" style={{ height: height }}>
         <p className="text-[10px] text-gray-400">Collecting data...</p>
@@ -75,11 +101,10 @@ function LivePriceChart({
     );
   }
 
-  const allPrices = [...pricesWithValues];
-  if (currentPolicyPrice > 0) allPrices.push(currentPolicyPrice);
+  if (currentPolicyPrice > 0) allPricesForScale.push(currentPolicyPrice);
 
-  const minPrice = Math.min(...allPrices) - 30;
-  const maxPrice = Math.max(...allPrices) + 30;
+  const minPrice = Math.min(...allPricesForScale) - 30;
+  const maxPrice = Math.max(...allPricesForScale) + 30;
   const priceRange = maxPrice - minPrice || 1;
 
   const getX = (index: number) => {
@@ -91,30 +116,15 @@ function LivePriceChart({
     return paddingTop + chartHeight - ((price - minPrice) / priceRange) * chartHeight;
   };
 
-  // Build line segments that break at null values (no data months)
-  const lineSegments: string[] = [];
-  let currentSegment: { x: number; y: number }[] = [];
+  const marketSegments = buildLineSegments(priceHistory, (p) => p.marketLowestPrice, getX, getY);
+  const matchedSegments = buildLineSegments(priceHistory, (p) => p.lowestPrice, getX, getY);
 
-  priceHistory.forEach((p, i) => {
-    if (p.lowestPrice !== null) {
-      currentSegment.push({ x: getX(i), y: getY(p.lowestPrice) });
-    } else {
-      if (currentSegment.length > 1) {
-        lineSegments.push(
-          currentSegment.map((pt, j) => `${j === 0 ? "M" : "L"} ${pt.x} ${pt.y}`).join(" "),
-        );
-      }
-      currentSegment = [];
-    }
-  });
-  if (currentSegment.length > 1) {
-    lineSegments.push(
-      currentSegment.map((pt, j) => `${j === 0 ? "M" : "L"} ${pt.x} ${pt.y}`).join(" "),
-    );
-  }
+  const marketDots = priceHistory
+    .map((p, i) => (p.marketLowestPrice !== null ? { x: getX(i), y: getY(p.marketLowestPrice), price: p.marketLowestPrice, index: i } : null))
+    .filter((p): p is NonNullable<typeof p> => p !== null);
 
-  const dataPoints = priceHistory
-    .map((p, i) => (p.lowestPrice !== null ? { x: getX(i), y: getY(p.lowestPrice), price: p.lowestPrice, month: p.month, index: i } : null))
+  const matchedDots = priceHistory
+    .map((p, i) => (p.lowestPrice !== null ? { x: getX(i), y: getY(p.lowestPrice), price: p.lowestPrice, index: i } : null))
     .filter((p): p is NonNullable<typeof p> => p !== null);
 
   const refLineY = currentPolicyPrice > 0 ? getY(currentPolicyPrice) : null;
@@ -127,6 +137,18 @@ function LivePriceChart({
 
   return (
     <svg width={width} height={height} className="w-full" viewBox={`0 0 ${width} ${height}`} data-testid="price-chart-svg">
+      {/* Legend */}
+      <circle cx={paddingLeft + 2} cy={6} r={3} fill="#9ca3af" />
+      <text x={paddingLeft + 8} y={9} fontSize="6" className="fill-gray-500">Market</text>
+      <circle cx={paddingLeft + 42} cy={6} r={3} fill="#3b82f6" />
+      <text x={paddingLeft + 48} y={9} fontSize="6" className="fill-blue-600">Matched</text>
+      {currentPolicyPrice > 0 && (
+        <>
+          <line x1={paddingLeft + 88} y1={6} x2={paddingLeft + 98} y2={6} stroke="#f97316" strokeWidth={1} strokeDasharray="2 1" />
+          <text x={paddingLeft + 101} y={9} fontSize="6" className="fill-orange-500">Your price</text>
+        </>
+      )}
+
       {/* Y-axis tick labels */}
       {tickValues.map((val) => (
         <text key={val} x={paddingLeft - 4} y={getY(val) + 3} textAnchor="end" className="fill-gray-400" fontSize="8">
@@ -149,40 +171,54 @@ function LivePriceChart({
 
       {/* Current policy price reference line */}
       {refLineY !== null && (
-        <>
-          <line
-            x1={paddingLeft}
-            y1={refLineY}
-            x2={width - paddingRight}
-            y2={refLineY}
-            stroke="#f97316"
-            strokeWidth={1}
-            strokeDasharray="4 3"
-            opacity={0.8}
-          />
-          <text x={width - paddingRight} y={refLineY - 3} textAnchor="end" fontSize="7" className="fill-orange-500" fontWeight="600">
-            Your price
-          </text>
-        </>
+        <line
+          x1={paddingLeft}
+          y1={refLineY}
+          x2={width - paddingRight}
+          y2={refLineY}
+          stroke="#f97316"
+          strokeWidth={1}
+          strokeDasharray="4 3"
+          opacity={0.8}
+        />
       )}
 
-      {/* Line segments connecting dots (breaks at gaps) */}
-      {lineSegments.map((segment, i) => (
-        <path key={i} d={segment} fill="none" stroke="#3b82f6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      {/* Grey market line segments */}
+      {marketSegments.map((segment, i) => (
+        <path key={`market-${i}`} d={segment} fill="none" stroke="#9ca3af" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />
       ))}
 
-      {/* Data points */}
-      {dataPoints.map((point, i) => (
-        <g key={i}>
+      {/* Grey market dots */}
+      {marketDots.map((point, i) => (
+        <circle
+          key={`market-dot-${i}`}
+          cx={point.x}
+          cy={point.y}
+          r={2.5}
+          fill="#9ca3af"
+          stroke="white"
+          strokeWidth={1}
+          opacity={0.8}
+        />
+      ))}
+
+      {/* Blue matched line segments */}
+      {matchedSegments.map((segment, i) => (
+        <path key={`matched-${i}`} d={segment} fill="none" stroke="#3b82f6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      ))}
+
+      {/* Blue matched dots */}
+      {matchedDots.map((point, i) => (
+        <g key={`matched-dot-${i}`}>
           <circle
             cx={point.x}
             cy={point.y}
-            r={i === dataPoints.length - 1 ? 4 : 3}
-            fill={i === dataPoints.length - 1 ? "#2563eb" : "#3b82f6"}
+            r={i === matchedDots.length - 1 ? 4 : 3}
+            fill={i === matchedDots.length - 1 ? "#2563eb" : "#3b82f6"}
             stroke="white"
             strokeWidth={1.5}
           >
-            {i === dataPoints.length - 1 && (
+            {i === matchedDots.length - 1 && (
               <animate attributeName="r" values="4;6;4" dur="1.5s" repeatCount="indefinite" />
             )}
           </circle>

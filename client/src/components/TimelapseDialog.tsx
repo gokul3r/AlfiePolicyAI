@@ -122,7 +122,7 @@ export function TimelapseDialog({
   const [currentInsuranceProvider, setCurrentInsuranceProvider] =
     useState<string>("");
   const [priceHistory, setPriceHistory] = useState<
-    { month: string; lowestPrice: number | null }[]
+    { month: string; lowestPrice: number | null; marketLowestPrice: number | null }[]
   >([]);
   const [currentPolicyPrice, setCurrentPolicyPrice] = useState<number>(0);
   const { toast } = useToast();
@@ -186,22 +186,29 @@ export function TimelapseDialog({
       // Track price data for the live graph - aggregate per month+year
       const monthLabel = searchDate.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
       const lowestPrice = allMatches.length > 0 ? Math.min(...allMatches.map((m) => m.price)) : null;
+      const allQuotePrices: number[] = response.all_quote_prices || [];
+      const marketLowestPrice = allQuotePrices.length > 0 ? Math.min(...allQuotePrices) : null;
 
       setPriceHistory((prev) => {
         const existing = prev.find((p) => p.month === monthLabel);
         if (existing) {
-          // Same month - update with lower price if found
+          const updatedEntry = { ...existing };
           if (lowestPrice !== null) {
-            const currentBest = existing.lowestPrice;
-            if (currentBest === null || lowestPrice < currentBest) {
-              return prev.map((p) =>
-                p.month === monthLabel ? { ...p, lowestPrice } : p,
-              );
+            if (updatedEntry.lowestPrice === null || lowestPrice < updatedEntry.lowestPrice) {
+              updatedEntry.lowestPrice = lowestPrice;
             }
+          }
+          if (marketLowestPrice !== null) {
+            if (updatedEntry.marketLowestPrice === null || marketLowestPrice < updatedEntry.marketLowestPrice) {
+              updatedEntry.marketLowestPrice = marketLowestPrice;
+            }
+          }
+          if (updatedEntry.lowestPrice !== existing.lowestPrice || updatedEntry.marketLowestPrice !== existing.marketLowestPrice) {
+            return prev.map((p) => p.month === monthLabel ? updatedEntry : p);
           }
           return prev;
         }
-        return [...prev, { month: monthLabel, lowestPrice }];
+        return [...prev, { month: monthLabel, lowestPrice, marketLowestPrice }];
       });
 
       if (matches.length > 0) {
@@ -394,6 +401,7 @@ export function TimelapseDialog({
         console.log(
           `[Timelapse] DB updated: policy switched to ${currentMatch.insurer} at £${currentMatch.price}`,
         );
+        setCurrentPolicyPrice(currentMatch.price);
         queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
       } catch (purchaseError) {
         console.error("[Timelapse] Failed to update policy in DB:", purchaseError);

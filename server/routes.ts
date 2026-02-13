@@ -465,6 +465,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quotes = quoteData.quotes_with_insights || [];
       console.log(`[Timelapse Week] Received ${quotes.length} quotes from API`);
 
+      // Collect ALL valid quote prices for market trend (grey line on chart)
+      const allQuotePrices: number[] = [];
+
       // Find all matching quotes (not just best one) using API's pre-computed matching data
       const matches: any[] = [];
       for (const quote of quotes) {
@@ -475,6 +478,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!quotePrice || !insurerName) {
           continue;
         }
+
+        // Track all valid prices for market trend regardless of feature matching
+        allQuotePrices.push(quotePrice);
 
         // Use API's pre-computed budget check
         const withinBudget = quote.price_analysis?.within_budget ?? true;
@@ -521,12 +527,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Sort matches by price (cheapest first)
       matches.sort((a, b) => a.price - b.price);
 
-      console.log(`[Timelapse Week] Found ${matches.length} matches on ${search_date}`);
+      console.log(`[Timelapse Week] Found ${matches.length} matches on ${search_date}, ${allQuotePrices.length} total quotes with prices`);
 
       res.json({
         search_date,
         match_found: matches.length > 0,
         matches,
+        all_quote_prices: allQuotePrices,
         current_insurance_provider: policy.current_insurance_provider,
         total_quotes_searched: quotes.length,
         parsed_preferences: parsedPrefs,
