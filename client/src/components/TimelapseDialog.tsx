@@ -73,6 +73,7 @@ type TimelapseState =
   | "notification_slide"
   | "match_found"
   | "no_match"
+  | "timelapse_complete"
   | "confirming_purchase"
   | "celebration";
 
@@ -233,10 +234,10 @@ export function TimelapseDialog({
         // Check if we've reached the end
         if (nextDate > endDate) {
           console.log(
-            `[Timelapse] Reached policy end date (${endDate.toISOString().split("T")[0]}). No matches found.`,
+            `[Timelapse] Reached policy end date (${endDate.toISOString().split("T")[0]}). Timelapse complete.`,
           );
           flushSync(() => {
-            setState("no_match");
+            setState("timelapse_complete");
             setIsSearching(false);
           });
         } else {
@@ -446,7 +447,7 @@ export function TimelapseDialog({
         `[Timelapse] Reached policy end date after keeping searching.`,
       );
       flushSync(() => {
-        setState("no_match");
+        setState("timelapse_complete");
         setIsSearching(false);
       });
       return;
@@ -475,7 +476,7 @@ export function TimelapseDialog({
     if (nextDate > policyEndDate) {
       console.log("[Timelapse] Reached policy end date after continuing timelapse.");
       flushSync(() => {
-        setState("no_match");
+        setState("timelapse_complete");
         setIsSearching(false);
       });
       return;
@@ -613,6 +614,57 @@ export function TimelapseDialog({
             rejectedQuotes={rejectedQuotes}
             searchDate={currentDate}
           />
+        )}
+
+        {/* Timelapse Complete - Keep chart visible with summary banner */}
+        {state === "timelapse_complete" && (
+          <div className="flex flex-col items-center justify-center h-full p-8">
+            <IPhoneMockup
+              showNotification={false}
+              searchDate={currentDate}
+              caption=""
+              priceHistory={priceHistory}
+              currentPolicyPrice={currentPolicyPrice}
+            />
+            <div className="w-full max-w-md mt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="rounded-md border border-border bg-muted/50 p-4 text-center space-y-3">
+                <div className="flex items-center justify-center gap-2">
+                  <Calendar className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-base font-semibold text-foreground">
+                    End of Timelapse Demo
+                  </span>
+                </div>
+                <div className="flex justify-center gap-6 text-sm">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <span className="text-muted-foreground">
+                      Accepted:{" "}
+                      <span className="font-medium text-green-600 dark:text-green-400">
+                        {quotesAccepted}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <XCircle className="w-4 h-4 text-red-500" />
+                    <span className="text-muted-foreground">
+                      Rejected:{" "}
+                      <span className="font-medium text-red-600 dark:text-red-400">
+                        {quotesRejected}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  size="lg"
+                  onClick={handleClose}
+                  className="w-full mt-2"
+                  data-testid="button-close-timelapse-complete"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* No Match State */}
