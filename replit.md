@@ -69,6 +69,9 @@ Database Schema includes:
   - Replaced full card (circular SVG ring, stars row, thumbs-up reviews, trust score progress bar) with single responsive row
   - Shows: blue star icon, numeric rating, mini star icons, "TrustPilot" label, divider, review count
   - Uses flex-wrap for mobile responsiveness
+- **5.2.3**: Fixed month-skipping bug in timelapse chart:
+  - Root cause: JavaScript `setMonth()` overflows short months (e.g., Jan 31 + 1 month = Mar 3, skipping February)
+  - Fix: Clamp day to last day of target month (e.g., Jan 31 -> Feb 28, Mar 31 -> Apr 30)
 
 ### Release 5.1 (February 2026)
 - **5.1.1**: Scheduled quote search screen - changed "Continue Searching" button text to "Continue Demo"

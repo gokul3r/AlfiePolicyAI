@@ -138,7 +138,11 @@ export function TimelapseDialog({
     if (frequency === "weekly") {
       nextDate.setDate(nextDate.getDate() + 7);
     } else {
-      nextDate.setMonth(nextDate.getMonth() + 1);
+      const currentDay = currentDate.getDate();
+      const targetMonth = currentDate.getMonth() + 1;
+      nextDate.setMonth(targetMonth, 1);
+      const lastDayOfTargetMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
+      nextDate.setDate(Math.min(currentDay, lastDayOfTargetMonth));
     }
     return nextDate;
   };
