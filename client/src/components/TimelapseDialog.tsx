@@ -19,7 +19,6 @@ import {
   Star,
   StarHalf,
   Shield,
-  ThumbsUp,
   Scale,
   Gavel,
   Car,
@@ -867,7 +866,7 @@ function MatchFoundState({
       stars.push(
         <Star
           key={`full-${i}`}
-          className="w-4 h-4 fill-amber-400 text-amber-400"
+          className="w-3.5 h-3.5 fill-blue-500 text-blue-500"
         />,
       );
     }
@@ -875,7 +874,7 @@ function MatchFoundState({
       stars.push(
         <StarHalf
           key="half"
-          className="w-4 h-4 fill-amber-400 text-amber-400"
+          className="w-3.5 h-3.5 fill-blue-500 text-blue-500"
         />,
       );
     }
@@ -884,7 +883,7 @@ function MatchFoundState({
       stars.push(
         <Star
           key={`empty-${i}`}
-          className="w-4 h-4 text-gray-300 dark:text-gray-600"
+          className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600"
         />,
       );
     }
@@ -1249,105 +1248,44 @@ function MatchFoundState({
           </div>
         </div>
 
-        {/* ENHANCED: TrustPilot Rating Section with Amber Gradient */}
-        <div
-          className="rounded-lg overflow-hidden border border-amber-200 dark:border-amber-800"
-          data-testid="rating-section"
-        >
-          <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 flex items-center gap-2">
-            <Star className="w-5 h-5 text-white fill-white" />
-            <span className="text-sm font-semibold text-white">
-              TrustPilot Rating
-            </span>
-          </div>
-          <div className="bg-gradient-to-br from-amber-50 via-white to-orange-50 dark:from-amber-950/50 dark:via-background dark:to-orange-950/50 p-4">
-            {(() => {
-              const rating = matchData.trustpilot_rating ?? 0;
-              const ratingPercentage = (rating / 5) * 100;
-              return (
-                <div className="flex items-center gap-4">
-                  {/* Circular Score Badge */}
-                  <div className="relative">
-                    <svg className="w-16 h-16 transform -rotate-90">
-                      <circle
-                        cx="32"
-                        cy="32"
-                        r="28"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                        className="text-amber-100 dark:text-amber-900"
-                      />
-                      <circle
-                        cx="32"
-                        cy="32"
-                        r="28"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                        strokeDasharray={`${(rating / 5) * 175.9} 175.9`}
-                        strokeLinecap="round"
-                        className="text-amber-500"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-lg font-bold text-amber-600 dark:text-amber-400">
-                        {rating > 0 ? rating.toFixed(1) : "N/A"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Stars and Details */}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-1 mb-2">
-                      {renderStars(rating)}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <ThumbsUp className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                      <span className="text-amber-700 dark:text-amber-300 font-medium">
-                        {Math.floor(
-                          Math.random() * 5000 + 2000,
-                        ).toLocaleString()}{" "}
-                        reviews
-                      </span>
-                    </div>
-                    {/* Trust Score Bar */}
-                    <div className="mt-2">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-muted-foreground">
-                          Trust Score
-                        </span>
-                        <span className="font-semibold text-amber-600 dark:text-amber-400">
-                          {ratingPercentage.toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="h-2 bg-amber-100 dark:bg-amber-900 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full transition-all duration-1000"
-                          style={{ width: `${ratingPercentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
+        {/* TrustPilot Rating - Compact inline display */}
+        {(() => {
+          const rating = matchData.trustpilot_rating ?? 0;
+          const reviewCount = Math.floor(Math.random() * 5000 + 2000);
+          return (
+            <div
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-4 py-3"
+              data-testid="rating-section"
+            >
+              <div className="flex items-center gap-2 shrink-0">
+                <Star className="w-4 h-4 fill-blue-500 text-blue-500 shrink-0" />
+                <span className="text-sm font-semibold text-foreground">
+                  {rating > 0 ? rating.toFixed(1) : "N/A"}
+                </span>
+                <div className="flex items-center gap-0.5">
+                  {renderStars(rating)}
                 </div>
-              );
-            })()}
-          </div>
-        </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  TrustPilot
+                </span>
+                <span className="text-muted-foreground/40">|</span>
+                <span className="text-xs text-muted-foreground">
+                  {reviewCount.toLocaleString()} reviews
+                </span>
+              </div>
+            </div>
+          );
+        })()}
 
-        {/* ENHANCED: AutoAnnie's Insight with Purple Gradient */}
+        {/* AutoAnnie's Insight - Blue branded */}
         {ai_insight && (
           <div
-            className="rounded-lg overflow-hidden border border-purple-200 dark:border-purple-800"
+            className="rounded-lg overflow-hidden border border-blue-200 dark:border-blue-800"
             data-testid="insight-section"
           >
-            <div className="bg-gradient-to-r from-purple-500 to-indigo-500 px-4 py-3 flex items-center gap-2 relative overflow-hidden">
-              {/* Animated sparkle effect */}
-              <div className="absolute inset-0 opacity-30">
-                <div className="absolute top-1 left-1/4 w-1 h-1 bg-white rounded-full animate-pulse" />
-                <div className="absolute top-2 right-1/3 w-1.5 h-1.5 bg-white rounded-full animate-pulse delay-300" />
-                <div className="absolute bottom-1 left-1/2 w-1 h-1 bg-white rounded-full animate-pulse delay-500" />
-              </div>
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 flex items-center gap-2 relative overflow-hidden">
               <Sparkles className="w-5 h-5 text-white animate-pulse" />
               <span className="text-sm font-semibold text-white">
                 AutoAnnie's Insight
@@ -1359,26 +1297,26 @@ function MatchFoundState({
                 </span>
               </div>
             </div>
-            <div className="bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-purple-950/50 dark:via-background dark:to-indigo-950/50 p-4">
+            <div className="bg-gradient-to-br from-blue-50 via-white to-blue-50/50 dark:from-blue-950/50 dark:via-background dark:to-blue-950/30 p-4">
               <div className="flex items-start gap-3">
-                <div className="bg-purple-100 dark:bg-purple-900 p-2 rounded-lg shrink-0">
-                  <BadgeCheck className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded-lg shrink-0">
+                  <BadgeCheck className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <p className="text-sm text-foreground leading-relaxed">
                   {ai_insight}
                 </p>
               </div>
               {/* Coverage Match Indicator */}
-              <div className="mt-3 pt-3 border-t border-purple-100 dark:border-purple-800">
+              <div className="mt-3 pt-3 border-t border-blue-100 dark:border-blue-800">
                 <div className="flex items-center justify-between text-xs mb-1.5">
                   <span className="text-muted-foreground">Coverage Match</span>
-                  <span className="font-semibold text-purple-600 dark:text-purple-400">
+                  <span className="font-semibold text-blue-600 dark:text-blue-400">
                     {Math.floor(85 + Math.random() * 10)}%
                   </span>
                 </div>
-                <div className="h-2 bg-purple-100 dark:bg-purple-900 rounded-full overflow-hidden">
+                <div className="h-2 bg-blue-100 dark:bg-blue-900 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all duration-1000"
+                    className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-1000"
                     style={{ width: `${85 + Math.random() * 10}%` }}
                   />
                 </div>

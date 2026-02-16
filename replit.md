@@ -59,6 +59,17 @@ Database Schema includes:
 
 ## Recent Changes
 
+### Release 5.2 (February 2026) - Quote Match Found Screen Simplification & Branding
+- **5.2.1**: Re-themed quote match found screen to align with blue AutoAnnie branding:
+  - Trustpilot section: changed from orange/amber gradients to blue tones
+  - AutoAnnie Insight section: changed from purple/indigo gradients to blue gradients
+  - Star ratings now rendered in blue instead of amber
+  - Removed animated sparkle dots from insight header for cleaner look
+- **5.2.2**: Simplified Trustpilot rating into compact inline display:
+  - Replaced full card (circular SVG ring, stars row, thumbs-up reviews, trust score progress bar) with single responsive row
+  - Shows: blue star icon, numeric rating, mini star icons, "TrustPilot" label, divider, review count
+  - Uses flex-wrap for mobile responsiveness
+
 ### Release 5.1 (February 2026)
 - **5.1.1**: Scheduled quote search screen - changed "Continue Searching" button text to "Continue Demo"
 - **5.1.2**: Scheduled quote search screen - changed "Confirm Purchase" button text to "Switch Policy"
