@@ -11,7 +11,12 @@ export interface FinancialBreakdown {
   days_remaining: number;
   new_policy_cost: number; // Full 12-month new policy cost (UK policies are always annual)
   upfront_impact: number; // Positive = receive back, Negative = pay extra
-  annual_premium_delta: number; // Positive = saving, Negative = paying more
+  annual_premium_delta: number; // Legacy: simple premium difference (kept for backwards compat)
+  stay_cost_12m: number; // Total cost over next 12 months if staying (remaining coverage value + renewal)
+  switch_cost_12m: number; // Total cost over next 12 months if switching (new policy + cancellation fee)
+  annual_savings: number; // stay_cost_12m - switch_cost_12m (positive = saving by switching)
+  stay_remaining_value: number; // Value of remaining coverage on current policy
+  stay_renewal_cost: number; // Assumed renewal cost (same as current annual premium)
 }
 
 /**
@@ -82,11 +87,23 @@ export function calculateFinancialBreakdown(
   // Negative = pay money upfront
   const upfront_impact = refund - cancellationFee - newPolicyCost;
   
-  // Annual premium delta = current_cost - new_quote_price - cancellation_fee
-  // Cancellation fee is subtracted because it's a real cost when switching
-  // Positive = saving
-  // Negative = paying more
+  // Annual premium delta = current_cost - new_quote_price - cancellation_fee (legacy, kept for backwards compat)
   const annual_premium_delta = currentPolicyCost - newQuotePrice - cancellationFee;
+  
+  // Expert calculation: Total Cost Over Next 12 Months From Today
+  // If staying: remaining coverage value (already paid) + full renewal at current rate
+  const dailyRate = totalDays > 0 ? currentPolicyCost / totalDays : 0;
+  const stayRemainingValue = Math.round(dailyRate * daysRemaining * 100) / 100;
+  const stayRenewalCost = currentPolicyCost;
+  const stayCost12m = stayRemainingValue + stayRenewalCost;
+  
+  // If switching: new policy (full 12 months) + cancellation fee
+  // Note: pro-rata refund is NOT subtracted here because this represents total insurance cost,
+  // not cash flow. The refund is accounted in the upfront_impact section.
+  const switchCost12m = newQuotePrice + cancellationFee;
+  
+  // Annual savings = stay cost - switch cost (positive = saving by switching)
+  const annualSavings = stayCost12m - switchCost12m;
   
   return {
     new_quote_price: Math.round(newQuotePrice * 100) / 100,
@@ -98,5 +115,10 @@ export function calculateFinancialBreakdown(
     new_policy_cost: Math.round(newPolicyCost * 100) / 100,
     upfront_impact: Math.round(upfront_impact * 100) / 100,
     annual_premium_delta: Math.round(annual_premium_delta * 100) / 100,
+    stay_cost_12m: Math.round(stayCost12m * 100) / 100,
+    switch_cost_12m: Math.round(switchCost12m * 100) / 100,
+    annual_savings: Math.round(annualSavings * 100) / 100,
+    stay_remaining_value: stayRemainingValue,
+    stay_renewal_cost: Math.round(stayRenewalCost * 100) / 100,
   };
 }

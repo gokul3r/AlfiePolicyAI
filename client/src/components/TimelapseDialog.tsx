@@ -95,6 +95,11 @@ interface MatchData {
     new_policy_cost: number;
     upfront_impact: number;
     annual_premium_delta: number;
+    stay_cost_12m: number;
+    switch_cost_12m: number;
+    annual_savings: number;
+    stay_remaining_value: number;
+    stay_renewal_cost: number;
   };
 }
 
@@ -177,11 +182,10 @@ export function TimelapseDialog({
         setCurrentInsuranceProvider(response.current_insurance_provider);
       }
 
-      // Filter matches based on minimum savings threshold
-      // annual_premium_delta already includes cancellation fee (subtracted in backend)
+      // Filter matches based on minimum savings threshold using 12-month annual savings
       const matches = allMatches.filter((match) => {
         return (
-          match.financial_breakdown.annual_premium_delta >= minSavingsThreshold
+          match.financial_breakdown.annual_savings >= minSavingsThreshold
         );
       });
 
@@ -625,10 +629,9 @@ export function TimelapseDialog({
               showNotification={showNotification}
               notificationData={{
                 vehicle: vehicleName,
-                // annual_premium_delta already includes cancellation fee (subtracted in backend)
                 savings:
                   currentWeekMatches[currentMatchIndex].financial_breakdown
-                    .annual_premium_delta,
+                    .annual_savings,
                 provider:
                   currentWeekMatches[currentMatchIndex].financial_breakdown
                     .new_quote_insurer,
@@ -848,6 +851,7 @@ function MatchFoundState({
   const [showAllFeatures, setShowAllFeatures] = useState(false);
   const [showUpfrontBreakdown, setShowUpfrontBreakdown] = useState(false);
   const [showDeltaBreakdown, setShowDeltaBreakdown] = useState(false);
+  const [showSwitchBreakdown, setShowSwitchBreakdown] = useState(false);
   const requestedFeatures = matchData.requested_features ?? [];
   const missingFeatures = matchData.missing_features ?? [];
 
@@ -1047,78 +1051,109 @@ function MatchFoundState({
             )}
           </div>
 
+          {/* Annual Savings - Expert 12-month comparison */}
           <div className="flex justify-between items-center py-3 bg-primary/10 rounded-lg px-4">
-            <span className="font-semibold">Annual premium delta</span>
+            <span className="font-semibold">Annual Savings</span>
             <span
               className={`text-xl font-bold ${
-                financial_breakdown.annual_premium_delta > 0
+                financial_breakdown.annual_savings > 0
                   ? "text-green-600 dark:text-green-400"
                   : "text-red-600 dark:text-red-400"
               }`}
+              data-testid="text-annual-savings"
             >
-              {financial_breakdown.annual_premium_delta > 0
-                ? "Saving "
-                : "Paying "}
-              £{Math.abs(financial_breakdown.annual_premium_delta).toFixed(2)}{" "}
-              per year
+              {financial_breakdown.annual_savings > 0
+                ? "Save "
+                : "Extra "}
+              £{Math.abs(financial_breakdown.annual_savings).toFixed(2)}
             </span>
           </div>
 
-          {/* Annual Premium Delta Calculation Breakdown - Collapsible */}
-          <div className="bg-muted/50 rounded-lg px-4 py-3 text-xs text-muted-foreground">
-            <button
-              onClick={() => setShowDeltaBreakdown(!showDeltaBreakdown)}
-              className="flex items-center justify-between w-full text-left"
-              data-testid="button-toggle-delta-breakdown"
-            >
-              <span className="font-medium text-foreground">How this is calculated</span>
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <span className="text-xs">{showDeltaBreakdown ? "Hide" : "Show"}</span>
-                {showDeltaBreakdown ? (
-                  <ChevronUp className="w-4 h-4" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </div>
-            </button>
-            {showDeltaBreakdown && (
-              <div className="space-y-1 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="flex justify-between">
-                  <span>Current annual premium</span>
-                  <span>£{financial_breakdown.current_cost.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>New annual premium</span>
-                  <span className="text-red-600 dark:text-red-400">
-                    - £{financial_breakdown.new_quote_price.toFixed(2)}
+          {/* Stay vs Switch comparison with collapsible breakdowns */}
+          <div className="bg-muted/50 rounded-lg px-4 py-3 text-xs text-muted-foreground space-y-3">
+            <p className="text-xs text-muted-foreground mb-2">
+              Cost over next 12 months from switch date
+            </p>
+
+            {/* If you stay */}
+            <div>
+              <button
+                onClick={() => setShowDeltaBreakdown(!showDeltaBreakdown)}
+                className="flex items-center justify-between w-full text-left"
+                data-testid="button-toggle-stay-breakdown"
+              >
+                <span className="font-medium text-foreground">If you stay</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-foreground">
+                    £{financial_breakdown.stay_cost_12m.toFixed(2)}
                   </span>
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <span className="text-xs">{showDeltaBreakdown ? "Hide" : "Details"}</span>
+                    {showDeltaBreakdown ? (
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    )}
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span>Cancellation fee</span>
-                  <span className="text-red-600 dark:text-red-400">
-                    - £{financial_breakdown.cancellation_fee.toFixed(2)}
-                  </span>
+              </button>
+              {showDeltaBreakdown && (
+                <div className="space-y-1 mt-2 ml-2 pl-3 border-l-2 border-border animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex justify-between">
+                    <span>Remaining coverage (~{financial_breakdown.days_remaining} days)</span>
+                    <span>£{financial_breakdown.stay_remaining_value.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Renewal (assumed same rate)</span>
+                    <span>£{financial_breakdown.stay_renewal_cost.toFixed(2)}</span>
+                  </div>
+                  <div className="border-t border-border pt-1.5 mt-1.5 flex justify-between font-medium text-foreground">
+                    <span>Total</span>
+                    <span>£{financial_breakdown.stay_cost_12m.toFixed(2)}</span>
+                  </div>
                 </div>
-                <div className="border-t border-border pt-2 mt-2 flex justify-between font-medium text-foreground">
-                  <span>
-                    Net annual{" "}
-                    {financial_breakdown.annual_premium_delta > 0
-                      ? "savings"
-                      : "increase"}
+              )}
+            </div>
+
+            {/* If you switch */}
+            <div>
+              <button
+                onClick={() => setShowSwitchBreakdown(!showSwitchBreakdown)}
+                className="flex items-center justify-between w-full text-left"
+                data-testid="button-toggle-switch-breakdown"
+              >
+                <span className="font-medium text-foreground">If you switch</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-green-600 dark:text-green-400">
+                    £{financial_breakdown.switch_cost_12m.toFixed(2)}
                   </span>
-                  <span
-                    className={
-                      financial_breakdown.annual_premium_delta > 0
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-red-600 dark:text-red-400"
-                    }
-                  >
-                    = £
-                    {Math.abs(financial_breakdown.annual_premium_delta).toFixed(2)}
-                  </span>
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <span className="text-xs">{showSwitchBreakdown ? "Hide" : "Details"}</span>
+                    {showSwitchBreakdown ? (
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    ) : (
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              </button>
+              {showSwitchBreakdown && (
+                <div className="space-y-1 mt-2 ml-2 pl-3 border-l-2 border-green-300 dark:border-green-700 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="flex justify-between">
+                    <span>New policy (12 months)</span>
+                    <span>£{financial_breakdown.new_quote_price.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Cancellation fee</span>
+                    <span>£{financial_breakdown.cancellation_fee.toFixed(2)}</span>
+                  </div>
+                  <div className="border-t border-border pt-1.5 mt-1.5 flex justify-between font-medium text-foreground">
+                    <span>Total</span>
+                    <span className={financial_breakdown.annual_savings > 0 ? "text-green-600 dark:text-green-400" : ""}>£{financial_breakdown.switch_cost_12m.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

@@ -74,6 +74,14 @@ Database Schema includes:
   - Fix: Clamp day to last day of target month (e.g., Jan 31 -> Feb 28, Mar 31 -> Apr 30)
 - **5.2.4**: Chart readability improvements:
   - X-axis labels split into two lines: month abbreviation (top, normal) and year (below, smaller/lighter) to prevent overlapping
+- **5.2.5**: Replaced "Annual premium delta" with expert-validated "Annual Savings" calculation:
+  - Old logic: simple difference between annual premiums (misleading for mid-policy switches)
+  - New logic: compares total cost over next 12 months for stay vs switch scenarios
+  - "If you stay" = remaining coverage value + renewal at current rate
+  - "If you switch" = new policy (12 months) + cancellation fee
+  - Each scenario has a collapsible breakdown showing calculation details
+  - Savings threshold filter updated to use new annual_savings field
+  - Backend financial-calculator.ts returns stay_cost_12m, switch_cost_12m, annual_savings, stay_remaining_value, stay_renewal_cost
 
 ### Release 5.1 (February 2026)
 - **5.1.1**: Scheduled quote search screen - changed "Continue Searching" button text to "Continue Demo"
