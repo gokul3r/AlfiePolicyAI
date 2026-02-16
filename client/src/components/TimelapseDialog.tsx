@@ -100,6 +100,7 @@ interface MatchData {
     annual_savings: number;
     stay_remaining_value: number;
     stay_renewal_cost: number;
+    stay_renewal_days: number;
   };
 }
 
@@ -1104,7 +1105,7 @@ function MatchFoundState({
                     <span>£{financial_breakdown.stay_remaining_value.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Renewal (assumed same rate)</span>
+                    <span>Renewal (~{financial_breakdown.stay_renewal_days} days at same rate)</span>
                     <span>£{financial_breakdown.stay_renewal_cost.toFixed(2)}</span>
                   </div>
                   <div className="border-t border-border pt-1.5 mt-1.5 flex justify-between font-medium text-foreground">

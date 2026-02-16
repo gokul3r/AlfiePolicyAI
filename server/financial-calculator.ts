@@ -16,7 +16,8 @@ export interface FinancialBreakdown {
   switch_cost_12m: number; // Total cost over next 12 months if switching (new policy + cancellation fee)
   annual_savings: number; // stay_cost_12m - switch_cost_12m (positive = saving by switching)
   stay_remaining_value: number; // Value of remaining coverage on current policy
-  stay_renewal_cost: number; // Assumed renewal cost (same as current annual premium)
+  stay_renewal_cost: number; // Cost of renewal portion to fill 12 months
+  stay_renewal_days: number; // Number of days the renewal covers (365 - daysRemaining)
 }
 
 /**
@@ -90,11 +91,13 @@ export function calculateFinancialBreakdown(
   // Annual premium delta = current_cost - new_quote_price - cancellation_fee (legacy, kept for backwards compat)
   const annual_premium_delta = currentPolicyCost - newQuotePrice - cancellationFee;
   
-  // Expert calculation: Total Cost Over Next 12 Months From Today
-  // If staying: remaining coverage value (already paid) + full renewal at current rate
+  // Expert calculation: Total Cost Over Next 12 Months From Switch Date
+  // Both scenarios must cover exactly 365 days for a fair comparison
   const dailyRate = totalDays > 0 ? currentPolicyCost / totalDays : 0;
   const stayRemainingValue = Math.round(dailyRate * daysRemaining * 100) / 100;
-  const stayRenewalCost = currentPolicyCost;
+  // Renewal only covers the gap: 365 - daysRemaining days (not a full year)
+  const renewalDays = Math.max(0, 365 - daysRemaining);
+  const stayRenewalCost = Math.round(dailyRate * renewalDays * 100) / 100;
   const stayCost12m = stayRemainingValue + stayRenewalCost;
   
   // If switching: new policy (full 12 months) + cancellation fee
@@ -120,5 +123,6 @@ export function calculateFinancialBreakdown(
     annual_savings: Math.round(annualSavings * 100) / 100,
     stay_remaining_value: stayRemainingValue,
     stay_renewal_cost: Math.round(stayRenewalCost * 100) / 100,
+    stay_renewal_days: renewalDays,
   };
 }
