@@ -72,6 +72,8 @@ Database Schema includes:
 - **5.2.3**: Fixed month-skipping bug in timelapse chart:
   - Root cause: JavaScript `setMonth()` overflows short months (e.g., Jan 31 + 1 month = Mar 3, skipping February)
   - Fix: Clamp day to last day of target month (e.g., Jan 31 -> Feb 28, Mar 31 -> Apr 30)
+- **5.2.4**: Chart readability improvements:
+  - X-axis labels split into two lines: month abbreviation (top, normal) and year (below, smaller/lighter) to prevent overlapping
 
 ### Release 5.1 (February 2026)
 - **5.1.1**: Scheduled quote search screen - changed "Continue Searching" button text to "Continue Demo"

@@ -327,19 +327,36 @@ function LivePriceChart({
           );
         })}
 
-        {/* X-axis month labels */}
-        {priceHistory.map((p, i) => (
-          <text
-            key={i}
-            x={getX(i)}
-            y={height - 4}
-            textAnchor="middle"
-            fontSize="7"
-            className="fill-gray-500"
-          >
-            {p.month}
-          </text>
-        ))}
+        {/* X-axis month labels - split into month (top) and year (below) */}
+        {priceHistory.map((p, i) => {
+          const parts = p.month.split(" ");
+          const monthAbbr = parts[0] || p.month;
+          const yearAbbr = parts[1] || "";
+          return (
+            <g key={i}>
+              <text
+                x={getX(i)}
+                y={height - 8}
+                textAnchor="middle"
+                fontSize="7"
+                className="fill-gray-500"
+              >
+                {monthAbbr}
+              </text>
+              {yearAbbr && (
+                <text
+                  x={getX(i)}
+                  y={height - 1}
+                  textAnchor="middle"
+                  fontSize="5.5"
+                  className="fill-gray-400"
+                >
+                  {yearAbbr}
+                </text>
+              )}
+            </g>
+          );
+        })}
       </svg>
 
       {/* Tooltip overlay */}
