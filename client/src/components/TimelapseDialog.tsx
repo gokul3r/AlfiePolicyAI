@@ -916,9 +916,18 @@ function MatchFoundState({
             })()}
           </span>
         </div>
-        <p className="text-lg text-muted-foreground">
-          Auto-Annie found a great deal for you
-        </p>
+        <div className="mt-2 space-y-1">
+          <p className="text-lg font-semibold text-green-600 dark:text-green-400" data-testid="text-savings-headline">
+            Switching to {matchData.financial_breakdown.new_quote_insurer} will save you £{matchData.financial_breakdown.annual_savings.toFixed(2)} over the next 12 months
+          </p>
+          <p className="text-sm text-muted-foreground" data-testid="text-upfront-cost">
+            {matchData.financial_breakdown.upfront_impact < 0
+              ? `You would pay £${Math.abs(matchData.financial_breakdown.upfront_impact).toFixed(2)} today to make this change.`
+              : matchData.financial_breakdown.upfront_impact > 0
+                ? `You would receive £${matchData.financial_breakdown.upfront_impact.toFixed(2)} back today.`
+                : "No upfront cost to make this change."}
+          </p>
+        </div>
         {totalMatches > 1 && (
           <div className="flex items-center justify-center gap-3 mt-3" data-testid="match-navigation">
             <Button
