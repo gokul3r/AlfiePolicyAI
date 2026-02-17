@@ -128,6 +128,7 @@ export function TimelapseDialog({
   const [showNotification, setShowNotification] = useState(false);
   const [currentInsuranceProvider, setCurrentInsuranceProvider] =
     useState<string>("");
+  const [previousProvider, setPreviousProvider] = useState<string>("");
   const currentProviderRef = useRef<string>("");
   const [priceHistory, setPriceHistory] = useState<
     { month: string; lowestPrice: number | null; marketLowestPrice: number | null; status?: "purchased" | "matched" | "market"; insurer?: string; features?: string[] }[]
@@ -448,6 +449,7 @@ export function TimelapseDialog({
         );
         setCurrentPolicyPrice(currentMatch.price);
         const newProvider = currentMatch.insurer || currentMatch.financial_breakdown.new_quote_insurer;
+        setPreviousProvider(currentProviderRef.current || currentInsuranceProvider);
         setCurrentInsuranceProvider(newProvider);
         currentProviderRef.current = newProvider;
 
@@ -731,7 +733,7 @@ export function TimelapseDialog({
               currentWeekMatches[currentMatchIndex].financial_breakdown
                 .new_quote_insurer
             }
-            oldProvider={currentInsuranceProvider}
+            oldProvider={previousProvider}
             onComplete={() => setState("celebration")}
           />
         )}
