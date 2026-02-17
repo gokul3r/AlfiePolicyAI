@@ -66,6 +66,11 @@ Database Schema includes:
   - Removed marketInsurer/marketFeatures from price data (grey dots no longer represent a specific provider)
   - Tooltip simplified to show "Market Avg" label and average price only (no provider name or features)
   - Chart legend updated from "Market" to "Market Avg"
+- **5.4.13**: Filter out current provider from matched quotes:
+  - Quotes from the user's current insurance provider are now excluded from matched results (prevents "switch to same provider" suggestions)
+  - Uses case-insensitive comparison on insurer name
+  - After a policy switch, the current provider updates so subsequent searches exclude the new provider
+  - Uses useRef to track current provider reliably across async search loops
 
 ### Release 5.2 (February 2026) - Quote Match Found Screen Simplification & Branding
 - **5.2.1**: Re-themed quote match found screen to align with blue AutoAnnie branding:

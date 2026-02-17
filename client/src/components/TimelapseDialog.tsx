@@ -38,7 +38,7 @@ import {
   ChevronRight,
   Calendar,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -128,6 +128,7 @@ export function TimelapseDialog({
   const [showNotification, setShowNotification] = useState(false);
   const [currentInsuranceProvider, setCurrentInsuranceProvider] =
     useState<string>("");
+  const currentProviderRef = useRef<string>("");
   const [priceHistory, setPriceHistory] = useState<
     { month: string; lowestPrice: number | null; marketLowestPrice: number | null; status?: "purchased" | "matched" | "market"; insurer?: string; features?: string[] }[]
   >([]);
@@ -175,12 +176,22 @@ export function TimelapseDialog({
       );
 
       const response: any = await apiResponse.json();
-      const allMatches: MatchData[] = response.matches || [];
+      const rawMatches: MatchData[] = response.matches || [];
 
       // Store the current insurance provider from the API response
       if (response.current_insurance_provider) {
         setCurrentInsuranceProvider(response.current_insurance_provider);
+        currentProviderRef.current = response.current_insurance_provider;
       }
+
+      // Filter out quotes from the current provider (no point switching to the same insurer)
+      const currentProvider = currentProviderRef.current || response.current_insurance_provider || "";
+      const allMatches = currentProvider
+        ? rawMatches.filter((match) => {
+            const matchInsurer = (match.insurer || match.financial_breakdown?.new_quote_insurer || "").toLowerCase();
+            return matchInsurer !== currentProvider.toLowerCase();
+          })
+        : rawMatches;
 
       // Filter matches based on minimum savings threshold using 12-month annual savings
       const matches = allMatches.filter((match) => {
@@ -190,7 +201,7 @@ export function TimelapseDialog({
       });
 
       console.log(
-        `[Timelapse] Week ${dateStr}: ${allMatches.length} total matches, ${matches.length} above £${minSavingsThreshold} threshold`,
+        `[Timelapse] Week ${dateStr}: ${rawMatches.length} total quotes, ${rawMatches.length - allMatches.length} excluded (same provider: ${currentProvider}), ${allMatches.length} other-provider matches, ${matches.length} above £${minSavingsThreshold} threshold`,
       );
 
       // Track price data for the live graph - aggregate per month+year
@@ -300,6 +311,7 @@ export function TimelapseDialog({
     setShowNotification(false);
     setPriceHistory([]);
     setCurrentPolicyPrice(0);
+    currentProviderRef.current = "";
 
     try {
       // Clear previous session's quote history (session-based, not cumulative)
@@ -435,6 +447,9 @@ export function TimelapseDialog({
           `[Timelapse] DB updated: policy switched to ${currentMatch.insurer} at £${currentMatch.price}`,
         );
         setCurrentPolicyPrice(currentMatch.price);
+        const newProvider = currentMatch.insurer || currentMatch.financial_breakdown.new_quote_insurer;
+        setCurrentInsuranceProvider(newProvider);
+        currentProviderRef.current = newProvider;
 
         // Mark the corresponding price history entry as "purchased" (green dot)
         // Update price, insurer, and features to reflect the actual selected match
