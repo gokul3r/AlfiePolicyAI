@@ -129,7 +129,7 @@ export function TimelapseDialog({
   const [currentInsuranceProvider, setCurrentInsuranceProvider] =
     useState<string>("");
   const [priceHistory, setPriceHistory] = useState<
-    { month: string; lowestPrice: number | null; marketLowestPrice: number | null; status?: "purchased" | "matched" | "market"; insurer?: string; features?: string[]; marketInsurer?: string; marketFeatures?: string[] }[]
+    { month: string; lowestPrice: number | null; marketLowestPrice: number | null; status?: "purchased" | "matched" | "market"; insurer?: string; features?: string[] }[]
   >([]);
   const [currentPolicyPrice, setCurrentPolicyPrice] = useState<number>(0);
   const { toast } = useToast();
@@ -197,24 +197,17 @@ export function TimelapseDialog({
       const monthLabel = searchDate.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
       const lowestPrice = allMatches.length > 0 ? Math.min(...allMatches.map((m) => m.price)) : null;
       const allQuotePrices: number[] = response.all_quote_prices || [];
-      const marketLowestPrice = allQuotePrices.length > 0 ? Math.min(...allQuotePrices) : null;
+      const marketLowestPrice = allQuotePrices.length >= 3
+        ? Math.round([...allQuotePrices].sort((a, b) => a - b).slice(0, 3).reduce((sum, p) => sum + p, 0) / 3)
+        : allQuotePrices.length > 0
+          ? Math.round(allQuotePrices.reduce((sum, p) => sum + p, 0) / allQuotePrices.length)
+          : null;
 
       const bestMatch = allMatches.length > 0
         ? allMatches.reduce((best, m) => (m.price < best.price ? m : best), allMatches[0])
         : null;
       const matchedInsurer = bestMatch?.insurer || bestMatch?.financial_breakdown?.new_quote_insurer;
       const matchedFeatures = bestMatch?.features;
-
-      const marketQuotes = response.all_quotes_basic || [];
-      const cheapestMarketQuote = marketQuotes.length > 0
-        ? marketQuotes.reduce((best: any, q: any) => {
-            const price = q.price || q.annual_premium;
-            const bestPrice = best.price || best.annual_premium;
-            return price < bestPrice ? q : best;
-          }, marketQuotes[0])
-        : null;
-      const marketInsurerName = cheapestMarketQuote?.insurer || cheapestMarketQuote?.insurer_name;
-      const marketQuoteFeatures = cheapestMarketQuote?.features;
 
       setPriceHistory((prev) => {
         const existing = prev.find((p) => p.month === monthLabel);
@@ -229,11 +222,7 @@ export function TimelapseDialog({
             }
           }
           if (marketLowestPrice !== null) {
-            if (updatedEntry.marketLowestPrice === null || marketLowestPrice < updatedEntry.marketLowestPrice) {
-              updatedEntry.marketLowestPrice = marketLowestPrice;
-              updatedEntry.marketInsurer = marketInsurerName;
-              updatedEntry.marketFeatures = marketQuoteFeatures;
-            }
+            updatedEntry.marketLowestPrice = marketLowestPrice;
           }
           if (updatedEntry.lowestPrice !== existing.lowestPrice || updatedEntry.marketLowestPrice !== existing.marketLowestPrice) {
             return prev.map((p) => p.month === monthLabel ? updatedEntry : p);
@@ -247,8 +236,6 @@ export function TimelapseDialog({
           status: lowestPrice !== null ? "matched" as const : undefined,
           insurer: matchedInsurer,
           features: matchedFeatures,
-          marketInsurer: marketInsurerName,
-          marketFeatures: marketQuoteFeatures,
         }];
       });
 

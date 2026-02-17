@@ -49,8 +49,6 @@ interface PriceDataPoint {
   status?: "purchased" | "matched" | "market";
   insurer?: string;
   features?: string[];
-  marketInsurer?: string;
-  marketFeatures?: string[];
 }
 
 function buildLineSegments(
@@ -134,7 +132,7 @@ function LivePriceChart({
   const matchedSegments = buildLineSegments(priceHistory, (p) => p.lowestPrice, getX, getY);
 
   const marketDots = priceHistory
-    .map((p, i) => (p.marketLowestPrice !== null ? { x: getX(i), y: getY(p.marketLowestPrice), price: p.marketLowestPrice, index: i, insurer: p.marketInsurer, features: p.marketFeatures } : null))
+    .map((p, i) => (p.marketLowestPrice !== null ? { x: getX(i), y: getY(p.marketLowestPrice), price: p.marketLowestPrice, index: i } : null))
     .filter((p): p is NonNullable<typeof p> => p !== null);
 
   const matchedDots = priceHistory
@@ -184,28 +182,28 @@ function LivePriceChart({
       >
         {/* Legend */}
         <circle cx={paddingLeft + 2} cy={6} r={3} fill="#9ca3af" />
-        <text x={paddingLeft + 8} y={9} fontSize="6" className="fill-gray-500">Market</text>
+        <text x={paddingLeft + 8} y={9} fontSize="6" className="fill-gray-500">Market Avg</text>
         {hasPurchased ? (
           <>
-            <circle cx={paddingLeft + 42} cy={6} r={3} fill="#16a34a" />
-            <text x={paddingLeft + 48} y={9} fontSize="6" fill="#16a34a">Switched</text>
-            <circle cx={paddingLeft + 88} cy={6} r={3} fill="#3b82f6" />
-            <text x={paddingLeft + 94} y={9} fontSize="6" className="fill-blue-600">Matched</text>
+            <circle cx={paddingLeft + 52} cy={6} r={3} fill="#16a34a" />
+            <text x={paddingLeft + 58} y={9} fontSize="6" fill="#16a34a">Switched</text>
+            <circle cx={paddingLeft + 98} cy={6} r={3} fill="#3b82f6" />
+            <text x={paddingLeft + 104} y={9} fontSize="6" className="fill-blue-600">Matched</text>
             {currentPolicyPrice > 0 && (
               <>
-                <line x1={paddingLeft + 130} y1={6} x2={paddingLeft + 140} y2={6} stroke="#f97316" strokeWidth={1} strokeDasharray="2 1" />
-                <text x={paddingLeft + 143} y={9} fontSize="5.5" className="fill-orange-500">Your price</text>
+                <line x1={paddingLeft + 140} y1={6} x2={paddingLeft + 150} y2={6} stroke="#f97316" strokeWidth={1} strokeDasharray="2 1" />
+                <text x={paddingLeft + 153} y={9} fontSize="5.5" className="fill-orange-500">Your price</text>
               </>
             )}
           </>
         ) : (
           <>
-            <circle cx={paddingLeft + 42} cy={6} r={3} fill="#3b82f6" />
-            <text x={paddingLeft + 48} y={9} fontSize="6" className="fill-blue-600">Matched</text>
+            <circle cx={paddingLeft + 52} cy={6} r={3} fill="#3b82f6" />
+            <text x={paddingLeft + 58} y={9} fontSize="6" className="fill-blue-600">Matched</text>
             {currentPolicyPrice > 0 && (
               <>
-                <line x1={paddingLeft + 88} y1={6} x2={paddingLeft + 98} y2={6} stroke="#f97316" strokeWidth={1} strokeDasharray="2 1" />
-                <text x={paddingLeft + 101} y={9} fontSize="6" className="fill-orange-500">Your price</text>
+                <line x1={paddingLeft + 98} y1={6} x2={paddingLeft + 108} y2={6} stroke="#f97316" strokeWidth={1} strokeDasharray="2 1" />
+                <text x={paddingLeft + 111} y={9} fontSize="6" className="fill-orange-500">Your price</text>
               </>
             )}
           </>
@@ -261,7 +259,7 @@ function LivePriceChart({
               style={{ cursor: "pointer" }}
               onClick={(e) => {
                 e.stopPropagation();
-                handleDotClick(point.x, point.y, point.price, "market", point.insurer, point.features);
+                handleDotClick(point.x, point.y, point.price, "market");
               }}
             />
             <circle
@@ -392,7 +390,7 @@ function LivePriceChart({
                 }}
               >
                 {activeTooltip.type === "purchased" ? "Switched" :
-                 activeTooltip.type === "matched" ? "Matched" : "Market"}
+                 activeTooltip.type === "matched" ? "Matched" : "Market Avg"}
               </span>
             </div>
             {activeTooltip.insurer && (

@@ -59,6 +59,14 @@ Database Schema includes:
 
 ## Recent Changes
 
+### Release 5.4 (February 2026) - UX Improvements & Visual Hierarchy
+- **5.4.12**: Changed grey market dots from single lowest provider to average of lowest 3:
+  - Market price now calculated as average of 3 cheapest quotes (avoids anomalies from outlier prices)
+  - Falls back to average of all available quotes when fewer than 3 exist
+  - Removed marketInsurer/marketFeatures from price data (grey dots no longer represent a specific provider)
+  - Tooltip simplified to show "Market Avg" label and average price only (no provider name or features)
+  - Chart legend updated from "Market" to "Market Avg"
+
 ### Release 5.2 (February 2026) - Quote Match Found Screen Simplification & Branding
 - **5.2.1**: Re-themed quote match found screen to align with blue AutoAnnie branding:
   - Trustpilot section: changed from orange/amber gradients to blue tones
