@@ -43,7 +43,6 @@ import { useState, useEffect } from "react";
 import { flushSync } from "react-dom";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { IPhoneMockup } from "./IPhoneMockup";
 import { AIThinkingStep } from "./AIThinkingStep";
 
@@ -852,6 +851,7 @@ function MatchFoundState({
   const { insurer, price, ai_insight, financial_breakdown } = matchData;
   const [showAllFeatures, setShowAllFeatures] = useState(false);
   const [showDeltaBreakdown, setShowDeltaBreakdown] = useState(false);
+  const [showSwitchCostBreakdown, setShowSwitchCostBreakdown] = useState(false);
   const requestedFeatures = matchData.requested_features ?? [];
   const missingFeatures = matchData.missing_features ?? [];
 
@@ -925,41 +925,9 @@ function MatchFoundState({
             {matchData.financial_breakdown.upfront_impact !== 0 ? (
               <>
                 {matchData.financial_breakdown.upfront_impact < 0 ? "You would pay " : "You would receive "}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button
-                      className="text-xs font-bold text-muted-foreground underline decoration-dotted underline-offset-2 cursor-pointer inline"
-                      data-testid="button-upfront-figure"
-                    >
-                      £{Math.abs(matchData.financial_breakdown.upfront_impact).toFixed(2)}
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80" side="bottom" align="center">
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold text-foreground">Upfront impact if you switch today</p>
-                      <div className="space-y-1 text-xs text-muted-foreground">
-                        <div className="flex justify-between">
-                          <span>Pro-rata refund from old policy</span>
-                          <span className="text-green-600 dark:text-green-400">+ £{matchData.financial_breakdown.pro_rata_refund.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Cancellation fee</span>
-                          <span className="text-red-600 dark:text-red-400">- £{matchData.financial_breakdown.cancellation_fee.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>New policy cost (12 months)</span>
-                          <span className="text-red-600 dark:text-red-400">- £{matchData.financial_breakdown.new_policy_cost.toFixed(2)}</span>
-                        </div>
-                        <div className="border-t border-border pt-1.5 mt-1.5 flex justify-between font-medium text-foreground">
-                          <span>You would {matchData.financial_breakdown.upfront_impact < 0 ? "pay" : "receive"} today</span>
-                          <span className={matchData.financial_breakdown.upfront_impact > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                            £{Math.abs(matchData.financial_breakdown.upfront_impact).toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                <span className="font-bold">
+                  £{Math.abs(matchData.financial_breakdown.upfront_impact).toFixed(2)}
+                </span>
                 {matchData.financial_breakdown.upfront_impact < 0 ? " today to make this change." : " back today."}
               </>
             ) : (
@@ -1015,20 +983,54 @@ function MatchFoundState({
             </span>
           </div>
 
-          <div className="flex justify-between items-center py-1 border-b border-border">
-            <span className="text-xs text-muted-foreground">Cancellation fee</span>
-            <span className="text-xs text-muted-foreground">
-              £{financial_breakdown.cancellation_fee.toFixed(2)}
-            </span>
-          </div>
-
-          <div className="flex justify-between items-center py-1 border-b border-border">
-            <span className="text-xs text-muted-foreground">
-              Pro-rata refund (~{financial_breakdown.days_remaining} days)
-            </span>
-            <span className="text-xs text-green-600 dark:text-green-400">
-              £{financial_breakdown.pro_rata_refund.toFixed(2)}
-            </span>
+          <div className="border-b border-border">
+            <button
+              onClick={() => setShowSwitchCostBreakdown(!showSwitchCostBreakdown)}
+              className="flex justify-between items-center w-full py-2 text-left"
+              data-testid="button-toggle-switch-cost"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Cost to switch</span>
+                {!showSwitchCostBreakdown && (
+                  <span className="text-xs text-muted-foreground">(details)</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-lg font-semibold ${financial_breakdown.upfront_impact < 0 ? "" : "text-green-600 dark:text-green-400"}`}>
+                  {financial_breakdown.upfront_impact < 0 ? "" : "+ "}£{Math.abs(financial_breakdown.upfront_impact).toFixed(2)}
+                </span>
+                {showSwitchCostBreakdown ? (
+                  <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                )}
+              </div>
+            </button>
+            {showSwitchCostBreakdown && (
+              <div className="pb-3 space-y-1 text-xs text-muted-foreground animate-in fade-in slide-in-from-top-2 duration-300">
+                <p className="text-xs text-muted-foreground mb-2">Upfront impact if you switch today</p>
+                <div className="ml-2 pl-3 border-l-2 border-border space-y-1">
+                  <div className="flex justify-between">
+                    <span>Pro-rata refund from old policy</span>
+                    <span className="text-green-600 dark:text-green-400">+ £{financial_breakdown.pro_rata_refund.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Cancellation fee</span>
+                    <span className="text-red-600 dark:text-red-400">- £{financial_breakdown.cancellation_fee.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>New policy cost (12 months)</span>
+                    <span className="text-red-600 dark:text-red-400">- £{financial_breakdown.new_policy_cost.toFixed(2)}</span>
+                  </div>
+                  <div className="border-t border-border pt-1.5 mt-1.5 flex justify-between font-medium text-foreground">
+                    <span>You would {financial_breakdown.upfront_impact < 0 ? "pay" : "receive"} today</span>
+                    <span className={financial_breakdown.upfront_impact > 0 ? "text-green-600 dark:text-green-400" : ""}>
+                      £{Math.abs(financial_breakdown.upfront_impact).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Annual Savings - Unified collapsible section */}
