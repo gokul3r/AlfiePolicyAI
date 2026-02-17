@@ -9,132 +9,41 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Frontend Architecture
-The frontend is built with **React 18** and TypeScript, using **Vite** for building. It features a **mobile-first design** optimized for single-hand navigation, utilizing **shadcn/ui** components (New York style) built on Radix UI, styled with **Tailwind CSS**. The design philosophy emphasizes Material Design with minimalist refinement for trust and calm interactions. **TanStack Query** manages server state, caching, and data synchronization. Component-based routing handles five main states: "home", "confirmation", "welcome", "onboarding", and "quotes".
-
-Key UI components include:
-- **`PasswordGatePage`**: Access control page shown before the login page. Features AutoAnnie branding with "Innovation Lab" subtitle, AI-themed gradient background with animated orbs and particles, and access key validation (key: "AA@ITCTO"). Session access persists via sessionStorage.
-- **`WelcomeScreen`**: Modern dashboard with AI chat input, animated microphone, and a 6-button responsive icon grid for core functionalities (Policy Details, Whisper, Quote Search, Add Policy, Update Policy, Cancel Policy).
-- **`WhisperDialog`**: Interface for recording and editing user insurance preferences with stable recommendation system.
-- **`QuoteSearchDialog`**: Initiates insurance quote searches with retry logic and loading indicators.
-- **`QuotesScreen`**: Displays up to 10 insurance quotes with insurer info, Trustpilot rating, AutoAnnie Score, and AI analysis.
-- **`ChatDialog`**: Text-based AI assistant with message history, real-time updates, and **LLM-based intent detection** for quote searches and policy purchases. **Intent Classification**: Uses OpenAI GPT-4o-mini to classify user messages into QUOTE/POLICY/GENERAL intents with 2s timeout, retry logic, and keyword fallback. Supports natural language variations like "quote me", "how much to insure", "switch insurers", "cheaper insurance". **Real Purchase Flow with Payment UI**: When user says "Go with [insurer]", shows PaymentSection component with GPay, orange card (•••• 9878), payment icons, and terms. User confirms with natural language ("proceed", "go on", "pay", etc.). Animated status flow: "Processing payment..." (2 sec) → "Verifying details..." → "Contacting [Insurer]..." → success. Real database update via `POST /api/purchase-policy`.
-- **`PaymentSection`**: Inline payment checkout UI shown during purchase confirmation. Displays total cost, GPay logo with orange card (•••• 9878), Visa/Mastercard/PayPal icons, and terms text. Creates realistic checkout experience.
-- **`VoiceChatDialog`**: Voice-based AI assistant using **Web Speech API** for speech-to-text (SpeechRecognition) and browser **speechSynthesis** for text-to-speech. Backend uses **Gemini 2.0 Flash text API** with function calling for stable AI agent behavior. Features toggleable speaker, real-time transcription display, and conversational UI. **AI Agent Architecture**: Uses Gemini's function calling (tool use) instead of keyword matching. Annie (the AI) decides when to call functions based on understanding context and intent. **Available Tools**:
-  - `get_user_vehicles`: Fetches user's registered vehicles, shows on screen
-  - `search_quotes`: Searches for quotes for selected vehicle
-  - `get_available_quotes`: Returns list of displayed quotes with insurer names and prices
-  - `select_quote`: Selects a quote by insurer name or ordinal ("first", "cheapest")
-  - `show_payment`: Displays payment card UI for selected quote
-  - `complete_purchase`: Processes purchase, updates database
-  - `cancel_flow`: Cancels current operation
-  
-  **Flow**: User speaks → SpeechRecognition converts to text → Backend processes with Gemini → Annie responds with text → speechSynthesis speaks response. User asks for quotes → Annie calls `get_user_vehicles` → Shows vehicle details → User confirms → Annie calls `search_quotes` → Quotes displayed → User says "go with Admiral" → Annie calls `select_quote("Admiral")` → Backend fuzzy-matches to actual quote → Annie asks "Just to confirm - you'd like [insurer] at £[price]?" → User says "yes" → Annie calls `show_payment` → Payment card shown → User says "confirm payment" → Annie calls `complete_purchase` → Database updated. **Two-Stage Purchase Flow**: Uses hard state gates - `awaitingQuoteConfirmation` flag set by `select_quote`, required by `show_payment`. Payment confirmation ("confirm payment", "pay now", "complete purchase") required before `complete_purchase`. `toolExecutedThisTurn` flag prevents duplicate tool calls. All state (selectedVehicle, displayedQuotes, selectedQuote, showingPaymentCard, awaitingQuoteConfirmation) resets after purchase/cancel.
-- **`CancelPolicyDialog`**: Allows cancellation of policies grouped by insurance type.
-- **`InsuranceTypeSelectorDialog`**: Bento-style grid for selecting insurance type when adding a policy, with active 'Car' and inactive placeholders for 'Van', 'Home', 'Pet', 'Travel', 'Business'.
-- **`ConfigureAutoAnnieDialog`**: Settings for Email Scan and Custom Ratings, allowing users to customize Trustpilot and Defacto ratings for specific providers.
+The frontend uses React 18 with TypeScript and Vite, featuring a mobile-first design optimized for single-hand navigation. It leverages shadcn/ui components (New York style) built on Radix UI, styled with Tailwind CSS, following a Material Design philosophy. TanStack Query manages server state. Core UI components include:
+-   **`PasswordGatePage`**: Access control with AutoAnnie branding and AI-themed visuals.
+-   **`WelcomeScreen`**: Dashboard with AI chat input and a 6-button icon grid for core functionalities.
+-   **`WhisperDialog`**: Interface for recording and editing user insurance preferences.
+-   **`QuoteSearchDialog`**: Initiates insurance quote searches.
+-   **`QuotesScreen`**: Displays up to 10 insurance quotes with insurer info, ratings, and AI analysis.
+-   **`ChatDialog`**: Text-based AI assistant with message history and LLM-based intent detection (OpenAI GPT-4o-mini) for quote searches and policy purchases, including a realistic payment UI.
+-   **`PaymentSection`**: Inline payment checkout UI for purchase confirmation.
+-   **`VoiceChatDialog`**: Voice-based AI assistant using Web Speech API for STT, browser speechSynthesis for TTS, and Gemini 2.0 Flash text API with function calling for agent behavior. It supports a two-stage purchase flow with tools for vehicle fetching, quote searching, selection, payment display, and purchase completion.
+-   **`CancelPolicyDialog`**: Allows policy cancellations.
+-   **`InsuranceTypeSelectorDialog`**: Bento-style grid for selecting insurance type.
+-   **`ConfigureAutoAnnieDialog`**: Settings for Email Scan and Custom Ratings.
+-   **Policy Charting**: Interactive price chart showing "Your Price", "Market Avg", and "Feature-Matched" prices over time, with color-coded dots indicating status (purchased, matched, market) and tooltips. It calculates "Annual Savings" based on a comprehensive 12-month cost comparison.
 
 ### Backend Architecture
-The backend uses **Express.js** with TypeScript for a RESTful API under the `/api` prefix. It includes custom middleware for JSON parsing, logging, and error handling, with validation using **Zod** schemas.
-
-Key API endpoints include:
-- User authentication and management.
-- CRUD operations for vehicle policies.
-- Policy cancellation (`/api/cancel-policy`) and purchase (`/api/purchase-policy`).
-- Backend proxies for PDF extraction (`/api/extract-pdf`) and quote search (`/api/search-quotes`).
-- AI chat (`/api/chat/send-message`) and voice chat (`/api/voice-chat`) endpoints.
-- Gmail OAuth integration endpoints.
-- Custom ratings endpoints for saving and retrieving user-defined provider ratings.
+The backend uses Express.js with TypeScript for a RESTful API (`/api`). It includes middleware for JSON parsing, logging, error handling, and Zod for validation. Key API endpoints manage:
+-   User authentication and management.
+-   CRUD operations for vehicle policies, including cancellation and purchase.
+-   Proxies for PDF extraction and quote searches.
+-   AI chat and voice chat interactions.
+-   Gmail OAuth integration.
+-   Custom ratings management.
 
 ### Data Storage
-**PostgreSQL** is used via **Neon serverless driver** for persistent data storage. **Drizzle ORM** provides type-safe database operations and migrations with a schema-first design.
-
-Database Schema includes:
-- `users`: User information.
-- `policies`: Core policy details, linked to `users`.
-- `vehicle_policy_details`: Specific details for vehicle policies.
-- Placeholder tables for other policy types (van, home, pet, travel, business).
-- `chat_messages`: Stores chat history.
-- `personalizations`: Gmail integration details.
-- `custom_ratings`: User-defined insurance provider ratings.
-
-## Recent Changes
-
-### Release 5.4 (February 2026) - UX Improvements & Visual Hierarchy
-- **5.4.12**: Changed grey market dots from single lowest provider to average of lowest 3:
-  - Market price now calculated as average of 3 cheapest quotes (avoids anomalies from outlier prices)
-  - Falls back to average of all available quotes when fewer than 3 exist
-  - Removed marketInsurer/marketFeatures from price data (grey dots no longer represent a specific provider)
-  - Tooltip simplified to show "Market Avg" label and average price only (no provider name or features)
-  - Chart legend updated from "Market" to "Market Avg"
-- **5.4.13**: Filter out current provider from matched quotes:
-  - Quotes from the user's current insurance provider are now excluded from matched results (prevents "switch to same provider" suggestions)
-  - Uses case-insensitive comparison on insurer name
-  - After a policy switch, the current provider updates so subsequent searches exclude the new provider
-  - Uses useRef to track current provider reliably across async search loops
-
-### Release 5.2 (February 2026) - Quote Match Found Screen Simplification & Branding
-- **5.2.1**: Re-themed quote match found screen to align with blue AutoAnnie branding:
-  - Trustpilot section: changed from orange/amber gradients to blue tones
-  - AutoAnnie Insight section: changed from purple/indigo gradients to blue gradients
-  - Star ratings now rendered in blue instead of amber
-  - Removed animated sparkle dots from insight header for cleaner look
-- **5.2.2**: Simplified Trustpilot rating into compact inline display:
-  - Replaced full card (circular SVG ring, stars row, thumbs-up reviews, trust score progress bar) with single responsive row
-  - Shows: blue star icon, numeric rating, mini star icons, "TrustPilot" label, divider, review count
-  - Uses flex-wrap for mobile responsiveness
-- **5.2.3**: Fixed month-skipping bug in timelapse chart:
-  - Root cause: JavaScript `setMonth()` overflows short months (e.g., Jan 31 + 1 month = Mar 3, skipping February)
-  - Fix: Clamp day to last day of target month (e.g., Jan 31 -> Feb 28, Mar 31 -> Apr 30)
-- **5.2.4**: Chart readability improvements:
-  - X-axis labels split into two lines: month abbreviation (top, normal) and year (below, smaller/lighter) to prevent overlapping
-- **5.2.5**: Replaced "Annual premium delta" with expert-validated "Annual Savings" calculation:
-  - Old logic: simple difference between annual premiums (misleading for mid-policy switches)
-  - New logic: compares total cost over next 12 months for stay vs switch scenarios
-  - "If you stay" = remaining coverage value + renewal at current rate
-  - "If you switch" = new policy (12 months) + cancellation fee
-  - Each scenario has a collapsible breakdown showing calculation details
-  - Savings threshold filter updated to use new annual_savings field
-  - Backend financial-calculator.ts returns stay_cost_12m, switch_cost_12m, annual_savings, stay_remaining_value, stay_renewal_cost
-
-### Release 5.1 (February 2026)
-- **5.1.1**: Scheduled quote search screen - changed "Continue Searching" button text to "Continue Demo"
-- **5.1.2**: Scheduled quote search screen - changed "Confirm Purchase" button text to "Switch Policy"
-- **5.1.3**: Scheduled quote search match found screen - redesigned "Coverage Included" section with Option C:
-  - Smart summary header showing "X of Y requested features matched" count
-  - Subsection 1: "Features You Requested" - always visible, shows whisper-requested features with green tick (matched) or red cross (missing)
-  - Subsection 2: "All Quote Features" - collapsible accordion (collapsed by default), click to expand full quote feature list
-  - Current month & year displayed in the match found header
-  - Backend updated to pass `requested_features` and `missing_features` from the Quote API's feature matching data
-  - Note: Current strict matching logic means only quotes with ALL requested features appear. Relaxed matching is in backlog.
-- **5.1.12**: Interactive price chart with color-coded dots and tooltips:
-  - Chart dots are now color-coded: green = purchased/switched, blue = feature-matched, grey = market (unmatched)
-  - Click/tap any dot to see tooltip with insurer name, price, and included features
-  - Green dots show a checkmark icon and legend updates to show "Switched" when a purchase is made
-  - On purchase, the chart dot updates to reflect the actual selected match's price/insurer/features
-  - Backend `/api/timelapse-search-week` now returns `all_quotes_basic` array with insurer, price, and features for market quotes
-  - PriceDataPoint interface extended with status, insurer, features, marketInsurer, marketFeatures fields
-- **5.1.9**: Price chart improvements:
-  - "Your Price" reference line now updates after policy switch (was stuck at original price)
-  - Dual-line chart: grey line = market lowest (all quotes), blue line = feature-matched lowest
-  - Backend returns `all_quote_prices` array with all valid quote prices for market trend
-  - Chart legend shows Market (grey), Matched (blue), Your price (orange dashed)
-  - Month labels use "MMM yy" format to avoid year-boundary collisions
-  - Chart container always renders (shows "Collecting data..." when empty)
-- **5.1.4**: Added required `current_date` field (YYYY-MM-DD format) to all Quote Search API call sites in `insurance_details`:
-  - Frontend: QuoteSearchDialog (manual search), VoiceChatDialog (voice chat trigger) - uses today's date
-  - Backend: `/api/timelapse-search` (old timelapse) uses simulated iteration date, `/api/timelapse-search-week` uses simulated `search_date`
-  - Backend: `/api/chat/send-message` (text chat) and `voice-chat-handler.ts` (old voice handler) - uses today's date
-  - Total: 6 call sites updated across 4 files
+PostgreSQL is used via Neon serverless driver. Drizzle ORM provides type-safe database operations and migrations. The database schema includes tables for users, policies (with specific details for vehicle policies), chat messages, personalizations, and custom ratings.
 
 ## External Dependencies
 
-- **Neon Serverless PostgreSQL**: Database service.
-- **Google OAuth 2.0 & Gmail API**: For Gmail integration (read-only email access).
-- **Google Cloud Run Insurance PDF Extractor**: Serverless API for extracting policy data from PDFs.
-- **Google Cloud Run AutoSage Quote Search API**: Serverless API for insurance quote searches.
-- **Radix UI**: Headless UI components.
-- **Lucide React**: Icon library.
-- **React Hook Form**: Form state and validation.
-- **Zod**: Runtime type validation.
-- **Tailwind CSS**: Utility-first styling.
-- **TypeScript**: For full-stack type safety.
+-   **Neon Serverless PostgreSQL**: Database service.
+-   **Google OAuth 2.0 & Gmail API**: For Gmail integration.
+-   **Google Cloud Run Insurance PDF Extractor**: For extracting policy data from PDFs.
+-   **Google Cloud Run AutoSage Quote Search API**: For insurance quote searches.
+-   **Radix UI**: Headless UI components.
+-   **Lucide React**: Icon library.
+-   **React Hook Form**: Form state and validation.
+-   **Zod**: Runtime type validation.
+-   **Tailwind CSS**: Utility-first styling.
+-   **TypeScript**: For full-stack type safety.

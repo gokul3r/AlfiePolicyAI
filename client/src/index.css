@@ -326,6 +326,20 @@
     inset: -1px;
   }
 
+  /* Gentle pulse animation for budget hint message */
+  @keyframes gentle-pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+
+  .animate-gentle-pulse {
+    animation: gentle-pulse 3s ease-in-out infinite;
+  }
+
   /* Magical shimmer animation for Timelapse button */
   @keyframes shimmer {
     0% {

@@ -38,7 +38,7 @@ import {
   ChevronRight,
   Calendar,
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { flushSync } from "react-dom";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -135,6 +135,18 @@ export function TimelapseDialog({
   >([]);
   const [currentPolicyPrice, setCurrentPolicyPrice] = useState<number>(0);
   const { toast } = useToast();
+
+  const consecutiveNoMatchMonths = useMemo(() => {
+    let count = 0;
+    for (let i = priceHistory.length - 1; i >= 0; i--) {
+      if (priceHistory[i].lowestPrice === null && priceHistory[i].status !== "purchased") {
+        count++;
+      } else {
+        break;
+      }
+    }
+    return count;
+  }, [priceHistory]);
 
   // Calculate next search date based on frequency
   const calculateNextDate = (
@@ -252,7 +264,6 @@ export function TimelapseDialog({
       });
 
       if (matches.length > 0) {
-        // Match found above threshold! Show notification on iPhone
         flushSync(() => {
           setCurrentWeekMatches(matches);
           setCurrentMatchIndex(0);
@@ -261,7 +272,6 @@ export function TimelapseDialog({
           setIsSearching(false);
         });
       } else {
-        // No match - continue searching (stay on iPhone screen)
         await new Promise((resolve) => setTimeout(resolve, 800));
 
         // Continue to next week
@@ -622,6 +632,7 @@ export function TimelapseDialog({
               caption="Auto-Annie is searching in the background..."
               priceHistory={priceHistory}
               currentPolicyPrice={currentPolicyPrice}
+              consecutiveNoMatchMonths={consecutiveNoMatchMonths}
             />
           </div>
         )}
@@ -644,6 +655,7 @@ export function TimelapseDialog({
               caption="Tap the notification to view details"
               priceHistory={priceHistory}
               currentPolicyPrice={currentPolicyPrice}
+              consecutiveNoMatchMonths={consecutiveNoMatchMonths}
             />
           </div>
         )}
@@ -681,6 +693,7 @@ export function TimelapseDialog({
               caption=""
               priceHistory={priceHistory}
               currentPolicyPrice={currentPolicyPrice}
+              consecutiveNoMatchMonths={consecutiveNoMatchMonths}
             />
             <div className="w-full max-w-md mt-6 pb-4 shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="rounded-md border border-border bg-muted/50 p-4 text-center space-y-3">

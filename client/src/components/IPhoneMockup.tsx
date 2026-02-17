@@ -429,6 +429,7 @@ interface IPhoneMockupProps {
   searchDate?: string;
   priceHistory?: PriceDataPoint[];
   currentPolicyPrice?: number;
+  consecutiveNoMatchMonths?: number;
 }
 
 export function IPhoneMockup({ 
@@ -439,6 +440,7 @@ export function IPhoneMockup({
   searchDate,
   priceHistory = [],
   currentPolicyPrice = 0,
+  consecutiveNoMatchMonths = 0,
 }: IPhoneMockupProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -515,6 +517,27 @@ export function IPhoneMockup({
                   currentPolicyPrice={currentPolicyPrice}
                 />
               </motion.div>
+
+              {consecutiveNoMatchMonths >= 6 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="mt-3 w-full"
+                  data-testid="budget-hint-message"
+                >
+                  <div className="bg-amber-50/90 backdrop-blur-sm rounded-xl px-3 py-2.5 border border-amber-200/60 shadow-sm animate-gentle-pulse">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-[10px] leading-[14px] text-amber-800">
+                        Your budget of <span className="font-semibold">£{Math.round(currentPolicyPrice)}</span> hasn't found quote matches. Consider increasing your budget or updating your preferences for better results.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
             </div>
 
             {/* Notification */}
