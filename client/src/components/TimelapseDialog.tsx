@@ -852,7 +852,6 @@ function MatchFoundState({
   const { insurer, price, ai_insight, financial_breakdown } = matchData;
   const [showAllFeatures, setShowAllFeatures] = useState(false);
   const [showDeltaBreakdown, setShowDeltaBreakdown] = useState(false);
-  const [showSwitchBreakdown, setShowSwitchBreakdown] = useState(false);
   const requestedFeatures = matchData.requested_features ?? [];
   const missingFeatures = matchData.missing_features ?? [];
 
@@ -1032,109 +1031,84 @@ function MatchFoundState({
             </span>
           </div>
 
-          {/* Annual Savings - Expert 12-month comparison */}
-          <div className="flex justify-between items-center py-3 bg-primary/10 rounded-lg px-4">
-            <span className="font-semibold">Annual Savings</span>
-            <span
-              className={`text-xl font-bold ${
-                financial_breakdown.annual_savings > 0
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-red-600 dark:text-red-400"
-              }`}
-              data-testid="text-annual-savings"
+          {/* Annual Savings - Unified collapsible section */}
+          <div className="bg-muted/30 rounded-lg overflow-hidden" data-testid="section-annual-savings">
+            <button
+              onClick={() => setShowDeltaBreakdown(!showDeltaBreakdown)}
+              className="flex justify-between items-center w-full py-3 px-4 text-left"
+              data-testid="button-toggle-annual-savings"
             >
-              {financial_breakdown.annual_savings > 0
-                ? "Save "
-                : "Extra "}
-              £{Math.abs(financial_breakdown.annual_savings).toFixed(2)}
-            </span>
-          </div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">Annual Savings</span>
+                <span className="text-xs text-muted-foreground">
+                  {showDeltaBreakdown ? "" : "(tap for details)"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-xl font-bold ${
+                    financial_breakdown.annual_savings > 0
+                      ? "text-green-600 dark:text-green-400"
+                      : "text-red-600 dark:text-red-400"
+                  }`}
+                  data-testid="text-annual-savings"
+                >
+                  {financial_breakdown.annual_savings > 0 ? "Save " : "Extra "}
+                  £{Math.abs(financial_breakdown.annual_savings).toFixed(2)}
+                </span>
+                {showDeltaBreakdown ? (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                )}
+              </div>
+            </button>
 
-          {/* Stay vs Switch comparison with collapsible breakdowns */}
-          <div className="bg-muted/50 rounded-lg px-4 py-3 text-xs text-muted-foreground space-y-3">
-            <p className="text-xs text-muted-foreground mb-2">
-              Cost over next 12 months from switch date
-            </p>
+            {showDeltaBreakdown && (
+              <div className="px-4 pb-4 pt-1 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
+                  Cost over next 12 months from switch date
+                </p>
 
-            {/* If you stay */}
-            <div>
-              <button
-                onClick={() => setShowDeltaBreakdown(!showDeltaBreakdown)}
-                className="flex items-center justify-between w-full text-left"
-                data-testid="button-toggle-stay-breakdown"
-              >
-                <span className="font-medium text-foreground">If you stay</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-foreground">
-                    £{financial_breakdown.stay_cost_12m.toFixed(2)}
-                  </span>
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <span className="text-xs">{showDeltaBreakdown ? "Hide" : "Details"}</span>
-                    {showDeltaBreakdown ? (
-                      <ChevronUp className="w-3.5 h-3.5" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    )}
-                  </div>
-                </div>
-              </button>
-              {showDeltaBreakdown && (
-                <div className="space-y-1 mt-2 ml-2 pl-3 border-l-2 border-border animate-in fade-in slide-in-from-top-2 duration-300">
-                  <div className="flex justify-between">
-                    <span>Remaining coverage (~{financial_breakdown.days_remaining} days)</span>
-                    <span>£{financial_breakdown.stay_remaining_value.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Renewal (~{financial_breakdown.stay_renewal_days} days at same rate)</span>
-                    <span>£{financial_breakdown.stay_renewal_cost.toFixed(2)}</span>
-                  </div>
-                  <div className="border-t border-border pt-1.5 mt-1.5 flex justify-between font-medium text-foreground">
-                    <span>Total</span>
+                {/* If you stay */}
+                <div className="space-y-1">
+                  <div className="flex justify-between font-medium text-foreground">
+                    <span>If you stay</span>
                     <span>£{financial_breakdown.stay_cost_12m.toFixed(2)}</span>
                   </div>
+                  <div className="ml-2 pl-3 border-l-2 border-border space-y-1">
+                    <div className="flex justify-between">
+                      <span>Remaining coverage (~{financial_breakdown.days_remaining} days)</span>
+                      <span>£{financial_breakdown.stay_remaining_value.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Renewal (~{financial_breakdown.stay_renewal_days} days at same rate)</span>
+                      <span>£{financial_breakdown.stay_renewal_cost.toFixed(2)}</span>
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
 
-            {/* If you switch */}
-            <div>
-              <button
-                onClick={() => setShowSwitchBreakdown(!showSwitchBreakdown)}
-                className="flex items-center justify-between w-full text-left"
-                data-testid="button-toggle-switch-breakdown"
-              >
-                <span className="font-medium text-foreground">If you switch</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-green-600 dark:text-green-400">
-                    £{financial_breakdown.switch_cost_12m.toFixed(2)}
-                  </span>
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <span className="text-xs">{showSwitchBreakdown ? "Hide" : "Details"}</span>
-                    {showSwitchBreakdown ? (
-                      <ChevronUp className="w-3.5 h-3.5" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    )}
+                {/* If you switch */}
+                <div className="space-y-1">
+                  <div className="flex justify-between font-medium text-foreground">
+                    <span>If you switch</span>
+                    <span className={financial_breakdown.annual_savings > 0 ? "text-green-600 dark:text-green-400" : ""}>
+                      £{financial_breakdown.switch_cost_12m.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="ml-2 pl-3 border-l-2 border-green-300 dark:border-green-700 space-y-1">
+                    <div className="flex justify-between">
+                      <span>New policy (12 months)</span>
+                      <span>£{financial_breakdown.new_quote_price.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Cancellation fee</span>
+                      <span>£{financial_breakdown.cancellation_fee.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
-              </button>
-              {showSwitchBreakdown && (
-                <div className="space-y-1 mt-2 ml-2 pl-3 border-l-2 border-green-300 dark:border-green-700 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <div className="flex justify-between">
-                    <span>New policy (12 months)</span>
-                    <span>£{financial_breakdown.new_quote_price.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Cancellation fee</span>
-                    <span>£{financial_breakdown.cancellation_fee.toFixed(2)}</span>
-                  </div>
-                  <div className="border-t border-border pt-1.5 mt-1.5 flex justify-between font-medium text-foreground">
-                    <span>Total</span>
-                    <span className={financial_breakdown.annual_savings > 0 ? "text-green-600 dark:text-green-400" : ""}>£{financial_breakdown.switch_cost_12m.toFixed(2)}</span>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
