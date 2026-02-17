@@ -1112,125 +1112,94 @@ function MatchFoundState({
           </div>
         </div>
 
-        {/* Features Section - Option C: Smart Summary + Requested Features + Collapsible Full Coverage */}
+        {/* Features Section - Compact themed design */}
         <div
-          className="rounded-lg overflow-hidden border border-green-200 dark:border-green-800"
+          className="bg-muted/30 rounded-lg"
           data-testid="features-section"
         >
-          {/* Smart Summary Header */}
-          <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-3 flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-white" />
-            <span className="text-sm font-semibold text-white">
-              Feature Coverage
-            </span>
+          {/* Header */}
+          <div className="px-4 py-3 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+            <span className="text-sm font-semibold">Feature Coverage</span>
             {requestedFeatures.length > 0 && (
-              <div className="ml-auto flex items-center gap-2">
-                <div className="bg-white/20 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-white" data-testid="text-feature-match-count">
-                    {requestedFeatures.length} of {requestedFeatures.length + missingFeatures.length}
-                  </span>
-                  <span className="text-xs text-white/80">requested matched</span>
-                </div>
-              </div>
+              <span className="ml-auto text-xs text-muted-foreground" data-testid="text-feature-match-count">
+                {requestedFeatures.length}/{requestedFeatures.length + missingFeatures.length} matched
+              </span>
             )}
           </div>
 
-          <div className="bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-green-950/50 dark:via-background dark:to-emerald-950/50 p-4 space-y-4">
-            {/* Subsection 1: Features You Requested */}
+          <div className="px-4 pb-4 space-y-3">
+            {/* Requested Features - compact 2-column grid */}
             {requestedFeatures.length > 0 && (
               <div data-testid="requested-features-section">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  Features You Requested
+                <p className="text-xs text-muted-foreground mb-2">
+                  Your requested features
                 </p>
-                <div className="space-y-2">
-                  {requestedFeatures.map((feature, idx) => {
-                    const config = getFeatureConfig(feature);
-                    const IconComponent = config.icon;
-                    return (
-                      <div
-                        key={`req-${idx}`}
-                        className="flex items-center gap-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2.5"
-                        data-testid={`requested-feature-${idx}`}
-                      >
-                        <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
-                        <IconComponent className={`w-4 h-4 ${config.color} shrink-0`} />
-                        <span className="text-sm font-medium text-foreground">
-                          {feature}
-                        </span>
-                        <span className="ml-auto text-xs text-green-600 dark:text-green-400 font-medium">
-                          Included
-                        </span>
-                      </div>
-                    );
-                  })}
-                  {missingFeatures.map((feature, idx) => {
-                    const config = getFeatureConfig(feature);
-                    const IconComponent = config.icon;
-                    return (
-                      <div
-                        key={`miss-${idx}`}
-                        className="flex items-center gap-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2.5"
-                        data-testid={`missing-feature-${idx}`}
-                      >
-                        <XCircle className="w-4 h-4 text-red-500 shrink-0" />
-                        <IconComponent className={`w-4 h-4 ${config.color} shrink-0`} />
-                        <span className="text-sm font-medium text-foreground">
-                          {feature}
-                        </span>
-                        <span className="ml-auto text-xs text-red-600 dark:text-red-400 font-medium">
-                          Not included
-                        </span>
-                      </div>
-                    );
-                  })}
+                <div className="grid grid-cols-2 gap-1.5">
+                  {requestedFeatures.map((feature, idx) => (
+                    <div
+                      key={`req-${idx}`}
+                      className="flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-md bg-background"
+                      data-testid={`requested-feature-${idx}`}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                      <span className="text-foreground truncate">{feature}</span>
+                    </div>
+                  ))}
+                  {missingFeatures.map((feature, idx) => (
+                    <div
+                      key={`miss-${idx}`}
+                      className="flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-md bg-background"
+                      data-testid={`missing-feature-${idx}`}
+                    >
+                      <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                      <span className="text-muted-foreground truncate">{feature}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
             {requestedFeatures.length === 0 && (
-              <div className="text-center py-2">
-                <p className="text-sm text-muted-foreground">
-                  No specific features were requested via whisper
-                </p>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                No specific features requested via whisper
+              </p>
             )}
 
-            {/* Subsection 2: Full Quote Coverage - Collapsible */}
-            <div className="border-t border-green-200 dark:border-green-800 pt-3">
+            {/* All Quote Features - Collapsible */}
+            <div className="border-t border-border pt-3">
               <button
                 onClick={() => setShowAllFeatures(!showAllFeatures)}
-                className="flex items-center justify-between w-full text-left group"
+                className="flex items-center justify-between w-full text-left"
                 data-testid="button-toggle-all-features"
               >
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  All Quote Features ({matchData.features.length})
+                <span className="text-xs text-muted-foreground">
+                  All quote features ({matchData.features.length})
                 </span>
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <span className="text-xs">{showAllFeatures ? "Hide" : "Show"}</span>
                   {showAllFeatures ? (
-                    <ChevronUp className="w-4 h-4" />
+                    <ChevronUp className="w-3.5 h-3.5" />
                   ) : (
-                    <ChevronDown className="w-4 h-4" />
+                    <ChevronDown className="w-3.5 h-3.5" />
                   )}
                 </div>
               </button>
               {showAllFeatures && (
-                <div className="grid grid-cols-2 gap-2 mt-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="grid grid-cols-2 gap-1.5 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
                   {matchData.features.map((feature, idx) => {
                     const config = getFeatureConfig(feature);
                     const IconComponent = config.icon;
                     return (
                       <div
                         key={idx}
-                        className={`flex items-center gap-2 ${config.bgColor} rounded-lg px-3 py-2`}
+                        className="flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-md bg-background"
                         data-testid={`quote-feature-${idx}`}
                       >
                         <IconComponent
-                          className={`w-4 h-4 ${config.color} shrink-0`}
+                          className={`w-3.5 h-3.5 ${config.color} shrink-0`}
                         />
-                        <span
-                          className={`text-xs font-medium ${config.color} truncate`}
-                        >
+                        <span className="text-foreground truncate">
                           {feature}
                         </span>
                       </div>
