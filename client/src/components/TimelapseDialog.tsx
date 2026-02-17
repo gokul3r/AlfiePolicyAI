@@ -919,50 +919,53 @@ function MatchFoundState({
         <div className="mt-2 space-y-1.5">
           <p className="text-lg text-green-600 dark:text-green-400" data-testid="text-savings-headline">
             Switching to <span className="text-xl font-bold">{matchData.financial_breakdown.new_quote_insurer}</span> will save you{" "}
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  className="text-xl font-bold underline decoration-dotted decoration-green-400/60 underline-offset-4 cursor-pointer"
-                  data-testid="button-savings-figure"
-                >
-                  £{matchData.financial_breakdown.annual_savings.toFixed(2)}
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80" side="bottom" align="center">
-                <div className="space-y-2">
-                  <p className="text-sm font-semibold text-foreground">Upfront impact if you switch today</p>
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <div className="flex justify-between">
-                      <span>Pro-rata refund from old policy</span>
-                      <span className="text-green-600 dark:text-green-400">+ £{matchData.financial_breakdown.pro_rata_refund.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Cancellation fee</span>
-                      <span className="text-red-600 dark:text-red-400">- £{matchData.financial_breakdown.cancellation_fee.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>New policy cost (12 months)</span>
-                      <span className="text-red-600 dark:text-red-400">- £{matchData.financial_breakdown.new_policy_cost.toFixed(2)}</span>
-                    </div>
-                    <div className="border-t border-border pt-1.5 mt-1.5 flex justify-between font-medium text-foreground">
-                      <span>You would {matchData.financial_breakdown.upfront_impact < 0 ? "pay" : "receive"} today</span>
-                      <span className={matchData.financial_breakdown.upfront_impact > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                        £{Math.abs(matchData.financial_breakdown.upfront_impact).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>{" "}
+            <span className="text-xl font-bold">£{matchData.financial_breakdown.annual_savings.toFixed(2)}</span>{" "}
             over the next 12 months
           </p>
-          <p className="text-xs text-muted-foreground">
-            {matchData.financial_breakdown.upfront_impact < 0
-              ? `You would pay £${Math.abs(matchData.financial_breakdown.upfront_impact).toFixed(2)} today to make this change.`
-              : matchData.financial_breakdown.upfront_impact > 0
-                ? `You would receive £${matchData.financial_breakdown.upfront_impact.toFixed(2)} back today.`
-                : "No upfront cost to make this change."}{" "}
-            <span className="underline decoration-dotted cursor-pointer text-muted-foreground/70">Tap the figure above for details.</span>
+          <p className="text-xs text-muted-foreground" data-testid="text-upfront-cost">
+            {matchData.financial_breakdown.upfront_impact !== 0 ? (
+              <>
+                {matchData.financial_breakdown.upfront_impact < 0 ? "You would pay " : "You would receive "}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="text-xs font-bold text-muted-foreground underline decoration-dotted underline-offset-2 cursor-pointer inline"
+                      data-testid="button-upfront-figure"
+                    >
+                      £{Math.abs(matchData.financial_breakdown.upfront_impact).toFixed(2)}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80" side="bottom" align="center">
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-foreground">Upfront impact if you switch today</p>
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        <div className="flex justify-between">
+                          <span>Pro-rata refund from old policy</span>
+                          <span className="text-green-600 dark:text-green-400">+ £{matchData.financial_breakdown.pro_rata_refund.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Cancellation fee</span>
+                          <span className="text-red-600 dark:text-red-400">- £{matchData.financial_breakdown.cancellation_fee.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>New policy cost (12 months)</span>
+                          <span className="text-red-600 dark:text-red-400">- £{matchData.financial_breakdown.new_policy_cost.toFixed(2)}</span>
+                        </div>
+                        <div className="border-t border-border pt-1.5 mt-1.5 flex justify-between font-medium text-foreground">
+                          <span>You would {matchData.financial_breakdown.upfront_impact < 0 ? "pay" : "receive"} today</span>
+                          <span className={matchData.financial_breakdown.upfront_impact > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                            £{Math.abs(matchData.financial_breakdown.upfront_impact).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+                {matchData.financial_breakdown.upfront_impact < 0 ? " today to make this change." : " back today."}
+              </>
+            ) : (
+              "No upfront cost to make this change."
+            )}
           </p>
         </div>
         {totalMatches > 1 && (
