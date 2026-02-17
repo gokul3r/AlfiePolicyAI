@@ -37,6 +37,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  TrendingUp,
+  SlidersHorizontal,
+  Clock,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { flushSync } from "react-dom";
@@ -122,6 +125,7 @@ export function TimelapseDialog({
   const [currentMatchIndex, setCurrentMatchIndex] = useState<number>(0);
   const [weekIndex, setWeekIndex] = useState<number>(0);
   const [policyEndDate, setPolicyEndDate] = useState<Date | null>(null);
+  const [policyStartDate, setPolicyStartDate] = useState<Date | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [vehicleName, setVehicleName] = useState<string>("");
   const [vehicleRegNumber, setVehicleRegNumber] = useState<string>("");
@@ -158,6 +162,31 @@ export function TimelapseDialog({
     }
     return count;
   }, [priceHistory]);
+
+  useEffect(() => {
+    if (!open || !selectedVehicleId || !userEmail) return;
+    const fetchPolicySummary = async () => {
+      try {
+        const response = await apiRequest("GET", `/api/vehicle-policies/${userEmail}`);
+        const policies = await response.json();
+        const policy = policies.find((p: any) => p.policy_id === selectedVehicleId);
+        if (policy) {
+          if (policy.current_policy_cost) {
+            setCurrentPolicyPrice(Number(policy.current_policy_cost));
+          }
+          if (policy.policy_start_date) {
+            setPolicyStartDate(new Date(policy.policy_start_date));
+          }
+          if (policy.policy_end_date) {
+            setPolicyEndDate(new Date(policy.policy_end_date));
+          }
+        }
+      } catch (err) {
+        console.error("[Timelapse] Failed to pre-fetch policy summary:", err);
+      }
+    };
+    fetchPolicySummary();
+  }, [open, selectedVehicleId, userEmail]);
 
   // Calculate next search date based on frequency
   const calculateNextDate = (
@@ -431,10 +460,11 @@ export function TimelapseDialog({
       );
 
       // Start searching from policy start date + 1 interval (1 week or 1 month)
-      const policyStartDate = new Date(currentPolicy.policy_start_date);
-      const firstSearchDate = calculateNextDate(policyStartDate, frequency);
+      const startDate = new Date(currentPolicy.policy_start_date);
+      setPolicyStartDate(startDate);
+      const firstSearchDate = calculateNextDate(startDate, frequency);
       console.log(
-        `[Timelapse] Policy start: ${policyStartDate.toISOString().split("T")[0]}, first search: ${firstSearchDate.toISOString().split("T")[0]} (${frequency})`,
+        `[Timelapse] Policy start: ${startDate.toISOString().split("T")[0]}, first search: ${firstSearchDate.toISOString().split("T")[0]} (${frequency})`,
       );
       await searchWeek(firstSearchDate, endDate);
     } catch (error: any) {
@@ -640,6 +670,7 @@ export function TimelapseDialog({
     setCurrentMatchIndex(0);
     setWeekIndex(0);
     setPolicyEndDate(null);
+    setPolicyStartDate(null);
     setIsSearching(false);
     setVehicleName("");
     setVehicleRegNumber("");
@@ -674,29 +705,72 @@ export function TimelapseDialog({
 
         {/* Intro State */}
         {state === "intro" && (
-          <div className="flex flex-col items-center justify-center h-full space-y-8 p-8">
-            <div className="text-center space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
-              <h2 className="text-3xl md:text-4xl font-bold text-foreground leading-relaxed">
-                Experience how{" "}
-                <span className="text-primary">Auto-Annie's</span> scheduled
-                quote search works
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl">
-                Watch as Auto-Annie searches for the best insurance quotes{" "}
-                {frequency} through your policy period.
-              </p>
-            </div>
+          <div className="flex flex-col items-center justify-center h-full p-6 md:p-8">
+            <div className="max-w-lg w-full space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <div className="text-center space-y-3">
+                <h2 className="text-2xl md:text-3xl font-bold text-foreground leading-tight" data-testid="text-intro-heading">
+                  Experience{" "}
+                  <span className="text-primary">Auto-Annie's</span> Scheduled Market Monitoring
+                </h2>
+                <p className="text-sm md:text-base text-muted-foreground leading-relaxed" data-testid="text-intro-description">
+                  Auto-Annie scans the UK insurance market monthly during your policy period and alerts you only when a financially meaningful opportunity appears.
+                </p>
+              </div>
 
-            <Button
-              size="lg"
-              onClick={handleStartTimelapse}
-              disabled={!selectedVehicleId || isSearching}
-              className="px-12 py-7 text-xl animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150"
-              data-testid="button-start-timelapse"
-            >
-              <Sparkles className="mr-2 h-5 w-5" />
-              Start
-            </Button>
+              <div className="space-y-3 px-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center">
+                    <TrendingUp className="w-4 h-4 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground" data-testid="text-feature-pricing">Market-driven pricing simulation</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center">
+                    <SlidersHorizontal className="w-4 h-4 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground" data-testid="text-feature-threshold">Threshold-based switching logic</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center">
+                    <Clock className="w-4 h-4 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground" data-testid="text-feature-lifecycle">Full 12-month lifecycle monitoring</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-3 pt-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
+                <Button
+                  size="lg"
+                  onClick={handleStartTimelapse}
+                  disabled={!selectedVehicleId || isSearching}
+                  data-testid="button-start-timelapse"
+                >
+                  <Sparkles className="mr-2 h-5 w-5" />
+                  Start
+                </Button>
+
+                {currentPolicyPrice > 0 && policyStartDate && policyEndDate && (
+                  <p className="text-xs text-muted-foreground text-center" data-testid="text-policy-summary">
+                    Policy:{" "}
+                    <span className="font-semibold text-primary">
+                      £{Math.round(currentPolicyPrice)}
+                    </span>
+                    {" | "}
+                    <span className="font-semibold text-primary">
+                      {policyStartDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                    </span>
+                    {" – "}
+                    <span className="font-semibold text-primary">
+                      {policyEndDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                    </span>
+                    {" | Threshold: "}
+                    <span className="font-semibold text-primary">
+                      £{minSavingsThreshold}
+                    </span>
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
