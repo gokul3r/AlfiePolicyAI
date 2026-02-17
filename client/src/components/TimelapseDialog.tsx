@@ -1015,18 +1015,18 @@ function MatchFoundState({
             </span>
           </div>
 
-          <div className="flex justify-between items-center py-2 border-b border-border">
-            <span className="text-muted-foreground">Cancellation fee</span>
-            <span className="text-lg font-semibold">
+          <div className="flex justify-between items-center py-1 border-b border-border">
+            <span className="text-xs text-muted-foreground">Cancellation fee</span>
+            <span className="text-xs text-muted-foreground">
               £{financial_breakdown.cancellation_fee.toFixed(2)}
             </span>
           </div>
 
-          <div className="flex justify-between items-center py-2 border-b border-border">
-            <span className="text-muted-foreground">
+          <div className="flex justify-between items-center py-1 border-b border-border">
+            <span className="text-xs text-muted-foreground">
               Pro-rata refund (~{financial_breakdown.days_remaining} days)
             </span>
-            <span className="text-lg font-semibold text-green-600 dark:text-green-400">
+            <span className="text-xs text-green-600 dark:text-green-400">
               £{financial_breakdown.pro_rata_refund.toFixed(2)}
             </span>
           </div>
