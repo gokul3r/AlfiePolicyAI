@@ -131,7 +131,14 @@ export function TimelapseDialog({
   const [previousProvider, setPreviousProvider] = useState<string>("");
   const currentProviderRef = useRef<string>("");
   const [priceHistory, setPriceHistory] = useState<
-    { month: string; lowestPrice: number | null; marketLowestPrice: number | null; status?: "purchased" | "matched" | "market"; insurer?: string; features?: string[] }[]
+    {
+      month: string;
+      lowestPrice: number | null;
+      marketLowestPrice: number | null;
+      status?: "purchased" | "matched" | "market";
+      insurer?: string;
+      features?: string[];
+    }[]
   >([]);
   const [currentPolicyPrice, setCurrentPolicyPrice] = useState<number>(0);
   const [whisperBudget, setWhisperBudget] = useState<number | null>(null);
@@ -140,7 +147,10 @@ export function TimelapseDialog({
   const consecutiveNoMatchMonths = useMemo(() => {
     let count = 0;
     for (let i = priceHistory.length - 1; i >= 0; i--) {
-      if (priceHistory[i].lowestPrice === null && priceHistory[i].status !== "purchased") {
+      if (
+        priceHistory[i].lowestPrice === null &&
+        priceHistory[i].status !== "purchased"
+      ) {
         count++;
       } else {
         break;
@@ -161,7 +171,11 @@ export function TimelapseDialog({
       const currentDay = currentDate.getDate();
       const targetMonth = currentDate.getMonth() + 1;
       nextDate.setMonth(targetMonth, 1);
-      const lastDayOfTargetMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
+      const lastDayOfTargetMonth = new Date(
+        nextDate.getFullYear(),
+        nextDate.getMonth() + 1,
+        0,
+      ).getDate();
       nextDate.setDate(Math.min(currentDay, lastDayOfTargetMonth));
     }
     return nextDate;
@@ -199,19 +213,22 @@ export function TimelapseDialog({
       }
 
       // Filter out quotes from the current provider (no point switching to the same insurer)
-      const currentProvider = currentProviderRef.current || response.current_insurance_provider || "";
+      const currentProvider =
+        currentProviderRef.current || response.current_insurance_provider || "";
       const allMatches = currentProvider
         ? rawMatches.filter((match) => {
-            const matchInsurer = (match.insurer || match.financial_breakdown?.new_quote_insurer || "").toLowerCase();
+            const matchInsurer = (
+              match.insurer ||
+              match.financial_breakdown?.new_quote_insurer ||
+              ""
+            ).toLowerCase();
             return matchInsurer !== currentProvider.toLowerCase();
           })
         : rawMatches;
 
       // Filter matches based on minimum savings threshold using 12-month annual savings
       const matches = allMatches.filter((match) => {
-        return (
-          match.financial_breakdown.annual_savings >= minSavingsThreshold
-        );
+        return match.financial_breakdown.annual_savings >= minSavingsThreshold;
       });
 
       console.log(
@@ -219,19 +236,39 @@ export function TimelapseDialog({
       );
 
       // Track price data for the live graph - aggregate per month+year
-      const monthLabel = searchDate.toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
-      const lowestPrice = allMatches.length > 0 ? Math.min(...allMatches.map((m) => m.price)) : null;
-      const allQuotePrices: number[] = response.all_quote_prices || [];
-      const marketLowestPrice = allQuotePrices.length >= 3
-        ? Math.round([...allQuotePrices].sort((a, b) => a - b).slice(0, 3).reduce((sum, p) => sum + p, 0) / 3)
-        : allQuotePrices.length > 0
-          ? Math.round(allQuotePrices.reduce((sum, p) => sum + p, 0) / allQuotePrices.length)
+      const monthLabel = searchDate.toLocaleDateString("en-GB", {
+        month: "short",
+        year: "2-digit",
+      });
+      const lowestPrice =
+        allMatches.length > 0
+          ? Math.min(...allMatches.map((m) => m.price))
           : null;
+      const allQuotePrices: number[] = response.all_quote_prices || [];
+      const marketLowestPrice =
+        allQuotePrices.length >= 3
+          ? Math.round(
+              [...allQuotePrices]
+                .sort((a, b) => a - b)
+                .slice(0, 3)
+                .reduce((sum, p) => sum + p, 0) / 3,
+            )
+          : allQuotePrices.length > 0
+            ? Math.round(
+                allQuotePrices.reduce((sum, p) => sum + p, 0) /
+                  allQuotePrices.length,
+              )
+            : null;
 
-      const bestMatch = allMatches.length > 0
-        ? allMatches.reduce((best, m) => (m.price < best.price ? m : best), allMatches[0])
-        : null;
-      const matchedInsurer = bestMatch?.insurer || bestMatch?.financial_breakdown?.new_quote_insurer;
+      const bestMatch =
+        allMatches.length > 0
+          ? allMatches.reduce(
+              (best, m) => (m.price < best.price ? m : best),
+              allMatches[0],
+            )
+          : null;
+      const matchedInsurer =
+        bestMatch?.insurer || bestMatch?.financial_breakdown?.new_quote_insurer;
       const matchedFeatures = bestMatch?.features;
 
       setPriceHistory((prev) => {
@@ -239,7 +276,10 @@ export function TimelapseDialog({
         if (existing) {
           const updatedEntry = { ...existing };
           if (lowestPrice !== null) {
-            if (updatedEntry.lowestPrice === null || lowestPrice < updatedEntry.lowestPrice) {
+            if (
+              updatedEntry.lowestPrice === null ||
+              lowestPrice < updatedEntry.lowestPrice
+            ) {
               updatedEntry.lowestPrice = lowestPrice;
               updatedEntry.insurer = matchedInsurer;
               updatedEntry.features = matchedFeatures;
@@ -249,19 +289,25 @@ export function TimelapseDialog({
           if (marketLowestPrice !== null) {
             updatedEntry.marketLowestPrice = marketLowestPrice;
           }
-          if (updatedEntry.lowestPrice !== existing.lowestPrice || updatedEntry.marketLowestPrice !== existing.marketLowestPrice) {
-            return prev.map((p) => p.month === monthLabel ? updatedEntry : p);
+          if (
+            updatedEntry.lowestPrice !== existing.lowestPrice ||
+            updatedEntry.marketLowestPrice !== existing.marketLowestPrice
+          ) {
+            return prev.map((p) => (p.month === monthLabel ? updatedEntry : p));
           }
           return prev;
         }
-        return [...prev, {
-          month: monthLabel,
-          lowestPrice,
-          marketLowestPrice,
-          status: lowestPrice !== null ? "matched" as const : undefined,
-          insurer: matchedInsurer,
-          features: matchedFeatures,
-        }];
+        return [
+          ...prev,
+          {
+            month: monthLabel,
+            lowestPrice,
+            marketLowestPrice,
+            status: lowestPrice !== null ? ("matched" as const) : undefined,
+            insurer: matchedInsurer,
+            features: matchedFeatures,
+          },
+        ];
       });
 
       if (matches.length > 0) {
@@ -376,7 +422,9 @@ export function TimelapseDialog({
 
       const whisperText = currentPolicy.whisper_preferences || "";
       const budgetMatch = whisperText.match(/£\s*(\d+(?:[.,]\d+)?)/i);
-      setWhisperBudget(budgetMatch ? parseFloat(budgetMatch[1].replace(",", "")) : null);
+      setWhisperBudget(
+        budgetMatch ? parseFloat(budgetMatch[1].replace(",", "")) : null,
+      );
 
       console.log(
         `[Timelapse] Using real policy end date: ${endDate.toISOString().split("T")[0]}`,
@@ -463,28 +511,48 @@ export function TimelapseDialog({
           `[Timelapse] DB updated: policy switched to ${currentMatch.insurer} at £${currentMatch.price}`,
         );
         setCurrentPolicyPrice(currentMatch.price);
-        const newProvider = currentMatch.insurer || currentMatch.financial_breakdown.new_quote_insurer;
-        setPreviousProvider(currentProviderRef.current || currentInsuranceProvider);
+        const newProvider =
+          currentMatch.insurer ||
+          currentMatch.financial_breakdown.new_quote_insurer;
+        setPreviousProvider(
+          currentProviderRef.current || currentInsuranceProvider,
+        );
         setCurrentInsuranceProvider(newProvider);
         currentProviderRef.current = newProvider;
 
         // Mark the corresponding price history entry as "purchased" (green dot)
         // Update price, insurer, and features to reflect the actual selected match
-        const purchaseMonthLabel = new Date(currentDate).toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
-        const purchasedInsurer = currentMatch.insurer || currentMatch.financial_breakdown.new_quote_insurer;
+        const purchaseMonthLabel = new Date(currentDate).toLocaleDateString(
+          "en-GB",
+          { month: "short", year: "2-digit" },
+        );
+        const purchasedInsurer =
+          currentMatch.insurer ||
+          currentMatch.financial_breakdown.new_quote_insurer;
         const purchasedPrice = currentMatch.price;
         const purchasedFeatures = currentMatch.features;
         setPriceHistory((prev) =>
           prev.map((p) =>
             p.month === purchaseMonthLabel
-              ? { ...p, status: "purchased" as const, lowestPrice: purchasedPrice, insurer: purchasedInsurer, features: purchasedFeatures }
-              : p
-          )
+              ? {
+                  ...p,
+                  status: "purchased" as const,
+                  lowestPrice: purchasedPrice,
+                  insurer: purchasedInsurer,
+                  features: purchasedFeatures,
+                }
+              : p,
+          ),
         );
 
-        queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
+        queryClient.invalidateQueries({
+          queryKey: ["/api/vehicle-policies", userEmail],
+        });
       } catch (purchaseError) {
-        console.error("[Timelapse] Failed to update policy in DB:", purchaseError);
+        console.error(
+          "[Timelapse] Failed to update policy in DB:",
+          purchaseError,
+        );
       }
     }
 
@@ -531,7 +599,9 @@ export function TimelapseDialog({
 
   const handleContinueTimelapse = async () => {
     if (!policyEndDate) {
-      console.error("[Timelapse] policyEndDate is null in handleContinueTimelapse");
+      console.error(
+        "[Timelapse] policyEndDate is null in handleContinueTimelapse",
+      );
       setState("no_match");
       return;
     }
@@ -546,7 +616,9 @@ export function TimelapseDialog({
 
     // Check if we've passed the original policy end date
     if (nextDate > policyEndDate) {
-      console.log("[Timelapse] Reached policy end date after continuing timelapse.");
+      console.log(
+        "[Timelapse] Reached policy end date after continuing timelapse.",
+      );
       flushSync(() => {
         setState("timelapse_complete");
         setIsSearching(false);
@@ -611,7 +683,7 @@ export function TimelapseDialog({
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl">
                 Watch as Auto-Annie searches for the best insurance quotes{" "}
-                {frequency} until a match is found
+                {frequency} through your policy period.
               </p>
             </div>
 
@@ -675,8 +747,14 @@ export function TimelapseDialog({
             totalMatches={currentWeekMatches.length}
             onConfirmPurchase={handleConfirmPurchase}
             onKeepSearching={handleKeepSearching}
-            onPreviousMatch={() => setCurrentMatchIndex((prev) => Math.max(0, prev - 1))}
-            onNextMatch={() => setCurrentMatchIndex((prev) => Math.min(currentWeekMatches.length - 1, prev + 1))}
+            onPreviousMatch={() =>
+              setCurrentMatchIndex((prev) => Math.max(0, prev - 1))
+            }
+            onNextMatch={() =>
+              setCurrentMatchIndex((prev) =>
+                Math.min(currentWeekMatches.length - 1, prev + 1),
+              )
+            }
             canSearchMoreMonths={
               policyEndDate
                 ? calculateNextDate(new Date(currentDate), frequency) <=
@@ -891,7 +969,6 @@ function MatchFoundState({
     );
   };
 
-
   return (
     <div className="flex flex-col h-full overflow-y-auto p-8 bg-gradient-to-br from-background via-background to-green-500/5">
       {/* Success Header */}
@@ -902,27 +979,52 @@ function MatchFoundState({
         </h2>
         <div className="flex items-center justify-center gap-2 text-muted-foreground mb-1">
           <Calendar className="w-4 h-4" />
-          <span className="text-base font-medium" data-testid="text-search-month-year">
+          <span
+            className="text-base font-medium"
+            data-testid="text-search-month-year"
+          >
             {(() => {
               const d = searchDate ? new Date(searchDate) : new Date();
-              return d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+              return d.toLocaleDateString("en-GB", {
+                month: "long",
+                year: "numeric",
+              });
             })()}
           </span>
         </div>
         <div className="mt-2 space-y-1.5">
-          <p className="text-lg text-green-600 dark:text-green-400" data-testid="text-savings-headline">
-            Switching to <span className="text-xl font-bold">{matchData.financial_breakdown.new_quote_insurer}</span> will save you{" "}
-            <span className="text-xl font-bold">£{matchData.financial_breakdown.annual_savings.toFixed(2)}</span>{" "}
+          <p
+            className="text-lg text-green-600 dark:text-green-400"
+            data-testid="text-savings-headline"
+          >
+            Switching to{" "}
+            <span className="text-xl font-bold">
+              {matchData.financial_breakdown.new_quote_insurer}
+            </span>{" "}
+            will save you{" "}
+            <span className="text-xl font-bold">
+              £{matchData.financial_breakdown.annual_savings.toFixed(2)}
+            </span>{" "}
             over the next 12 months
           </p>
-          <p className="text-xs text-muted-foreground" data-testid="text-upfront-cost">
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="text-upfront-cost"
+          >
             {matchData.financial_breakdown.upfront_impact !== 0 ? (
               <>
-                {matchData.financial_breakdown.upfront_impact < 0 ? "You would pay " : "You would receive "}
+                {matchData.financial_breakdown.upfront_impact < 0
+                  ? "You would pay "
+                  : "You would receive "}
                 <span className="font-bold">
-                  £{Math.abs(matchData.financial_breakdown.upfront_impact).toFixed(2)}
+                  £
+                  {Math.abs(
+                    matchData.financial_breakdown.upfront_impact,
+                  ).toFixed(2)}
                 </span>
-                {matchData.financial_breakdown.upfront_impact < 0 ? " today to make this change." : " back today."}
+                {matchData.financial_breakdown.upfront_impact < 0
+                  ? " today to make this change."
+                  : " back today."}
               </>
             ) : (
               "No upfront cost to make this change."
@@ -930,7 +1032,10 @@ function MatchFoundState({
           </p>
         </div>
         {totalMatches > 1 && (
-          <div className="flex items-center justify-center gap-3 mt-3" data-testid="match-navigation">
+          <div
+            className="flex items-center justify-center gap-3 mt-3"
+            data-testid="match-navigation"
+          >
             <Button
               size="icon"
               variant="outline"
@@ -974,7 +1079,10 @@ function MatchFoundState({
               return (
                 <>
                   <span className="text-muted-foreground/40 text-xl">·</span>
-                  <div className="flex items-center gap-1.5" data-testid="rating-section">
+                  <div
+                    className="flex items-center gap-1.5"
+                    data-testid="rating-section"
+                  >
                     <Star className="w-4 h-4 fill-blue-500 text-blue-500 shrink-0" />
                     <span className="text-sm font-semibold text-foreground">
                       {rating.toFixed(1)}
@@ -1000,19 +1108,26 @@ function MatchFoundState({
 
           <div className="border-b border-border">
             <button
-              onClick={() => setShowSwitchCostBreakdown(!showSwitchCostBreakdown)}
+              onClick={() =>
+                setShowSwitchCostBreakdown(!showSwitchCostBreakdown)
+              }
               className="flex justify-between items-center w-full py-2 text-left"
               data-testid="button-toggle-switch-cost"
             >
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">Cost to switch</span>
                 {!showSwitchCostBreakdown && (
-                  <span className="text-xs text-muted-foreground">(details)</span>
+                  <span className="text-xs text-muted-foreground">
+                    (details)
+                  </span>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <span className={`text-lg font-semibold ${financial_breakdown.upfront_impact < 0 ? "" : "text-green-600 dark:text-green-400"}`}>
-                  {financial_breakdown.upfront_impact < 0 ? "" : "+ "}£{Math.abs(financial_breakdown.upfront_impact).toFixed(2)}
+                <span
+                  className={`text-lg font-semibold ${financial_breakdown.upfront_impact < 0 ? "" : "text-green-600 dark:text-green-400"}`}
+                >
+                  {financial_breakdown.upfront_impact < 0 ? "" : "+ "}£
+                  {Math.abs(financial_breakdown.upfront_impact).toFixed(2)}
                 </span>
                 {showSwitchCostBreakdown ? (
                   <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
@@ -1023,23 +1138,43 @@ function MatchFoundState({
             </button>
             {showSwitchCostBreakdown && (
               <div className="pb-3 space-y-1 text-xs text-muted-foreground animate-in fade-in slide-in-from-top-2 duration-300">
-                <p className="text-xs text-muted-foreground mb-2">Upfront impact if you switch today</p>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Upfront impact if you switch today
+                </p>
                 <div className="ml-2 pl-3 border-l-2 border-border space-y-1">
                   <div className="flex justify-between">
                     <span>Pro-rata refund from old policy</span>
-                    <span className="text-green-600 dark:text-green-400">+ £{financial_breakdown.pro_rata_refund.toFixed(2)}</span>
+                    <span className="text-green-600 dark:text-green-400">
+                      + £{financial_breakdown.pro_rata_refund.toFixed(2)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Cancellation fee</span>
-                    <span className="text-red-600 dark:text-red-400">- £{financial_breakdown.cancellation_fee.toFixed(2)}</span>
+                    <span className="text-red-600 dark:text-red-400">
+                      - £{financial_breakdown.cancellation_fee.toFixed(2)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>New policy cost (12 months)</span>
-                    <span className="text-red-600 dark:text-red-400">- £{financial_breakdown.new_policy_cost.toFixed(2)}</span>
+                    <span className="text-red-600 dark:text-red-400">
+                      - £{financial_breakdown.new_policy_cost.toFixed(2)}
+                    </span>
                   </div>
                   <div className="border-t border-border pt-1.5 mt-1.5 flex justify-between font-medium text-foreground">
-                    <span>You would {financial_breakdown.upfront_impact < 0 ? "pay" : "receive"} today</span>
-                    <span className={financial_breakdown.upfront_impact > 0 ? "text-green-600 dark:text-green-400" : ""}>
+                    <span>
+                      You would{" "}
+                      {financial_breakdown.upfront_impact < 0
+                        ? "pay"
+                        : "receive"}{" "}
+                      today
+                    </span>
+                    <span
+                      className={
+                        financial_breakdown.upfront_impact > 0
+                          ? "text-green-600 dark:text-green-400"
+                          : ""
+                      }
+                    >
                       £{Math.abs(financial_breakdown.upfront_impact).toFixed(2)}
                     </span>
                   </div>
@@ -1049,7 +1184,10 @@ function MatchFoundState({
           </div>
 
           {/* Annual Savings - Unified collapsible section */}
-          <div className="bg-muted/30 rounded-lg overflow-hidden" data-testid="section-annual-savings">
+          <div
+            className="bg-muted/30 rounded-lg overflow-hidden"
+            data-testid="section-annual-savings"
+          >
             <button
               onClick={() => setShowDeltaBreakdown(!showDeltaBreakdown)}
               className="flex justify-between items-center w-full py-3 px-4 text-left"
@@ -1070,8 +1208,8 @@ function MatchFoundState({
                   }`}
                   data-testid="text-annual-savings"
                 >
-                  {financial_breakdown.annual_savings > 0 ? "Save " : "Extra "}
-                  £{Math.abs(financial_breakdown.annual_savings).toFixed(2)}
+                  {financial_breakdown.annual_savings > 0 ? "Save " : "Extra "}£
+                  {Math.abs(financial_breakdown.annual_savings).toFixed(2)}
                 </span>
                 {showDeltaBreakdown ? (
                   <ChevronUp className="w-4 h-4 text-muted-foreground" />
@@ -1095,12 +1233,22 @@ function MatchFoundState({
                   </div>
                   <div className="ml-2 pl-3 border-l-2 border-border space-y-1">
                     <div className="flex justify-between">
-                      <span>Remaining coverage (~{financial_breakdown.days_remaining} days)</span>
-                      <span>£{financial_breakdown.stay_remaining_value.toFixed(2)}</span>
+                      <span>
+                        Remaining coverage (~
+                        {financial_breakdown.days_remaining} days)
+                      </span>
+                      <span>
+                        £{financial_breakdown.stay_remaining_value.toFixed(2)}
+                      </span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Renewal (~{financial_breakdown.stay_renewal_days} days at same rate)</span>
-                      <span>£{financial_breakdown.stay_renewal_cost.toFixed(2)}</span>
+                      <span>
+                        Renewal (~{financial_breakdown.stay_renewal_days} days
+                        at same rate)
+                      </span>
+                      <span>
+                        £{financial_breakdown.stay_renewal_cost.toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1109,18 +1257,28 @@ function MatchFoundState({
                 <div className="space-y-1">
                   <div className="flex justify-between font-medium text-foreground">
                     <span>If you switch</span>
-                    <span className={financial_breakdown.annual_savings > 0 ? "text-green-600 dark:text-green-400" : ""}>
+                    <span
+                      className={
+                        financial_breakdown.annual_savings > 0
+                          ? "text-green-600 dark:text-green-400"
+                          : ""
+                      }
+                    >
                       £{financial_breakdown.switch_cost_12m.toFixed(2)}
                     </span>
                   </div>
                   <div className="ml-2 pl-3 border-l-2 border-green-300 dark:border-green-700 space-y-1">
                     <div className="flex justify-between">
                       <span>New policy (12 months)</span>
-                      <span>£{financial_breakdown.new_quote_price.toFixed(2)}</span>
+                      <span>
+                        £{financial_breakdown.new_quote_price.toFixed(2)}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Cancellation fee</span>
-                      <span>£{financial_breakdown.cancellation_fee.toFixed(2)}</span>
+                      <span>
+                        £{financial_breakdown.cancellation_fee.toFixed(2)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1130,17 +1288,18 @@ function MatchFoundState({
         </div>
 
         {/* Features Section - Compact themed design */}
-        <div
-          className="bg-muted/30 rounded-lg"
-          data-testid="features-section"
-        >
+        <div className="bg-muted/30 rounded-lg" data-testid="features-section">
           {/* Header */}
           <div className="px-4 py-3 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
             <span className="text-sm font-semibold">Feature Coverage</span>
             {requestedFeatures.length > 0 && (
-              <span className="ml-auto text-xs text-muted-foreground" data-testid="text-feature-match-count">
-                {requestedFeatures.length}/{requestedFeatures.length + missingFeatures.length} matched
+              <span
+                className="ml-auto text-xs text-muted-foreground"
+                data-testid="text-feature-match-count"
+              >
+                {requestedFeatures.length}/
+                {requestedFeatures.length + missingFeatures.length} matched
               </span>
             )}
           </div>
@@ -1160,7 +1319,9 @@ function MatchFoundState({
                       data-testid={`requested-feature-${idx}`}
                     >
                       <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                      <span className="text-foreground truncate">{formatFeatureName(feature)}</span>
+                      <span className="text-foreground truncate">
+                        {formatFeatureName(feature)}
+                      </span>
                     </div>
                   ))}
                   {missingFeatures.map((feature, idx) => (
@@ -1170,7 +1331,9 @@ function MatchFoundState({
                       data-testid={`missing-feature-${idx}`}
                     >
                       <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                      <span className="text-muted-foreground truncate">{formatFeatureName(feature)}</span>
+                      <span className="text-muted-foreground truncate">
+                        {formatFeatureName(feature)}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -1194,7 +1357,9 @@ function MatchFoundState({
                   All quote features ({matchData.features.length})
                 </span>
                 <div className="flex items-center gap-1 text-muted-foreground">
-                  <span className="text-xs">{showAllFeatures ? "Hide" : "Show"}</span>
+                  <span className="text-xs">
+                    {showAllFeatures ? "Hide" : "Show"}
+                  </span>
                   {showAllFeatures ? (
                     <ChevronUp className="w-3.5 h-3.5" />
                   ) : (
@@ -1227,7 +1392,6 @@ function MatchFoundState({
             </div>
           </div>
         </div>
-
 
         {/* AutoAnnie's Insight - Blue branded */}
         {ai_insight && (
@@ -1360,9 +1524,7 @@ function MatchFoundState({
             className="flex-1 text-lg py-6"
             data-testid="button-keep-searching"
           >
-            {canSearchMoreMonths
-              ? "Continue Demo"
-              : "End of policy period"}
+            {canSearchMoreMonths ? "Continue Demo" : "End of policy period"}
           </Button>
         </div>
       </div>
