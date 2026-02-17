@@ -848,6 +848,8 @@ function MatchFoundState({
   searchDate: string;
 }) {
   const { insurer, price, ai_insight, financial_breakdown } = matchData;
+  const formatFeatureName = (name: string) =>
+    name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   const [showAllFeatures, setShowAllFeatures] = useState(false);
   const [showDeltaBreakdown, setShowDeltaBreakdown] = useState(false);
   const [showSwitchCostBreakdown, setShowSwitchCostBreakdown] = useState(false);
@@ -1133,7 +1135,7 @@ function MatchFoundState({
                       data-testid={`requested-feature-${idx}`}
                     >
                       <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                      <span className="text-foreground truncate">{feature}</span>
+                      <span className="text-foreground truncate">{formatFeatureName(feature)}</span>
                     </div>
                   ))}
                   {missingFeatures.map((feature, idx) => (
@@ -1143,7 +1145,7 @@ function MatchFoundState({
                       data-testid={`missing-feature-${idx}`}
                     >
                       <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                      <span className="text-muted-foreground truncate">{feature}</span>
+                      <span className="text-muted-foreground truncate">{formatFeatureName(feature)}</span>
                     </div>
                   ))}
                 </div>
@@ -1190,7 +1192,7 @@ function MatchFoundState({
                           className={`w-3.5 h-3.5 ${config.color} shrink-0`}
                         />
                         <span className="text-foreground truncate">
-                          {feature}
+                          {formatFeatureName(feature)}
                         </span>
                       </div>
                     );
