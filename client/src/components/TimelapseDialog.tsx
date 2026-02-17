@@ -134,6 +134,7 @@ export function TimelapseDialog({
     { month: string; lowestPrice: number | null; marketLowestPrice: number | null; status?: "purchased" | "matched" | "market"; insurer?: string; features?: string[] }[]
   >([]);
   const [currentPolicyPrice, setCurrentPolicyPrice] = useState<number>(0);
+  const [whisperBudget, setWhisperBudget] = useState<number | null>(null);
   const { toast } = useToast();
 
   const consecutiveNoMatchMonths = useMemo(() => {
@@ -372,6 +373,10 @@ export function TimelapseDialog({
       if (currentPolicy.current_policy_cost) {
         setCurrentPolicyPrice(Number(currentPolicy.current_policy_cost));
       }
+
+      const whisperText = currentPolicy.whisper_preferences || "";
+      const budgetMatch = whisperText.match(/£\s*(\d+(?:[.,]\d+)?)/i);
+      setWhisperBudget(budgetMatch ? parseFloat(budgetMatch[1].replace(",", "")) : null);
 
       console.log(
         `[Timelapse] Using real policy end date: ${endDate.toISOString().split("T")[0]}`,
@@ -633,6 +638,7 @@ export function TimelapseDialog({
               priceHistory={priceHistory}
               currentPolicyPrice={currentPolicyPrice}
               consecutiveNoMatchMonths={consecutiveNoMatchMonths}
+              whisperBudget={whisperBudget}
             />
           </div>
         )}
@@ -656,6 +662,7 @@ export function TimelapseDialog({
               priceHistory={priceHistory}
               currentPolicyPrice={currentPolicyPrice}
               consecutiveNoMatchMonths={consecutiveNoMatchMonths}
+              whisperBudget={whisperBudget}
             />
           </div>
         )}
@@ -694,6 +701,7 @@ export function TimelapseDialog({
               priceHistory={priceHistory}
               currentPolicyPrice={currentPolicyPrice}
               consecutiveNoMatchMonths={consecutiveNoMatchMonths}
+              whisperBudget={whisperBudget}
             />
             <div className="w-full max-w-md mt-6 pb-4 shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="rounded-md border border-border bg-muted/50 p-4 text-center space-y-3">

@@ -430,6 +430,7 @@ interface IPhoneMockupProps {
   priceHistory?: PriceDataPoint[];
   currentPolicyPrice?: number;
   consecutiveNoMatchMonths?: number;
+  whisperBudget?: number | null;
 }
 
 export function IPhoneMockup({ 
@@ -441,6 +442,7 @@ export function IPhoneMockup({
   priceHistory = [],
   currentPolicyPrice = 0,
   consecutiveNoMatchMonths = 0,
+  whisperBudget = null,
 }: IPhoneMockupProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -532,7 +534,11 @@ export function IPhoneMockup({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <p className="text-[10px] leading-[14px] text-amber-800">
-                        Your budget of <span className="font-semibold">£{Math.round(currentPolicyPrice)}</span> hasn't found quote matches. Consider increasing your budget or updating your preferences for better results.
+                        {whisperBudget ? (
+                          <>Your budget of <span className="font-semibold">£{Math.round(whisperBudget)}</span> hasn't found quote matches. Consider increasing your budget in Whisper preferences for better results.</>
+                        ) : (
+                          <>No quote matches found. Consider setting a budget or updating your Whisper preferences for better results.</>
+                        )}
                       </p>
                     </div>
                   </div>
