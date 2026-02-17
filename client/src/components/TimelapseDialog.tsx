@@ -17,7 +17,6 @@ import {
   CheckCircle2,
   XCircle,
   Star,
-  StarHalf,
   Shield,
   Scale,
   Gavel,
@@ -865,38 +864,6 @@ function MatchFoundState({
     );
   };
 
-  const renderStars = (rating: number) => {
-    const stars = [];
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-
-    for (let i = 0; i < fullStars; i++) {
-      stars.push(
-        <Star
-          key={`full-${i}`}
-          className="w-3.5 h-3.5 fill-blue-500 text-blue-500"
-        />,
-      );
-    }
-    if (hasHalfStar) {
-      stars.push(
-        <StarHalf
-          key="half"
-          className="w-3.5 h-3.5 fill-blue-500 text-blue-500"
-        />,
-      );
-    }
-    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-    for (let i = 0; i < emptyStars; i++) {
-      stars.push(
-        <Star
-          key={`empty-${i}`}
-          className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600"
-        />,
-      );
-    }
-    return stars;
-  };
 
   return (
     <div className="flex flex-col h-full overflow-y-auto p-8 bg-gradient-to-br from-background via-background to-green-500/5">
@@ -969,9 +936,30 @@ function MatchFoundState({
           <h3 className="text-5xl font-bold text-primary mb-2">
             £{financial_breakdown.new_quote_price.toFixed(2)}
           </h3>
-          <p className="text-2xl text-muted-foreground">
-            {financial_breakdown.new_quote_insurer}
-          </p>
+          <div className="flex items-center justify-center gap-2 flex-wrap">
+            <span className="text-2xl text-muted-foreground">
+              {financial_breakdown.new_quote_insurer}
+            </span>
+            {(() => {
+              const rating = matchData.trustpilot_rating ?? 0;
+              const reviewCount = Math.floor(Math.random() * 5000 + 2000);
+              if (rating <= 0) return null;
+              return (
+                <>
+                  <span className="text-muted-foreground/40 text-xl">·</span>
+                  <div className="flex items-center gap-1.5" data-testid="rating-section">
+                    <Star className="w-4 h-4 fill-blue-500 text-blue-500 shrink-0" />
+                    <span className="text-sm font-semibold text-foreground">
+                      {rating.toFixed(1)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      ({reviewCount.toLocaleString()})
+                    </span>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
         </div>
 
         {/* Financial Details Card */}
@@ -1213,36 +1201,6 @@ function MatchFoundState({
           </div>
         </div>
 
-        {/* TrustPilot Rating - Compact inline display */}
-        {(() => {
-          const rating = matchData.trustpilot_rating ?? 0;
-          const reviewCount = Math.floor(Math.random() * 5000 + 2000);
-          return (
-            <div
-              className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-4 py-3"
-              data-testid="rating-section"
-            >
-              <div className="flex items-center gap-2 shrink-0">
-                <Star className="w-4 h-4 fill-blue-500 text-blue-500 shrink-0" />
-                <span className="text-sm font-semibold text-foreground">
-                  {rating > 0 ? rating.toFixed(1) : "N/A"}
-                </span>
-                <div className="flex items-center gap-0.5">
-                  {renderStars(rating)}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  TrustPilot
-                </span>
-                <span className="text-muted-foreground/40">|</span>
-                <span className="text-xs text-muted-foreground">
-                  {reviewCount.toLocaleString()} reviews
-                </span>
-              </div>
-            </div>
-          );
-        })()}
 
         {/* AutoAnnie's Insight - Blue branded */}
         {ai_insight && (
