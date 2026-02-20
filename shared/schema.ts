@@ -90,8 +90,8 @@ export const businessPolicyDetails = pgTable("business_policy_details", {
 // Policy type enum for validation
 const policyTypeEnum = z.enum(["car", "van", "home", "pet", "travel", "business"]);
 
-// Core policy insert schema
-export const insertPolicySchema = createInsertSchema(policies).omit({
+// Base policy insert schema (without cross-field refinements, used for .partial() in update schema)
+const basePolicySchema = createInsertSchema(policies).omit({
   policy_id: true,
   created_at: true,
   updated_at: true,
@@ -103,8 +103,22 @@ export const insertPolicySchema = createInsertSchema(policies).omit({
   policy_end_date: z.string().min(1, "Policy end date is required"),
   current_policy_cost: z.number().min(0, "Policy cost must be positive"),
   current_insurance_provider: z.string().min(1, "Insurance provider is required").trim(),
-  whisper_preferences: z.string().nullish(),  // Allow null, undefined, or string
-  status: z.string().nullish(),  // Allow null, undefined, or string
+  whisper_preferences: z.string().nullish(),
+  status: z.string().nullish(),
+});
+
+// Core policy insert schema with 365-day max duration validation
+export const insertPolicySchema = basePolicySchema.refine((data) => {
+  if (data.policy_start_date && data.policy_end_date) {
+    const start = new Date(data.policy_start_date);
+    const end = new Date(data.policy_end_date);
+    const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays > 0 && diffDays <= 365;
+  }
+  return true;
+}, {
+  message: "Policy duration must be between 1 and 365 days (annual policies only)",
+  path: ["policy_end_date"],
 });
 
 // Vehicle policy details insert schema
@@ -131,9 +145,21 @@ export const insertVehiclePolicySchema = z.object({
 });
 
 // Update schema for vehicle policy (allows partial fields)
+// Applies 365-day validation when both start and end dates are provided in the update
 export const updateVehiclePolicySchema = z.object({
-  policy: insertPolicySchema.partial(),
+  policy: basePolicySchema.partial(),
   details: insertVehiclePolicyDetailsSchema.partial(),
+}).refine((data) => {
+  if (data.policy?.policy_start_date && data.policy?.policy_end_date) {
+    const start = new Date(data.policy.policy_start_date);
+    const end = new Date(data.policy.policy_end_date);
+    const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays > 0 && diffDays <= 365;
+  }
+  return true;
+}, {
+  message: "Policy duration must be between 1 and 365 days (annual policies only)",
+  path: ["policy", "policy_end_date"],
 });
 
 export type InsertPolicy = z.infer<typeof insertPolicySchema>;

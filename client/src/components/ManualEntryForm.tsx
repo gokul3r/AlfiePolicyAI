@@ -49,6 +49,27 @@ const manualEntryFormSchema = z.object({
   type_of_cover_needed: z.string().min(1, "Please select a cover type"),
   no_claim_bonus_years: z.coerce.number().int().min(0, "Must be 0 or more").max(20, "Maximum 20 years"),
   voluntary_excess: z.coerce.number().min(0, "Must be 0 or more"),
+}).refine((data) => {
+  if (data.policy_start_date && data.policy_end_date) {
+    const start = new Date(data.policy_start_date);
+    const end = new Date(data.policy_end_date);
+    return end > start;
+  }
+  return true;
+}, {
+  message: "End date must be after start date",
+  path: ["policy_end_date"],
+}).refine((data) => {
+  if (data.policy_start_date && data.policy_end_date) {
+    const start = new Date(data.policy_start_date);
+    const end = new Date(data.policy_end_date);
+    const diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays <= 365;
+  }
+  return true;
+}, {
+  message: "Policy duration cannot exceed 365 days (12 months). This demo supports annual policies only.",
+  path: ["policy_end_date"],
 });
 
 export type VehiclePolicyFormData = z.infer<typeof manualEntryFormSchema>;

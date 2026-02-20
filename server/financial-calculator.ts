@@ -67,9 +67,12 @@ export function calculateFinancialBreakdown(
   // Calculate total policy days (same as in refund calculation)
   const startDate = new Date(policyStartDate);
   const endDate = new Date(policyEndDate);
-  const totalDays = Math.ceil(
+  const rawTotalDays = Math.ceil(
     (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
   );
+  // Clamp to 365 days max so non-standard policy durations (e.g. 13 months)
+  // don't produce an artificially low daily rate that skews all calculations
+  const totalDays = Math.min(rawTotalDays, 365);
   
   // Calculate pro-rata refund
   const { refund, daysRemaining } = calculateProRataRefund(
