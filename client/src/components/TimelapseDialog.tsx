@@ -856,8 +856,32 @@ export function TimelapseDialog({
             matchData={currentWeekMatches[currentMatchIndex]}
             currentProvider={currentProviderRef.current || currentInsuranceProvider}
             allQuotesBasic={allQuotesBasic}
-            onStay={() => setState("match_found")}
-            onSwitch={() => setState("match_found")}
+            userEmail={userEmail || ""}
+            vehicleRegNumber={vehicleRegNumber || ""}
+            onStay={async (renewalCost: number) => {
+              if (!userEmail || !vehicleRegNumber) {
+                throw new Error("Missing user email or vehicle registration");
+              }
+              const provider = currentProviderRef.current || currentInsuranceProvider;
+              await apiRequest("POST", "/api/purchase-policy", {
+                email_id: userEmail,
+                vehicle_registration_number: vehicleRegNumber,
+                insurer_name: provider,
+                policy_cost: renewalCost,
+              });
+              setCurrentPolicyPrice(renewalCost);
+              const stayMonthLabel = new Date(currentDate).toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
+              setPriceHistory((prev) =>
+                prev.map((p) =>
+                  p.month === stayMonthLabel
+                    ? { ...p, status: "purchased" as const, lowestPrice: renewalCost, insurer: provider }
+                    : p,
+                ),
+              );
+              queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
+            }}
+            onSwitch={() => handleConfirmPurchase()}
+            onClose={handleClose}
           />
         )}
 
@@ -1024,19 +1048,27 @@ function NegotiationScreen({
   matchData,
   currentProvider,
   allQuotesBasic,
+  userEmail,
+  vehicleRegNumber,
   onStay,
   onSwitch,
+  onClose,
 }: {
   matchData: MatchData;
   currentProvider: string;
   allQuotesBasic: { insurer: string; price: number; features: string[] }[];
-  onStay: () => void;
+  userEmail: string;
+  vehicleRegNumber: string;
+  onStay: (renewalCost: number) => Promise<void>;
   onSwitch: () => void;
+  onClose: () => void;
 }) {
   const [phase, setPhase] = useState<"contacting" | "chatting" | "done">("contacting");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [negotiationResult, setNegotiationResult] = useState<"matched" | "rejected" | null>(null);
   const [showButtons, setShowButtons] = useState(false);
+  const [stayConfirmed, setStayConfirmed] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
 
@@ -1258,6 +1290,25 @@ function NegotiationScreen({
                         <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "150ms" }} />
                         <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "300ms" }} />
                       </span>
+                    ) : msg.text.startsWith("CONFIRMED_STAY:") ? (
+                      (() => {
+                        const parts = msg.text.split(":");
+                        const provider = parts[1];
+                        const cost = parts[2];
+                        return (
+                          <div className="space-y-2" data-testid="stay-confirmation">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0" />
+                              <span className="font-semibold text-green-700 dark:text-green-300">Policy Confirmed</span>
+                            </div>
+                            <p className="text-foreground leading-relaxed">
+                              You are staying with <span className="font-bold">{provider}</span> for the yearly premium of{" "}
+                              <span className="font-bold text-lg text-green-700 dark:text-green-300">£{cost}</span>/year
+                            </p>
+                            <p className="text-xs text-muted-foreground">Your policy has been updated.</p>
+                          </div>
+                        );
+                      })()
                     ) : (
                       msg.text
                     )}
@@ -1270,13 +1321,30 @@ function NegotiationScreen({
         )}
 
         {/* Action buttons */}
-        {showButtons && (
+        {showButtons && !stayConfirmed && (
           <div className="p-4 border-t border-border space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-500" data-testid="negotiation-actions">
             <Button
               size="lg"
               variant={negotiationResult === "matched" ? "default" : "outline"}
               className="w-full"
-              onClick={onStay}
+              disabled={isProcessing}
+              onClick={async () => {
+                setIsProcessing(true);
+                try {
+                  await onStay(currentProviderRenewalCost);
+                  await addMessage({
+                    sender: "autoannie",
+                    text: `CONFIRMED_STAY:${currentProvider}:${currentProviderRenewalCost.toFixed(2)}`,
+                  });
+                  setStayConfirmed(true);
+                } catch {
+                  await addMessage({
+                    sender: "autoannie",
+                    text: "Sorry, there was an error updating your policy. Please try again.",
+                  });
+                }
+                setIsProcessing(false);
+              }}
               data-testid="button-stay-provider"
             >
               Stay with {currentProvider}
@@ -1285,10 +1353,25 @@ function NegotiationScreen({
               size="lg"
               variant={negotiationResult === "rejected" ? "default" : "outline"}
               className="w-full"
+              disabled={isProcessing}
               onClick={onSwitch}
               data-testid="button-switch-provider"
             >
               Switch to {newProviderName}
+            </Button>
+          </div>
+        )}
+
+        {/* Stay confirmed - close button */}
+        {stayConfirmed && (
+          <div className="p-4 border-t border-border animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <Button
+              size="lg"
+              className="w-full"
+              onClick={onClose}
+              data-testid="button-close-negotiation"
+            >
+              Done
             </Button>
           </div>
         )}
