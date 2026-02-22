@@ -31,6 +31,7 @@ The backend uses Express.js with TypeScript for a RESTful API (`/api`). It inclu
 -   AI chat and voice chat interactions.
 -   Gmail OAuth integration.
 -   Custom ratings management.
+-   **Negotiator Agent** (`server/negotiator-agent.ts`): AI-powered negotiation agent using Gemini 2.5 Flash. When AutoAnnie finds a cheaper quote and the customer wants to switch, it contacts the current insurer's negotiation agent (POST `/api/negotiate`) with the new and current provider renewal costs. The agent decides "matched" (if current provider is cheaper or within 2% of the new quote) or "rejected". Has a deterministic fallback if the AI is unavailable. Policy duration validation enforces max 365 days with totalDays clamped in the financial calculator.
 
 ### Data Storage
 PostgreSQL is used via Neon serverless driver. Drizzle ORM provides type-safe database operations and migrations. The database schema includes tables for users, policies (with specific details for vehicle policies), chat messages, personalizations, and custom ratings.

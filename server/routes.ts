@@ -21,6 +21,7 @@ import { scanGmailForTravelEmails } from "./gmail-scanner";
 import { parseWhisperPreferences } from "./preference-parser";
 import { calculateFinancialBreakdown } from "./financial-calculator";
 import { classifyIntent, isQuoteIntent, isPolicyIntent, type IntentResult } from "./intent-classifier";
+import { negotiate } from "./negotiator-agent";
 
 // Helper function to flatten policy response for frontend compatibility
 function flattenPolicyResponse(policy: VehiclePolicyWithDetails): any {
@@ -550,6 +551,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[Timelapse Week] Error in single-week search:", error);
       res.status(500).json({
         error: "Failed to perform week search",
+        message: error.message,
+      });
+    }
+  });
+
+  // Negotiation agent endpoint - AutoAnnie negotiates with current insurer
+  app.post("/api/negotiate", async (req, res) => {
+    try {
+      const { renewal_cost_new_provider, renewal_cost_current_provider } = req.body;
+
+      if (
+        typeof renewal_cost_new_provider !== "number" ||
+        typeof renewal_cost_current_provider !== "number" ||
+        renewal_cost_new_provider <= 0 ||
+        renewal_cost_current_provider <= 0
+      ) {
+        return res.status(400).json({
+          error: "Both renewal_cost_new_provider and renewal_cost_current_provider must be positive numbers",
+        });
+      }
+
+      console.log(
+        `[Negotiate] Request: new_provider=£${renewal_cost_new_provider}, current_provider=£${renewal_cost_current_provider}`
+      );
+
+      const result = await negotiate({
+        renewal_cost_new_provider,
+        renewal_cost_current_provider,
+      });
+
+      console.log(`[Negotiate] Result: ${result.status}`);
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Negotiate] Error:", error);
+      res.status(500).json({
+        error: "Negotiation failed",
         message: error.message,
       });
     }
