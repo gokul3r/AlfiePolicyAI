@@ -123,6 +123,7 @@ export function TimelapseDialog({
   rejectedQuotes,
 }: TimelapseDialogProps) {
   const [state, setState] = useState<TimelapseState>("intro");
+  const [stayProvider, setStayProvider] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState<string>("");
   const [currentWeekMatches, setCurrentWeekMatches] = useState<MatchData[]>([]);
   const [currentMatchIndex, setCurrentMatchIndex] = useState<number>(0);
@@ -684,6 +685,7 @@ export function TimelapseDialog({
     setShowNotification(false);
     setPriceHistory([]);
     setCurrentPolicyPrice(0);
+    setStayProvider(null);
     onOpenChange(false);
   };
 
@@ -881,7 +883,10 @@ export function TimelapseDialog({
               queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
             }}
             onSwitch={() => handleConfirmPurchase()}
-            onClose={handleClose}
+            onStayComplete={(provider: string) => {
+              setStayProvider(provider);
+              setState("celebration");
+            }}
           />
         )}
 
@@ -954,14 +959,19 @@ export function TimelapseDialog({
         )}
 
         {/* Celebration State */}
-        {state === "celebration" && currentWeekMatches.length > 0 && (
+        {state === "celebration" && (stayProvider || currentWeekMatches.length > 0) && (
           <CelebrationState
             provider={
-              currentWeekMatches[currentMatchIndex].financial_breakdown
-                .new_quote_insurer
+              stayProvider ||
+              currentWeekMatches[currentMatchIndex]?.financial_breakdown
+                ?.new_quote_insurer || ""
             }
+            message={stayProvider ? "Auto-Annie has kept your insurance policy" : undefined}
             onClose={handleClose}
-            onContinueTimelapse={handleContinueTimelapse}
+            onContinueTimelapse={() => {
+              setStayProvider(null);
+              handleContinueTimelapse();
+            }}
           />
         )}
       </DialogContent>
@@ -1052,7 +1062,7 @@ function NegotiationScreen({
   vehicleRegNumber,
   onStay,
   onSwitch,
-  onClose,
+  onStayComplete,
 }: {
   matchData: MatchData;
   currentProvider: string;
@@ -1061,7 +1071,7 @@ function NegotiationScreen({
   vehicleRegNumber: string;
   onStay: (renewalCost: number) => Promise<void>;
   onSwitch: () => void;
-  onClose: () => void;
+  onStayComplete: (provider: string) => void;
 }) {
   const [phase, setPhase] = useState<"contacting" | "chatting" | "done">("contacting");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -1362,13 +1372,13 @@ function NegotiationScreen({
           </div>
         )}
 
-        {/* Stay confirmed - close button */}
+        {/* Stay confirmed - done button */}
         {stayConfirmed && (
           <div className="p-4 border-t border-border animate-in fade-in slide-in-from-bottom-4 duration-500">
             <Button
               size="lg"
               className="w-full"
-              onClick={onClose}
+              onClick={() => onStayComplete(currentProvider)}
               data-testid="button-close-negotiation"
             >
               Done
@@ -2106,10 +2116,12 @@ function ConfirmingPurchaseState({
 // Celebration State with Confetti
 function CelebrationState({
   provider,
+  message,
   onClose,
   onContinueTimelapse,
 }: {
   provider: string;
+  message?: string;
   onClose: () => void;
   onContinueTimelapse: () => void;
 }) {
@@ -2179,7 +2191,7 @@ function CelebrationState({
           with <span className="text-primary">{provider}</span>
         </p>
         <p className="text-lg text-muted-foreground max-w-md mx-auto mt-6">
-          Auto-Annie has successfully switched your insurance policy
+          {message || "Auto-Annie has successfully switched your insurance policy"}
         </p>
       </div>
 
