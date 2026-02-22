@@ -40,6 +40,8 @@ import {
   TrendingUp,
   SlidersHorizontal,
   Clock,
+  Bot,
+  MessageSquare,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { flushSync } from "react-dom";
@@ -73,6 +75,7 @@ type TimelapseState =
   | "searching_with_phone"
   | "notification_slide"
   | "match_found"
+  | "negotiating"
   | "no_match"
   | "timelapse_complete"
   | "confirming_purchase"
@@ -146,6 +149,7 @@ export function TimelapseDialog({
   >([]);
   const [currentPolicyPrice, setCurrentPolicyPrice] = useState<number>(0);
   const [whisperBudget, setWhisperBudget] = useState<number | null>(null);
+  const [allQuotesBasic, setAllQuotesBasic] = useState<{ insurer: string; price: number; features: string[] }[]>([]);
   const { toast } = useToast();
 
   const consecutiveNoMatchMonths = useMemo(() => {
@@ -235,10 +239,13 @@ export function TimelapseDialog({
       const response: any = await apiResponse.json();
       const rawMatches: MatchData[] = response.matches || [];
 
-      // Store the current insurance provider from the API response
+      // Store the current insurance provider and all quotes from the API response
       if (response.current_insurance_provider) {
         setCurrentInsuranceProvider(response.current_insurance_provider);
         currentProviderRef.current = response.current_insurance_provider;
+      }
+      if (response.all_quotes_basic) {
+        setAllQuotesBasic(response.all_quotes_basic);
       }
 
       // Filter out quotes from the current provider (no point switching to the same insurer)
@@ -819,7 +826,7 @@ export function TimelapseDialog({
             matchData={currentWeekMatches[currentMatchIndex]}
             matchNumber={currentMatchIndex + 1}
             totalMatches={currentWeekMatches.length}
-            onConfirmPurchase={handleConfirmPurchase}
+            onConfirmPurchase={() => setState("negotiating")}
             onKeepSearching={handleKeepSearching}
             onPreviousMatch={() =>
               setCurrentMatchIndex((prev) => Math.max(0, prev - 1))
@@ -840,6 +847,17 @@ export function TimelapseDialog({
             quotesRejected={quotesRejected}
             rejectedQuotes={rejectedQuotes}
             searchDate={currentDate}
+          />
+        )}
+
+        {/* Negotiation State */}
+        {state === "negotiating" && currentWeekMatches.length > 0 && (
+          <NegotiationScreen
+            matchData={currentWeekMatches[currentMatchIndex]}
+            currentProvider={currentProviderRef.current || currentInsuranceProvider}
+            allQuotesBasic={allQuotesBasic}
+            onStay={() => setState("match_found")}
+            onSwitch={() => setState("match_found")}
           />
         )}
 
@@ -993,6 +1011,291 @@ const FEATURE_CONFIG: Record<
     bgColor: "bg-yellow-50 dark:bg-yellow-950/50",
   },
 };
+
+// Negotiation Chat Message type
+interface ChatMessage {
+  sender: "autoannie" | "agent";
+  text: string;
+  isTyping?: boolean;
+}
+
+// Negotiation Screen Component
+function NegotiationScreen({
+  matchData,
+  currentProvider,
+  allQuotesBasic,
+  onStay,
+  onSwitch,
+}: {
+  matchData: MatchData;
+  currentProvider: string;
+  allQuotesBasic: { insurer: string; price: number; features: string[] }[];
+  onStay: () => void;
+  onSwitch: () => void;
+}) {
+  const [phase, setPhase] = useState<"contacting" | "chatting" | "done">("contacting");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [negotiationResult, setNegotiationResult] = useState<"matched" | "rejected" | null>(null);
+  const [showButtons, setShowButtons] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const hasStartedRef = useRef(false);
+
+  const newProviderName = matchData.insurer || matchData.financial_breakdown.new_quote_insurer;
+  const newProviderCost = matchData.price;
+
+  const currentProviderQuote = allQuotesBasic.find(
+    (q) => q.insurer.toLowerCase() === currentProvider.toLowerCase()
+  );
+  const currentProviderRenewalCost = currentProviderQuote?.price || matchData.financial_breakdown.current_cost;
+
+  useEffect(() => {
+    if (hasStartedRef.current) return;
+    hasStartedRef.current = true;
+
+    const timer = setTimeout(() => {
+      setPhase("chatting");
+      runNegotiationChat();
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const addMessage = (msg: ChatMessage): Promise<void> => {
+    return new Promise((resolve) => {
+      setMessages((prev) => [...prev, { ...msg, isTyping: true }]);
+      setTimeout(() => {
+        setMessages((prev) =>
+          prev.map((m, i) => (i === prev.length - 1 ? { ...m, isTyping: false } : m))
+        );
+        resolve();
+      }, 800);
+    });
+  };
+
+  const runNegotiationChat = async () => {
+    await addMessage({
+      sender: "autoannie",
+      text: `Detected competitor quote from ${newProviderName} at £${newProviderCost.toFixed(2)}`,
+    });
+
+    await new Promise((r) => setTimeout(r, 600));
+
+    await addMessage({
+      sender: "autoannie",
+      text: `Contacting ${currentProvider} retention desk...`,
+    });
+
+    await new Promise((r) => setTimeout(r, 1200));
+
+    try {
+      const response = await fetch("/api/negotiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          renewal_cost_new_provider: newProviderCost,
+          renewal_cost_current_provider: currentProviderRenewalCost,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`Negotiation request failed: ${response.status}`);
+      }
+      const result = await response.json();
+      if (result.status !== "matched" && result.status !== "rejected") {
+        throw new Error("Invalid negotiation response");
+      }
+      setNegotiationResult(result.status);
+
+      await new Promise((r) => setTimeout(r, 800));
+
+      if (result.status === "matched") {
+        await addMessage({
+          sender: "agent",
+          text: `We can match that offer. ${currentProvider} will retain your policy at the competitive rate.`,
+        });
+
+        await new Promise((r) => setTimeout(r, 600));
+
+        await addMessage({
+          sender: "autoannie",
+          text: `${currentProvider} has matched the offer at £${currentProviderRenewalCost.toFixed(2)}. Staying avoids the £${matchData.financial_breakdown.cancellation_fee.toFixed(2)} cancellation fee.`,
+        });
+      } else {
+        await addMessage({
+          sender: "agent",
+          text: `Unable to match. Our renewal rate of £${currentProviderRenewalCost.toFixed(2)} is the best we can offer at this time.`,
+        });
+
+        await new Promise((r) => setTimeout(r, 600));
+
+        await addMessage({
+          sender: "autoannie",
+          text: `${currentProvider} could not match the offer. Switching to ${newProviderName} at £${newProviderCost.toFixed(2)} would save you £${matchData.financial_breakdown.annual_savings.toFixed(2)} per year.`,
+        });
+      }
+    } catch {
+      await addMessage({
+        sender: "agent",
+        text: `Unable to reach the retention desk at this time. Please try again later.`,
+      });
+      setNegotiationResult("rejected");
+    }
+
+    setPhase("done");
+    await new Promise((r) => setTimeout(r, 400));
+    setShowButtons(true);
+  };
+
+  return (
+    <div className="flex h-full overflow-hidden" data-testid="negotiation-screen">
+      {/* Left side - greyed out match summary */}
+      <div className="flex-1 overflow-y-auto p-6 opacity-30 pointer-events-none select-none">
+        <div className="text-center mb-6">
+          <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-3" />
+          <h2 className="text-2xl font-bold text-foreground mb-1">Quote Match Found!</h2>
+          <p className="text-muted-foreground">{newProviderName} - £{newProviderCost.toFixed(2)}/year</p>
+        </div>
+        <div className="space-y-3">
+          <div className="bg-muted/30 rounded-lg p-4">
+            <div className="flex justify-between gap-2 items-center mb-2">
+              <span className="text-sm font-medium">Current cost</span>
+              <span className="font-bold">£{matchData.financial_breakdown.current_cost.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between gap-2 items-center">
+              <span className="text-sm font-medium">New quote</span>
+              <span className="font-bold text-green-600 dark:text-green-400">£{newProviderCost.toFixed(2)}</span>
+            </div>
+          </div>
+          <div className="bg-muted/30 rounded-lg p-4">
+            <div className="flex justify-between gap-2 items-center">
+              <span className="text-sm font-medium">Annual Savings</span>
+              <span className="font-bold text-green-600 dark:text-green-400">£{matchData.financial_breakdown.annual_savings.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right side - Negotiation chatbot */}
+      <div
+        className="w-[380px] border-l border-border flex flex-col bg-background animate-in slide-in-from-right-full duration-500"
+        data-testid="negotiation-chatbot"
+      >
+        {/* Chatbot header */}
+        <div className="px-4 py-3 border-b border-border bg-primary/5">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
+                <Bot className="w-5 h-5 text-primary" />
+              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-500 border-2 border-background" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">AutoAnnie Negotiator</h3>
+              <p className="text-xs text-muted-foreground">AI-powered retention negotiation</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Contacting overlay */}
+        {phase === "contacting" && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <MessageSquare className="w-8 h-8 text-primary" />
+              </div>
+              <div className="absolute inset-0 rounded-full border-2 border-primary/30 animate-ping" />
+            </div>
+            <p className="text-sm font-medium text-foreground animate-pulse text-center" data-testid="text-contacting-message">
+              Contacting {currentProvider}'s negotiation agent...
+            </p>
+            <div className="flex gap-1.5 mt-2">
+              <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+              <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
+              <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
+            </div>
+          </div>
+        )}
+
+        {/* Chat messages */}
+        {phase !== "contacting" && (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {messages.map((msg, i) => (
+              <div
+                key={i}
+                className={`flex gap-2.5 ${msg.sender === "agent" ? "flex-row-reverse" : ""} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+                data-testid={`chat-message-${i}`}
+              >
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                    msg.sender === "autoannie"
+                      ? "bg-primary/10"
+                      : "bg-orange-100 dark:bg-orange-900/30"
+                  }`}
+                >
+                  {msg.sender === "autoannie" ? (
+                    <Bot className="w-4 h-4 text-primary" />
+                  ) : (
+                    <Shield className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                  )}
+                </div>
+                <div className={`flex flex-col gap-1 max-w-[85%] ${msg.sender === "agent" ? "items-end" : ""}`}>
+                  <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+                    {msg.sender === "autoannie" ? "AutoAnnie" : `${currentProvider} Agent`}
+                  </span>
+                  <div
+                    className={`px-3 py-2 rounded-lg text-sm leading-relaxed ${
+                      msg.sender === "autoannie"
+                        ? "bg-primary/10 text-foreground rounded-tl-none"
+                        : "bg-orange-50 dark:bg-orange-900/20 text-foreground rounded-tr-none"
+                    }`}
+                  >
+                    {msg.isTyping ? (
+                      <span className="flex gap-1 items-center py-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "0ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "150ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "300ms" }} />
+                      </span>
+                    ) : (
+                      msg.text
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div ref={chatEndRef} />
+          </div>
+        )}
+
+        {/* Action buttons */}
+        {showButtons && (
+          <div className="p-4 border-t border-border space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-500" data-testid="negotiation-actions">
+            <Button
+              size="lg"
+              variant={negotiationResult === "matched" ? "default" : "outline"}
+              className="w-full"
+              onClick={onStay}
+              data-testid="button-stay-provider"
+            >
+              Stay with {currentProvider}
+            </Button>
+            <Button
+              size="lg"
+              variant={negotiationResult === "rejected" ? "default" : "outline"}
+              className="w-full"
+              onClick={onSwitch}
+              data-testid="button-switch-provider"
+            >
+              Switch to {newProviderName}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Match Found State Component
 function MatchFoundState({
