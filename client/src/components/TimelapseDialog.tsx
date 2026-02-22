@@ -1173,9 +1173,14 @@ function NegotiationScreen({
 
         await new Promise((r) => setTimeout(r, 600));
 
+        const switchCost12m = matchData.financial_breakdown.switch_cost_12m;
+        const actualSavings = currentProviderRenewalCost - switchCost12m;
+        const rejectedMsg = actualSavings > 0.01
+          ? `${currentProvider} could not match the offer. Switching to ${newProviderName} (£${switchCost12m.toFixed(2)} including cancellation fee) would save you £${actualSavings.toFixed(2)} over 12 months.`
+          : `${currentProvider} could not match the offer but their renewal rate of £${currentProviderRenewalCost.toFixed(2)} is still cheaper than switching to ${newProviderName} (£${switchCost12m.toFixed(2)} including cancellation fee).`;
         await addMessage({
           sender: "autoannie",
-          text: `${currentProvider} could not match the offer. Switching to ${newProviderName} at £${newProviderCost.toFixed(2)} would save you £${matchData.financial_breakdown.annual_savings.toFixed(2)} per year.`,
+          text: rejectedMsg,
         });
       }
     } catch {
