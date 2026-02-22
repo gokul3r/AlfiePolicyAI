@@ -1334,7 +1334,7 @@ function NegotiationScreen({
         {showButtons && !stayConfirmed && (() => {
           const fb = matchData.financial_breakdown;
           const stayCost = negotiationResult === "matched"
-            ? fb.stay_remaining_value + (currentProviderRenewalCost / 365) * fb.stay_renewal_days
+            ? currentProviderRenewalCost
             : fb.stay_cost_12m;
           const switchCost = fb.switch_cost_12m;
           const stayIsCheaper = stayCost <= switchCost;
