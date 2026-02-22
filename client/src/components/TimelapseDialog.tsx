@@ -1333,9 +1333,7 @@ function NegotiationScreen({
         {/* Cost comparison card */}
         {showButtons && !stayConfirmed && (() => {
           const fb = matchData.financial_breakdown;
-          const stayCost = negotiationResult === "matched"
-            ? currentProviderRenewalCost
-            : fb.stay_cost_12m;
+          const stayCost = currentProviderRenewalCost;
           const switchCost = fb.switch_cost_12m;
           const stayIsCheaper = stayCost <= switchCost;
           const switchIsCheaper = switchCost < stayCost;
@@ -1349,9 +1347,9 @@ function NegotiationScreen({
                 <div className={`flex items-start justify-between gap-2 p-2 rounded-md ${stayIsCheaper ? "bg-green-50 dark:bg-green-900/20" : ""}`}>
                   <div className="space-y-0.5">
                     <p className="text-sm font-semibold">If you stay with {currentProvider}</p>
-                    {negotiationResult === "matched" && (
-                      <p className="text-xs text-muted-foreground">Matched renewal rate</p>
-                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {negotiationResult === "matched" ? "Matched renewal rate" : "Best renewal offer"}
+                    </p>
                   </div>
                   <p className={`text-sm font-bold whitespace-nowrap ${stayIsCheaper ? "text-green-700 dark:text-green-400" : ""}`}>
                     £{stayCost.toFixed(2)}
