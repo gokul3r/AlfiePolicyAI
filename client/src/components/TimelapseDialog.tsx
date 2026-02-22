@@ -1047,10 +1047,14 @@ const FEATURE_CONFIG: Record<
 };
 
 // Negotiation Chat Message type
+let msgIdCounter = 0;
 interface ChatMessage {
+  id: number;
   sender: "autoannie" | "agent";
   text: string;
   isTyping?: boolean;
+  isThinking?: boolean;
+  revealedWords?: number;
 }
 
 // Negotiation Screen Component
@@ -1106,15 +1110,44 @@ function NegotiationScreen({
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const addMessage = (msg: ChatMessage): Promise<void> => {
+  const addMessage = (msg: Omit<ChatMessage, "id">): Promise<void> => {
+    const id = ++msgIdCounter;
     return new Promise((resolve) => {
-      setMessages((prev) => [...prev, { ...msg, isTyping: true }]);
+      setMessages((prev) => [...prev, { ...msg, id, isTyping: true }]);
       setTimeout(() => {
+        const words = msg.text.split(" ");
+        const totalWords = words.length;
+        let revealed = 0;
         setMessages((prev) =>
-          prev.map((m, i) => (i === prev.length - 1 ? { ...m, isTyping: false } : m))
+          prev.map((m) => m.id === id ? { ...m, isTyping: false, revealedWords: 0 } : m)
         );
+        const wordInterval = setInterval(() => {
+          revealed += 2;
+          if (revealed >= totalWords) {
+            clearInterval(wordInterval);
+            setMessages((prev) =>
+              prev.map((m) => m.id === id ? { ...m, revealedWords: undefined } : m)
+            );
+            resolve();
+          } else {
+            setMessages((prev) =>
+              prev.map((m) => m.id === id ? { ...m, revealedWords: revealed } : m)
+            );
+          }
+        }, 60);
+      }, 500);
+    });
+  };
+
+  const showThinking = (thinkingText: string): Promise<void> => {
+    const id = ++msgIdCounter;
+    const delay = 2500 + Math.random() * 2000;
+    return new Promise((resolve) => {
+      setMessages((prev) => [...prev, { id, sender: "agent", text: thinkingText, isThinking: true }]);
+      setTimeout(() => {
+        setMessages((prev) => prev.filter((m) => m.id !== id));
         resolve();
-      }, 800);
+      }, delay);
     });
   };
 
@@ -1151,7 +1184,7 @@ function NegotiationScreen({
       }
       setNegotiationResult(result.status);
 
-      await new Promise((r) => setTimeout(r, 800));
+      await showThinking(`${currentProvider} agent reviewing retention options`);
 
       if (result.status === "matched") {
         await addMessage({
@@ -1271,7 +1304,7 @@ function NegotiationScreen({
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((msg, i) => (
               <div
-                key={i}
+                key={msg.id}
                 className={`flex gap-2.5 ${msg.sender === "agent" ? "flex-row-reverse" : ""} animate-in fade-in slide-in-from-bottom-2 duration-300`}
                 data-testid={`chat-message-${i}`}
               >
@@ -1299,12 +1332,23 @@ function NegotiationScreen({
                         : "bg-orange-50 dark:bg-orange-900/20 text-foreground rounded-tr-none"
                     }`}
                   >
-                    {msg.isTyping ? (
+                    {msg.isThinking ? (
+                      <span className="flex gap-2 items-center py-1 text-xs text-muted-foreground italic">
+                        <span className="animate-pulse">{msg.text}</span>
+                        <span className="flex gap-0.5">
+                          <span className="w-1 h-1 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "0ms" }} />
+                          <span className="w-1 h-1 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "200ms" }} />
+                          <span className="w-1 h-1 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "400ms" }} />
+                        </span>
+                      </span>
+                    ) : msg.isTyping ? (
                       <span className="flex gap-1 items-center py-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "0ms" }} />
                         <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "150ms" }} />
                         <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: "300ms" }} />
                       </span>
+                    ) : msg.revealedWords !== undefined ? (
+                      <span>{msg.text.split(" ").slice(0, msg.revealedWords).join(" ")}<span className="inline-block w-0.5 h-3.5 bg-muted-foreground animate-pulse ml-0.5 align-text-bottom" /></span>
                     ) : msg.text.startsWith("CONFIRMED_STAY:") ? (
                       (() => {
                         const parts = msg.text.split(":");
