@@ -1330,9 +1330,68 @@ function NegotiationScreen({
           </div>
         )}
 
+        {/* Cost comparison card */}
+        {showButtons && !stayConfirmed && (() => {
+          const fb = matchData.financial_breakdown;
+          const stayCost = negotiationResult === "matched"
+            ? fb.stay_remaining_value + (currentProviderRenewalCost / 365) * fb.stay_renewal_days
+            : fb.stay_cost_12m;
+          const switchCost = fb.switch_cost_12m;
+          const stayIsCheaper = stayCost <= switchCost;
+          const switchIsCheaper = switchCost < stayCost;
+          const savings = Math.abs(stayCost - switchCost);
+
+          return (
+            <div className="mx-4 mt-3 mb-1 animate-in fade-in slide-in-from-bottom-4 duration-500" data-testid="cost-comparison">
+              <div className="rounded-md border border-border bg-card p-3 space-y-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cost over next 12 months</p>
+
+                <div className={`flex items-start justify-between gap-2 p-2 rounded-md ${stayIsCheaper ? "bg-green-50 dark:bg-green-900/20" : ""}`}>
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-semibold">If you stay with {currentProvider}</p>
+                    {negotiationResult === "matched" && (
+                      <p className="text-xs text-muted-foreground">Matched renewal rate</p>
+                    )}
+                  </div>
+                  <p className={`text-sm font-bold whitespace-nowrap ${stayIsCheaper ? "text-green-700 dark:text-green-400" : ""}`}>
+                    £{stayCost.toFixed(2)}
+                  </p>
+                </div>
+
+                <div className={`flex items-start justify-between gap-2 p-2 rounded-md ${switchIsCheaper ? "bg-green-50 dark:bg-green-900/20" : ""}`}>
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-semibold">If you switch to {newProviderName}</p>
+                    {fb.cancellation_fee > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Includes £{fb.cancellation_fee.toFixed(2)} cancellation fee
+                      </p>
+                    )}
+                    {fb.upfront_impact !== 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {fb.upfront_impact < 0
+                          ? `£${Math.abs(fb.upfront_impact).toFixed(2)} to pay today`
+                          : `£${fb.upfront_impact.toFixed(2)} refund today`}
+                      </p>
+                    )}
+                  </div>
+                  <p className={`text-sm font-bold whitespace-nowrap ${switchIsCheaper ? "text-green-700 dark:text-green-400" : ""}`}>
+                    £{switchCost.toFixed(2)}
+                  </p>
+                </div>
+
+                {savings > 0.01 && (
+                  <p className="text-xs text-center text-green-700 dark:text-green-400 font-medium">
+                    {stayIsCheaper ? "Staying" : "Switching"} saves £{savings.toFixed(2)} over 12 months
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Action buttons */}
         {showButtons && !stayConfirmed && (
-          <div className="p-4 border-t border-border space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-500" data-testid="negotiation-actions">
+          <div className="p-4 border-t-0 border-border space-y-2" data-testid="negotiation-actions">
             <Button
               size="lg"
               variant={negotiationResult === "matched" ? "default" : "outline"}
