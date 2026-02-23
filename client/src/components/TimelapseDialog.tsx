@@ -5,6 +5,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   HoverCard,
   HoverCardContent,
@@ -42,6 +44,7 @@ import {
   Clock,
   Bot,
   MessageSquare,
+  UserRound,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { flushSync } from "react-dom";
@@ -63,6 +66,7 @@ interface TimelapseDialogProps {
   frequency: "weekly" | "monthly";
   userEmail: string | null;
   minSavingsThreshold?: number;
+  negotiationMode?: "human" | "ai";
   onQuoteAccepted?: (count?: number) => void;
   onQuoteRejected?: (quoteData: RejectedQuoteData) => void;
   quotesAccepted: number;
@@ -116,6 +120,7 @@ export function TimelapseDialog({
   frequency,
   userEmail,
   minSavingsThreshold = 50,
+  negotiationMode = "ai",
   onQuoteAccepted,
   onQuoteRejected,
   quotesAccepted,
@@ -151,6 +156,8 @@ export function TimelapseDialog({
   const [currentPolicyPrice, setCurrentPolicyPrice] = useState<number>(0);
   const [whisperBudget, setWhisperBudget] = useState<number | null>(null);
   const [allQuotesBasic, setAllQuotesBasic] = useState<{ insurer: string; price: number; features: string[] }[]>([]);
+  const [policyNumber, setPolicyNumber] = useState<string>("");
+  const [userName, setUserName] = useState<string>("");
   const { toast } = useToast();
 
   const consecutiveNoMatchMonths = useMemo(() => {
@@ -185,6 +192,13 @@ export function TimelapseDialog({
           if (policy.policy_end_date) {
             setPolicyEndDate(new Date(policy.policy_end_date));
           }
+          if (policy.policy_number) {
+            setPolicyNumber(policy.policy_number);
+          }
+        }
+        if (userEmail) {
+          const namePart = userEmail.split("@")[0].replace(/[._-]/g, " ");
+          setUserName(namePart.replace(/\b\w/g, (c) => c.toUpperCase()));
         }
       } catch (err) {
         console.error("[Timelapse] Failed to pre-fetch policy summary:", err);
@@ -860,6 +874,9 @@ export function TimelapseDialog({
             allQuotesBasic={allQuotesBasic}
             userEmail={userEmail || ""}
             vehicleRegNumber={vehicleRegNumber || ""}
+            negotiationMode={negotiationMode}
+            policyNumber={policyNumber}
+            userName={userName}
             onStay={async (renewalCost: number) => {
               if (!userEmail || !vehicleRegNumber) {
                 throw new Error("Missing user email or vehicle registration");
@@ -1064,6 +1081,9 @@ function NegotiationScreen({
   allQuotesBasic,
   userEmail,
   vehicleRegNumber,
+  negotiationMode = "ai",
+  policyNumber = "",
+  userName = "",
   onStay,
   onSwitch,
   onStayComplete,
@@ -1073,6 +1093,9 @@ function NegotiationScreen({
   allQuotesBasic: { insurer: string; price: number; features: string[] }[];
   userEmail: string;
   vehicleRegNumber: string;
+  negotiationMode?: "human" | "ai";
+  policyNumber?: string;
+  userName?: string;
   onStay: (renewalCost: number) => Promise<void>;
   onSwitch: () => void;
   onStayComplete: (provider: string) => void;
@@ -1083,6 +1106,8 @@ function NegotiationScreen({
   const [showButtons, setShowButtons] = useState(false);
   const [stayConfirmed, setStayConfirmed] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showHumanAgentChat, setShowHumanAgentChat] = useState(false);
+  const [humanAgentOfferPrice, setHumanAgentOfferPrice] = useState<string>("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
 
@@ -1165,6 +1190,16 @@ function NegotiationScreen({
     });
 
     await new Promise((r) => setTimeout(r, 1200));
+
+    if (negotiationMode === "human") {
+      await addMessage({
+        sender: "autoannie",
+        text: `Connecting you with ${currentProvider} customer agent...`,
+      });
+      await new Promise((r) => setTimeout(r, 800));
+      setShowHumanAgentChat(true);
+      return;
+    }
 
     try {
       const response = await fetch("/api/negotiate", {
@@ -1492,6 +1527,98 @@ function NegotiationScreen({
           </div>
         )}
       </div>
+
+      {showHumanAgentChat && (
+        <div
+          className="fixed left-4 bottom-4 w-[360px] z-50 rounded-md border border-border bg-card shadow-lg animate-in slide-in-from-left duration-500"
+          data-testid="human-agent-chat"
+        >
+          <div className="px-4 py-3 border-b border-border bg-emerald-50 dark:bg-emerald-950/30 rounded-t-md">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-9 w-9">
+                <AvatarFallback className="bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 text-sm font-semibold">
+                  J
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-foreground">John</h3>
+                <p className="text-xs text-muted-foreground truncate">{currentProvider} Customer Agent</p>
+              </div>
+              <div className="ml-auto">
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 space-y-4 max-h-[400px] overflow-y-auto">
+            <div className="flex gap-2.5">
+              <Avatar className="h-7 w-7 shrink-0">
+                <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                  <Bot className="w-4 h-4" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">AutoAnnie</span>
+                <div className="px-3 py-2.5 rounded-lg rounded-tl-none bg-primary/10 text-sm leading-relaxed text-foreground">
+                  <p>Dear John,</p>
+                  <p className="mt-2">
+                    Customer <span className="font-semibold">{userName || "N/A"}</span> (Policy No: <span className="font-semibold">{policyNumber || "N/A"}</span>) has received a competitive quote of{" "}
+                    <span className="font-semibold text-green-700 dark:text-green-400">£{newProviderCost.toFixed(2)}</span> from{" "}
+                    <span className="font-semibold">{newProviderName}</span>.
+                  </p>
+                  <p className="mt-2">Would you be able to match or improve upon this rate to retain the customer?</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-border/50 pt-3 space-y-3">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium text-muted-foreground">{currentProvider}'s offer price:</label>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-medium">£</span>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9.]*"
+                    placeholder="Enter price"
+                    value={humanAgentOfferPrice}
+                    onChange={(e) => setHumanAgentOfferPrice(e.target.value)}
+                    className="h-8 text-sm"
+                    data-testid="input-human-agent-price"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="flex-1"
+                  data-testid="button-human-match"
+                >
+                  Match
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  data-testid="button-human-partial-match"
+                >
+                  Partially Match
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                  data-testid="button-human-unable-match"
+                >
+                  Unable to Match
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

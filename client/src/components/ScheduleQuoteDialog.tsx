@@ -364,6 +364,7 @@ export function ScheduleQuoteDialog({
           frequency={frequency}
           userEmail={userEmail}
           minSavingsThreshold={minSavingsThreshold}
+          negotiationMode={negotiationMode}
           onQuoteAccepted={handleQuoteAccepted}
           onQuoteRejected={handleQuoteRejected}
           quotesAccepted={quotesAccepted}
