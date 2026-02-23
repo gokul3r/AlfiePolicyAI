@@ -1268,13 +1268,13 @@ function NegotiationScreen({
 
   const handleHumanAgentDecision = async (decision: "match" | "partial" | "unable") => {
     const priceValue = parseFloat(humanAgentOfferPrice);
-    if (decision !== "unable" && (isNaN(priceValue) || priceValue <= 0)) {
+    if (isNaN(priceValue) || priceValue <= 0) {
       setHumanAgentPriceError("Please enter a valid price");
       return;
     }
     setHumanAgentPriceError("");
 
-    const offerPrice = decision === "unable" ? currentProviderRenewalCost : priceValue;
+    const offerPrice = priceValue;
     setHumanAgentOverridePrice(offerPrice);
     setShowHumanAgentChat(false);
 
