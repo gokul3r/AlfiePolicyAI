@@ -16,7 +16,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
-import { Calendar, Sparkles } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Calendar, Sparkles, UserRound, Bot } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
 import { TimelapseDialog, RejectedQuoteData } from "./TimelapseDialog";
 
@@ -76,6 +77,11 @@ export function ScheduleQuoteDialog({
     return "50";
   });
   const [thresholdError, setThresholdError] = useState<string>("");
+  const [negotiationMode, setNegotiationMode] = useState<"human" | "ai">(() => {
+    const stored = localStorage.getItem("negotiationMode");
+    if (stored === "human" || stored === "ai") return stored;
+    return "ai";
+  });
 
   // Reset and sync state when dialog opens or frequency changes
   useEffect(() => {
@@ -190,6 +196,13 @@ export function ScheduleQuoteDialog({
     setThresholdInput(finalValue.toString());
     setThresholdError("");
     localStorage.setItem("minSavingsThreshold", finalValue.toString());
+  };
+
+  const handleNegotiationModeChange = (value: string) => {
+    if (value === "human" || value === "ai") {
+      setNegotiationMode(value);
+      localStorage.setItem("negotiationMode", value);
+    }
   };
 
   return (
@@ -309,6 +322,33 @@ export function ScheduleQuoteDialog({
                 {thresholdError}
               </p>
             )}
+          </div>
+
+          <div className="flex flex-col gap-2 pt-1 border-t border-border/50">
+            <Label className="text-xs text-muted-foreground">
+              Quote Negotiation by:
+            </Label>
+            <RadioGroup
+              value={negotiationMode}
+              onValueChange={handleNegotiationModeChange}
+              className="flex flex-row gap-6"
+              data-testid="radio-negotiation-mode"
+            >
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="human" id="negotiation-human" data-testid="radio-negotiation-human" />
+                <Label htmlFor="negotiation-human" className="flex items-center gap-1.5 text-sm font-normal cursor-pointer">
+                  <UserRound className="w-3.5 h-3.5 text-muted-foreground" />
+                  Human Customer Agent
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="ai" id="negotiation-ai" data-testid="radio-negotiation-ai" />
+                <Label htmlFor="negotiation-ai" className="flex items-center gap-1.5 text-sm font-normal cursor-pointer">
+                  <Bot className="w-3.5 h-3.5 text-muted-foreground" />
+                  AI Agent
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
         </div>
 
