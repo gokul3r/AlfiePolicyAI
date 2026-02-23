@@ -1108,6 +1108,8 @@ function NegotiationScreen({
   const [isProcessing, setIsProcessing] = useState(false);
   const [showHumanAgentChat, setShowHumanAgentChat] = useState(false);
   const [humanAgentOfferPrice, setHumanAgentOfferPrice] = useState<string>("");
+  const [humanAgentPriceError, setHumanAgentPriceError] = useState<string>("");
+  const [humanAgentOverridePrice, setHumanAgentOverridePrice] = useState<number | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
 
@@ -1117,7 +1119,7 @@ function NegotiationScreen({
   const currentProviderQuote = allQuotesBasic.find(
     (q) => q.insurer.toLowerCase() === currentProvider.toLowerCase()
   );
-  const currentProviderRenewalCost = currentProviderQuote?.price || matchData.financial_breakdown.current_cost;
+  const currentProviderRenewalCost = humanAgentOverridePrice ?? (currentProviderQuote?.price || matchData.financial_breakdown.current_cost);
 
   useEffect(() => {
     if (hasStartedRef.current) return;
@@ -1257,6 +1259,63 @@ function NegotiationScreen({
         text: `Unable to reach the retention desk at this time. Please try again later.`,
       });
       setNegotiationResult("rejected");
+    }
+
+    setPhase("done");
+    await new Promise((r) => setTimeout(r, 400));
+    setShowButtons(true);
+  };
+
+  const handleHumanAgentDecision = async (decision: "match" | "partial" | "unable") => {
+    const priceValue = parseFloat(humanAgentOfferPrice);
+    if (decision !== "unable" && (isNaN(priceValue) || priceValue <= 0)) {
+      setHumanAgentPriceError("Please enter a valid price");
+      return;
+    }
+    setHumanAgentPriceError("");
+
+    const offerPrice = decision === "unable" ? currentProviderRenewalCost : priceValue;
+    setHumanAgentOverridePrice(offerPrice);
+    setShowHumanAgentChat(false);
+
+    if (decision === "match") {
+      setNegotiationResult("matched");
+      await addMessage({
+        sender: "agent",
+        text: `We can match that offer. ${currentProvider} will retain your policy at £${offerPrice.toFixed(2)}.`,
+      });
+      await new Promise((r) => setTimeout(r, 600));
+      await addMessage({
+        sender: "autoannie",
+        text: `${currentProvider} has matched the offer at £${offerPrice.toFixed(2)}. Staying avoids the £${matchData.financial_breakdown.cancellation_fee.toFixed(2)} cancellation fee.`,
+      });
+    } else if (decision === "partial") {
+      setNegotiationResult("matched");
+      await addMessage({
+        sender: "agent",
+        text: `We can offer a reduced rate of £${offerPrice.toFixed(2)}, though we cannot fully match the competitor's quote.`,
+      });
+      await new Promise((r) => setTimeout(r, 600));
+      await addMessage({
+        sender: "autoannie",
+        text: `${currentProvider} has offered a partial match at £${offerPrice.toFixed(2)}. The competitor quote from ${newProviderName} is £${newProviderCost.toFixed(2)}.`,
+      });
+    } else {
+      setNegotiationResult("rejected");
+      await addMessage({
+        sender: "agent",
+        text: `Unable to match. Our renewal rate of £${offerPrice.toFixed(2)} is the best we can offer at this time.`,
+      });
+      await new Promise((r) => setTimeout(r, 600));
+      const switchCost12m = matchData.financial_breakdown.switch_cost_12m;
+      const actualSavings = offerPrice - switchCost12m;
+      const rejectedMsg = actualSavings > 0.01
+        ? `${currentProvider} could not match the offer. Switching to ${newProviderName} (£${switchCost12m.toFixed(2)} including cancellation fee) would save you £${actualSavings.toFixed(2)} over 12 months.`
+        : `${currentProvider} could not match the offer but their renewal rate of £${offerPrice.toFixed(2)} is still cheaper than switching to ${newProviderName} (£${switchCost12m.toFixed(2)} including cancellation fee).`;
+      await addMessage({
+        sender: "autoannie",
+        text: rejectedMsg,
+      });
     }
 
     setPhase("done");
@@ -1582,11 +1641,17 @@ function NegotiationScreen({
                     pattern="[0-9.]*"
                     placeholder="Enter price"
                     value={humanAgentOfferPrice}
-                    onChange={(e) => setHumanAgentOfferPrice(e.target.value)}
-                    className="h-8 text-sm"
+                    onChange={(e) => {
+                      setHumanAgentOfferPrice(e.target.value);
+                      setHumanAgentPriceError("");
+                    }}
+                    className={`h-8 text-sm ${humanAgentPriceError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                     data-testid="input-human-agent-price"
                   />
                 </div>
+                {humanAgentPriceError && (
+                  <p className="text-xs text-red-500" data-testid="text-human-price-error">{humanAgentPriceError}</p>
+                )}
               </div>
 
               <div className="flex gap-2">
@@ -1594,6 +1659,7 @@ function NegotiationScreen({
                   size="sm"
                   variant="default"
                   className="flex-1"
+                  onClick={() => handleHumanAgentDecision("match")}
                   data-testid="button-human-match"
                 >
                   Match
@@ -1602,6 +1668,7 @@ function NegotiationScreen({
                   size="sm"
                   variant="outline"
                   className="flex-1"
+                  onClick={() => handleHumanAgentDecision("partial")}
                   data-testid="button-human-partial-match"
                 >
                   Partially Match
@@ -1610,6 +1677,7 @@ function NegotiationScreen({
                   size="sm"
                   variant="outline"
                   className="flex-1"
+                  onClick={() => handleHumanAgentDecision("unable")}
                   data-testid="button-human-unable-match"
                 >
                   Unable to Match
