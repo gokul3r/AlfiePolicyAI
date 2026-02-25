@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Mail, Shield, CheckCircle2, XCircle, Clock, ArrowRight, AlertTriangle, X, ChevronRight, LayoutDashboard, ArrowLeft } from "lucide-react";
+import { Bell, Mail, Shield, CheckCircle2, XCircle, Clock, ArrowRight, AlertTriangle, X, ChevronRight, LayoutDashboard, ArrowLeft, Users, UserMinus, TrendingDown, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import type { Negotiation } from "@shared/schema";
@@ -258,7 +258,7 @@ function NegotiationCard({
   );
 }
 
-type StatFilter = "all" | "pending" | "matched" | "partial" | "declined";
+type StatFilter = null | "pending" | "matched" | "partial" | "declined";
 
 function formatTimestamp(dateStr: string): string {
   const d = new Date(dateStr);
@@ -303,7 +303,7 @@ function AgentDashboard({ provider, onBack }: { provider: string; onBack: () => 
   const [pendingCount, setPendingCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeFilter, setActiveFilter] = useState<StatFilter>("all");
+  const [activeFilter, setActiveFilter] = useState<StatFilter>(null);
   const [selectedNegotiationId, setSelectedNegotiationId] = useState<number | null>(null);
   const { toast } = useToast();
   const colors = getProviderColors(provider);
@@ -360,8 +360,7 @@ function AgentDashboard({ provider, onBack }: { provider: string; onBack: () => 
     declined: negotiations.filter((n) => n.status !== "pending" && (n.decision_type === "unable" || n.decision_type === "rejected" || n.status === "rejected")).length,
   };
 
-  const filteredNegotiations = negotiations.filter((n) => {
-    if (activeFilter === "all") return true;
+  const filteredNegotiations = activeFilter === null ? [] : negotiations.filter((n) => {
     if (activeFilter === "pending") return n.status === "pending";
     if (activeFilter === "matched") return n.status !== "pending" && n.decision_type === "match";
     if (activeFilter === "partial") return n.status !== "pending" && n.decision_type === "partial";
@@ -463,7 +462,7 @@ function AgentDashboard({ provider, onBack }: { provider: string; onBack: () => 
                   <Card
                     key={stat.key}
                     className={`p-4 cursor-pointer hover-elevate transition-colors overflow-visible ${isActive ? `${stat.bgClass} border ${stat.borderClass}` : ""}`}
-                    onClick={() => setActiveFilter(isActive ? "all" : stat.key)}
+                    onClick={() => { setActiveFilter(isActive ? null : stat.key); if (isActive) setSelectedNegotiationId(null); }}
                     data-testid={`stat-card-${stat.key}`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -487,28 +486,40 @@ function AgentDashboard({ provider, onBack }: { provider: string; onBack: () => 
               })}
             </div>
 
-            {activeFilter !== "all" && (
+            {activeFilter !== null && (
               <div className="flex items-center gap-2">
                 <p className="text-sm text-muted-foreground" data-testid="text-active-filter">
                   Showing: <span className="font-medium text-foreground">{statCards.find(s => s.key === activeFilter)?.label}</span>
                 </p>
-                <Button size="sm" variant="ghost" onClick={() => setActiveFilter("all")} data-testid="button-clear-filter">
-                  <X className="w-3 h-3 mr-1" /> Clear filter
+                <Button size="sm" variant="ghost" onClick={() => { setActiveFilter(null); setSelectedNegotiationId(null); }} data-testid="button-clear-filter">
+                  <X className="w-3 h-3 mr-1" /> Clear
                 </Button>
               </div>
             )}
 
-            {filteredNegotiations.length === 0 ? (
+            {activeFilter === null ? (
+              negotiations.length === 0 ? (
+                <div className="flex items-center justify-center py-16">
+                  <div className="text-center space-y-3">
+                    <Bell className="w-10 h-10 mx-auto text-muted-foreground/40" />
+                    <h2 className="text-base font-semibold text-foreground">No Retention Requests Yet</h2>
+                    <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                      When a customer receives a competitive quote, retention requests will appear here.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-select-prompt">
+                  Select a category above to view requests
+                </p>
+              )
+            ) : filteredNegotiations.length === 0 ? (
               <div className="flex items-center justify-center py-16">
                 <div className="text-center space-y-3">
                   <Bell className="w-10 h-10 mx-auto text-muted-foreground/40" />
-                  <h2 className="text-base font-semibold text-foreground">
-                    {negotiations.length === 0 ? "No Retention Requests Yet" : "No Results"}
-                  </h2>
+                  <h2 className="text-base font-semibold text-foreground">No Results</h2>
                   <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                    {negotiations.length === 0
-                      ? "When a customer receives a competitive quote, retention requests will appear here."
-                      : "No negotiations match the selected filter."}
+                    No negotiations match the selected filter.
                   </p>
                 </div>
               </div>
@@ -694,6 +705,83 @@ function HomeScreen({ provider, onNavigate }: { provider: string; onNavigate: (v
 function DashboardView({ provider, onBack }: { provider: string; onBack: () => void }) {
   const colors = getProviderColors(provider);
   const displayName = formatProviderDisplayName(provider);
+  const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchNegotiations = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/negotiations?provider=${encodeURIComponent(provider)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setNegotiations(data);
+      }
+    } catch {
+    } finally {
+      setIsLoading(false);
+    }
+  }, [provider]);
+
+  useEffect(() => {
+    fetchNegotiations();
+    const interval = setInterval(fetchNegotiations, 5000);
+    return () => clearInterval(interval);
+  }, [fetchNegotiations]);
+
+  const retained = negotiations.filter((n) => n.customer_outcome === "stayed").length;
+  const lost = negotiations.filter((n) => n.customer_outcome === "switched").length;
+
+  let marginConceded = 0;
+  negotiations.forEach((n) => {
+    if (
+      n.original_policy_cost &&
+      n.agent_offer_price &&
+      n.agent_offer_price < n.original_policy_cost &&
+      n.status !== "pending"
+    ) {
+      marginConceded += n.original_policy_cost - n.agent_offer_price;
+    }
+  });
+
+  let revenueLost = 0;
+  negotiations.forEach((n) => {
+    if (n.customer_outcome === "switched" && n.original_policy_cost) {
+      revenueLost += n.original_policy_cost;
+    }
+  });
+
+  const retentionMetrics = [
+    {
+      label: "Customers Retained",
+      value: retained,
+      icon: Users,
+      colorClass: "text-green-600 dark:text-green-400",
+      bgClass: "bg-green-50 dark:bg-green-950/30",
+    },
+    {
+      label: "Customers Lost",
+      value: lost,
+      icon: UserMinus,
+      colorClass: "text-red-600 dark:text-red-400",
+      bgClass: "bg-red-50 dark:bg-red-950/30",
+    },
+  ];
+
+  const financialMetrics = [
+    {
+      label: "Margin Conceded",
+      value: `£${marginConceded.toFixed(2)}`,
+      icon: TrendingDown,
+      colorClass: "text-amber-600 dark:text-amber-400",
+      bgClass: "bg-amber-50 dark:bg-amber-950/30",
+    },
+    {
+      label: "Revenue Lost",
+      value: `£${revenueLost.toFixed(2)}`,
+      icon: DollarSign,
+      colorClass: "text-red-600 dark:text-red-400",
+      bgClass: "bg-red-50 dark:bg-red-950/30",
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -717,18 +805,77 @@ function DashboardView({ provider, onBack }: { provider: string; onBack: () => v
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-16">
-        <div className="flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <div className="w-16 h-16 rounded-md bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mx-auto">
-              <LayoutDashboard className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+      <main className="max-w-5xl mx-auto px-4 py-6 space-y-8">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center space-y-3">
+              <div className="w-8 h-8 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin mx-auto" />
+              <p className="text-sm text-muted-foreground">Loading dashboard...</p>
             </div>
-            <h2 className="text-lg font-semibold text-foreground" data-testid="text-dashboard-title">Dashboard</h2>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto" data-testid="text-dashboard-placeholder">
-              Performance analytics and retention metrics will appear here.
-            </p>
           </div>
-        </div>
+        ) : (
+          <>
+            <div data-testid="section-retention-outcomes">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-1.5 rounded-md bg-blue-50 dark:bg-blue-950/30">
+                  <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h2 className="text-base font-semibold text-foreground" data-testid="text-section-retention">Retention Outcomes</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {retentionMetrics.map((metric) => {
+                  const Icon = metric.icon;
+                  return (
+                    <Card key={metric.label} className="p-5 overflow-visible" data-testid={`metric-${metric.label.toLowerCase().replace(/\s+/g, "-")}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-2 min-w-0">
+                          <p className="text-xs font-medium text-muted-foreground">{metric.label}</p>
+                          <p className="text-3xl font-bold text-foreground">{metric.value}</p>
+                        </div>
+                        <div className={`p-2.5 rounded-md ${metric.bgClass}`}>
+                          <Icon className={`w-5 h-5 ${metric.colorClass}`} />
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div data-testid="section-financial-impact">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-1.5 rounded-md bg-amber-50 dark:bg-amber-950/30">
+                  <TrendingDown className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <h2 className="text-base font-semibold text-foreground" data-testid="text-section-financial">Financial Impact</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {financialMetrics.map((metric) => {
+                  const Icon = metric.icon;
+                  return (
+                    <Card key={metric.label} className="p-5 overflow-visible" data-testid={`metric-${metric.label.toLowerCase().replace(/\s+/g, "-")}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-2 min-w-0">
+                          <p className="text-xs font-medium text-muted-foreground">{metric.label}</p>
+                          <p className="text-3xl font-bold text-foreground">{metric.value}</p>
+                        </div>
+                        <div className={`p-2.5 rounded-md ${metric.bgClass}`}>
+                          <Icon className={`w-5 h-5 ${metric.colorClass}`} />
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+
+            {retained === 0 && lost === 0 && (
+              <p className="text-sm text-muted-foreground text-center pt-2" data-testid="text-no-outcomes">
+                No customer outcomes recorded yet. Metrics will update as customers make their decisions.
+              </p>
+            )}
+          </>
+        )}
       </main>
       <Toaster />
     </div>
