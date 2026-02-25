@@ -166,6 +166,12 @@ function NegotiationCard({
             <p className="text-xs text-muted-foreground">Policy No.</p>
             <p className="text-sm font-medium text-foreground" data-testid={`text-policy-number-${negotiation.id}`}>{negotiation.policy_number}</p>
           </div>
+          {negotiation.original_policy_cost && (
+            <div>
+              <p className="text-xs text-muted-foreground">Original Policy Cost</p>
+              <p className="text-sm font-medium text-foreground" data-testid={`text-original-cost-${negotiation.id}`}>£{negotiation.original_policy_cost.toFixed(2)}</p>
+            </div>
+          )}
           <div>
             <p className="text-xs text-muted-foreground">Current Renewal</p>
             <p className="text-sm font-semibold text-foreground" data-testid={`text-renewal-cost-${negotiation.id}`}>£{negotiation.current_renewal_cost.toFixed(2)}</p>
@@ -177,11 +183,21 @@ function NegotiationCard({
         </div>
 
         {!isPending && negotiation.agent_offer_price !== null && (
-          <div className="pt-2 border-t border-border/50">
-            <p className="text-xs text-muted-foreground">Your Response</p>
-            <p className="text-sm font-medium text-foreground">
-              {negotiation.decision_type === "match" ? "Matched" : negotiation.decision_type === "partial" ? "Partially Matched" : "Unable to Match"} at £{negotiation.agent_offer_price?.toFixed(2)}
-            </p>
+          <div className="pt-2 border-t border-border/50 space-y-2">
+            <div>
+              <p className="text-xs text-muted-foreground">Your Response</p>
+              <p className="text-sm font-medium text-foreground">
+                {negotiation.decision_type === "match" ? "Matched" : negotiation.decision_type === "partial" ? "Partially Matched" : "Unable to Match"} at £{negotiation.agent_offer_price?.toFixed(2)}
+              </p>
+            </div>
+            {negotiation.customer_outcome && (
+              <div>
+                <p className="text-xs text-muted-foreground">Customer Outcome</p>
+                <p className="text-sm font-medium text-foreground" data-testid={`text-outcome-${negotiation.id}`}>
+                  {negotiation.customer_outcome === "stayed" ? "Stayed with provider" : "Switched to competitor"}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -244,12 +260,13 @@ function NegotiationCard({
 
 type StatFilter = "all" | "pending" | "matched" | "partial" | "declined";
 
-function formatTimeAgo(dateStr: string): string {
-  const seconds = Math.round((Date.now() - new Date(dateStr).getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`;
-  return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+function formatTimestamp(dateStr: string): string {
+  const d = new Date(dateStr);
+  const day = d.getDate().toString().padStart(2, "0");
+  const month = d.toLocaleDateString("en-GB", { month: "short" });
+  const year = d.getFullYear();
+  const time = d.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
+  return `${day}-${month}-${year} ${time}`;
 }
 
 function getStatusBadge(status: string, decisionType: string | null) {
@@ -503,10 +520,13 @@ function AgentDashboard({ provider, onBack }: { provider: string; onBack: () => 
                       <tr className="border-b border-border">
                         <th className="text-left p-3 text-xs font-medium text-muted-foreground">Customer</th>
                         <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden sm:table-cell">Policy No.</th>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden lg:table-cell">Original Cost</th>
                         <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Competitor</th>
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Quote</th>
-                        <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden sm:table-cell">Received</th>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Competitor Cost</th>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden lg:table-cell">Matched Cost</th>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Timestamp</th>
                         <th className="text-left p-3 text-xs font-medium text-muted-foreground">Status</th>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden sm:table-cell">Outcome</th>
                         <th className="p-3 w-8"></th>
                       </tr>
                     </thead>
@@ -526,17 +546,40 @@ function AgentDashboard({ provider, onBack }: { provider: string; onBack: () => 
                             <td className="p-3 hidden sm:table-cell">
                               <span className="text-muted-foreground" data-testid={`table-policy-${n.id}`}>{n.policy_number}</span>
                             </td>
+                            <td className="p-3 hidden lg:table-cell">
+                              <span className="text-muted-foreground" data-testid={`table-original-cost-${n.id}`}>
+                                {n.original_policy_cost ? `£${n.original_policy_cost.toFixed(2)}` : "—"}
+                              </span>
+                            </td>
                             <td className="p-3 hidden md:table-cell">
                               <span className="text-muted-foreground" data-testid={`table-competitor-${n.id}`}>{n.competitor_name}</span>
                             </td>
                             <td className="p-3">
-                              <span className="font-medium text-green-700 dark:text-green-400" data-testid={`table-quote-${n.id}`}>£{n.competitor_quote.toFixed(2)}</span>
+                              <span className="font-medium text-green-700 dark:text-green-400" data-testid={`table-competitor-cost-${n.id}`}>£{n.competitor_quote.toFixed(2)}</span>
                             </td>
-                            <td className="p-3 hidden sm:table-cell">
-                              <span className="text-muted-foreground text-xs" data-testid={`table-received-${n.id}`}>{formatTimeAgo(n.created_at)}</span>
+                            <td className="p-3 hidden lg:table-cell">
+                              <span className="font-medium text-foreground" data-testid={`table-matched-cost-${n.id}`}>
+                                {n.agent_offer_price ? `£${n.agent_offer_price.toFixed(2)}` : "—"}
+                              </span>
+                            </td>
+                            <td className="p-3 hidden md:table-cell">
+                              <span className="text-muted-foreground text-xs whitespace-nowrap" data-testid={`table-timestamp-${n.id}`}>{formatTimestamp(n.created_at)}</span>
                             </td>
                             <td className="p-3" data-testid={`table-status-${n.id}`}>
                               {getStatusBadge(n.status, n.decision_type)}
+                            </td>
+                            <td className="p-3 hidden sm:table-cell" data-testid={`table-outcome-${n.id}`}>
+                              {n.customer_outcome === "stayed" ? (
+                                <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700">
+                                  Stayed
+                                </Badge>
+                              ) : n.customer_outcome === "switched" ? (
+                                <Badge variant="outline" className="text-xs bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700">
+                                  Switched
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
                             </td>
                             <td className="p-3">
                               <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${isSelected ? "rotate-90" : ""}`} />

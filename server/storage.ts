@@ -491,6 +491,14 @@ export class DbStorage implements IStorage {
       .where(eq(negotiations.id, id));
     return result[0];
   }
+
+  async updateNegotiationOutcome(id: number, outcome: string): Promise<Negotiation> {
+    const result = await db.update(negotiations)
+      .set({ customer_outcome: outcome })
+      .where(eq(negotiations.id, id))
+      .returning();
+    return result[0];
+  }
 }
 
 export const storage = new DbStorage();

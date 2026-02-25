@@ -877,6 +877,7 @@ export function TimelapseDialog({
             negotiationMode={negotiationMode}
             policyNumber={policyNumber}
             userName={userName}
+            originalPolicyCost={currentPolicyPrice}
             onStay={async (renewalCost: number) => {
               if (!userEmail || !vehicleRegNumber) {
                 throw new Error("Missing user email or vehicle registration");
@@ -1084,6 +1085,7 @@ function NegotiationScreen({
   negotiationMode = "ai",
   policyNumber = "",
   userName = "",
+  originalPolicyCost = 0,
   onStay,
   onSwitch,
   onStayComplete,
@@ -1096,6 +1098,7 @@ function NegotiationScreen({
   negotiationMode?: "human" | "ai";
   policyNumber?: string;
   userName?: string;
+  originalPolicyCost?: number;
   onStay: (renewalCost: number) => Promise<void>;
   onSwitch: () => void;
   onStayComplete: (provider: string) => void;
@@ -1107,6 +1110,7 @@ function NegotiationScreen({
   const [stayConfirmed, setStayConfirmed] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [humanAgentOverridePrice, setHumanAgentOverridePrice] = useState<number | null>(null);
+  const negotiationIdRef = useRef<number | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const hasStartedRef = useRef(false);
 
@@ -1206,6 +1210,7 @@ function NegotiationScreen({
             customer_name: userName || "Customer",
             policy_number: policyNumber || "N/A",
             current_renewal_cost: currentProviderRenewalCost,
+            original_policy_cost: originalPolicyCost || null,
             competitor_name: newProviderName,
             competitor_quote: newProviderCost,
           }),
@@ -1213,6 +1218,7 @@ function NegotiationScreen({
         if (!negoRes.ok) throw new Error("Failed to create negotiation");
         const negoData = await negoRes.json();
         const negotiationId = negoData.id;
+        negotiationIdRef.current = negotiationId;
 
         await addMessage({
           sender: "autoannie",
@@ -1578,6 +1584,13 @@ function NegotiationScreen({
                 setIsProcessing(true);
                 try {
                   await onStay(currentProviderRenewalCost);
+                  if (negotiationIdRef.current) {
+                    fetch(`/api/negotiations/${negotiationIdRef.current}/outcome`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ outcome: "stayed" }),
+                    }).catch(() => {});
+                  }
                   await addMessage({
                     sender: "autoannie",
                     text: `CONFIRMED_STAY:${currentProvider}:${currentProviderRenewalCost.toFixed(2)}`,
@@ -1600,7 +1613,16 @@ function NegotiationScreen({
               variant={negotiationResult === "rejected" ? "default" : "outline"}
               className="w-full"
               disabled={isProcessing}
-              onClick={onSwitch}
+              onClick={() => {
+                if (negotiationIdRef.current) {
+                  fetch(`/api/negotiations/${negotiationIdRef.current}/outcome`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ outcome: "switched" }),
+                  }).catch(() => {});
+                }
+                onSwitch();
+              }}
               data-testid="button-switch-provider"
             >
               Switch to {newProviderName}

@@ -438,11 +438,13 @@ export const negotiations = pgTable("negotiations", {
   customer_name: text("customer_name").notNull(),
   policy_number: text("policy_number").notNull(),
   current_renewal_cost: real("current_renewal_cost").notNull(),
+  original_policy_cost: real("original_policy_cost"),
   competitor_name: text("competitor_name").notNull(),
   competitor_quote: real("competitor_quote").notNull(),
   status: text("status").notNull().default("pending"),
   agent_offer_price: real("agent_offer_price"),
   decision_type: text("decision_type"),
+  customer_outcome: text("customer_outcome"),
   created_at: timestamp("created_at").notNull().defaultNow(),
   responded_at: timestamp("responded_at"),
 });
@@ -456,11 +458,13 @@ export const insertNegotiationSchema = createInsertSchema(negotiations).omit({
   customer_name: z.string().min(1, "Customer name is required").trim(),
   policy_number: z.string().min(1, "Policy number is required").trim(),
   current_renewal_cost: z.number().min(0, "Cost must be positive"),
+  original_policy_cost: z.number().min(0).nullable().optional(),
   competitor_name: z.string().min(1, "Competitor name is required").trim(),
   competitor_quote: z.number().min(0, "Quote must be positive"),
   status: z.string().optional(),
   agent_offer_price: z.number().nullable().optional(),
   decision_type: z.string().nullable().optional(),
+  customer_outcome: z.string().nullable().optional(),
 });
 
 export const negotiationResponseSchema = z.object({

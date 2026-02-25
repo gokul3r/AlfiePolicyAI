@@ -1341,6 +1341,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/negotiations/:id/outcome", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid negotiation ID" });
+      }
+      const { outcome } = req.body;
+      if (!outcome || !["stayed", "switched"].includes(outcome)) {
+        return res.status(400).json({ error: "Outcome must be 'stayed' or 'switched'" });
+      }
+      const existing = await storage.getNegotiationById(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Negotiation not found" });
+      }
+      const updated = await storage.updateNegotiationOutcome(id, outcome);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating negotiation outcome:", error);
+      res.status(500).json({ error: "Failed to update negotiation outcome" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for voice chat
