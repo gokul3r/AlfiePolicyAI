@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Mail, Shield, CheckCircle2, XCircle, Clock, ArrowRight } from "lucide-react";
+import { Bell, Mail, Shield, CheckCircle2, XCircle, Clock, ArrowRight, AlertTriangle, X, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import type { Negotiation } from "@shared/schema";
@@ -242,11 +242,52 @@ function NegotiationCard({
   );
 }
 
+type StatFilter = "all" | "pending" | "matched" | "partial" | "declined";
+
+function formatTimeAgo(dateStr: string): string {
+  const seconds = Math.round((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h ago`;
+  return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+function getStatusBadge(status: string, decisionType: string | null) {
+  if (status === "pending") {
+    return (
+      <Badge variant="outline" className="text-xs bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700">
+        <Clock className="w-3 h-3 mr-1" /> Pending
+      </Badge>
+    );
+  }
+  if (decisionType === "match") {
+    return (
+      <Badge variant="outline" className="text-xs bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700">
+        <CheckCircle2 className="w-3 h-3 mr-1" /> Matched
+      </Badge>
+    );
+  }
+  if (decisionType === "partial") {
+    return (
+      <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
+        <AlertTriangle className="w-3 h-3 mr-1" /> Partial
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="text-xs bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700">
+      <XCircle className="w-3 h-3 mr-1" /> Declined
+    </Badge>
+  );
+}
+
 function AgentDashboard({ provider }: { provider: string }) {
   const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<StatFilter>("all");
+  const [selectedNegotiationId, setSelectedNegotiationId] = useState<number | null>(null);
   const { toast } = useToast();
   const colors = getProviderColors(provider);
   const displayName = formatProviderDisplayName(provider);
@@ -290,31 +331,52 @@ function AgentDashboard({ provider }: { provider: string }) {
       }
       toast({ title: "Response Submitted", description: `Decision: ${decision === "match" ? "Matched" : decision === "partial" ? "Partially Matched" : "Unable to Match"} at £${price.toFixed(2)}` });
       fetchNegotiations();
-      setShowNotifications(false);
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to submit response", variant: "destructive" });
     }
   };
 
-  const pendingNegotiations = negotiations.filter((n) => n.status === "pending");
-  const respondedNegotiations = negotiations.filter((n) => n.status !== "pending");
+  const counts = {
+    pending: negotiations.filter((n) => n.status === "pending").length,
+    matched: negotiations.filter((n) => n.status !== "pending" && n.decision_type === "match").length,
+    partial: negotiations.filter((n) => n.status !== "pending" && n.decision_type === "partial").length,
+    declined: negotiations.filter((n) => n.status !== "pending" && (n.decision_type === "unable" || n.decision_type === "rejected" || n.status === "rejected")).length,
+  };
+
+  const filteredNegotiations = negotiations.filter((n) => {
+    if (activeFilter === "all") return true;
+    if (activeFilter === "pending") return n.status === "pending";
+    if (activeFilter === "matched") return n.status !== "pending" && n.decision_type === "match";
+    if (activeFilter === "partial") return n.status !== "pending" && n.decision_type === "partial";
+    if (activeFilter === "declined") return n.status !== "pending" && (n.decision_type === "unable" || n.decision_type === "rejected" || n.status === "rejected");
+    return true;
+  });
+
+  const selectedNegotiation = negotiations.find((n) => n.id === selectedNegotiationId) || null;
+
+  const statCards: { key: StatFilter; label: string; count: number; icon: typeof Bell; colorClass: string; bgClass: string; borderClass: string; actionLabel?: string }[] = [
+    { key: "pending", label: "Pending Requests", count: counts.pending, icon: Bell, colorClass: "text-yellow-600 dark:text-yellow-400", bgClass: "bg-yellow-50 dark:bg-yellow-950/30", borderClass: "border-yellow-200 dark:border-yellow-800", actionLabel: "Action Required" },
+    { key: "matched", label: "Matched", count: counts.matched, icon: CheckCircle2, colorClass: "text-green-600 dark:text-green-400", bgClass: "bg-green-50 dark:bg-green-950/30", borderClass: "border-green-200 dark:border-green-800" },
+    { key: "partial", label: "Partially Matched", count: counts.partial, icon: AlertTriangle, colorClass: "text-amber-600 dark:text-amber-400", bgClass: "bg-amber-50 dark:bg-amber-950/30", borderClass: "border-amber-200 dark:border-amber-800" },
+    { key: "declined", label: "Declined", count: counts.declined, icon: XCircle, colorClass: "text-red-600 dark:text-red-400", bgClass: "bg-red-50 dark:bg-red-950/30", borderClass: "border-red-200 dark:border-red-800" },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
       <header className={`${colors.headerBg} text-white shadow-md sticky top-0 z-50`}>
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <Shield className="w-6 h-6" />
             <div>
               <h1 className="text-lg font-bold leading-tight" data-testid="text-provider-name">{displayName}</h1>
-              <p className="text-xs opacity-80">Customer Support Portal</p>
+              <p className="text-xs opacity-80">Customer Retention Portal</p>
             </div>
           </div>
           <div className="relative">
             <Button
               size="icon"
               variant="ghost"
-              className="text-white hover:bg-white/20 no-default-hover-elevate"
+              className="text-white no-default-hover-elevate"
               onClick={() => setShowNotifications(!showNotifications)}
               data-testid="button-notification-bell"
             >
@@ -328,24 +390,21 @@ function AgentDashboard({ provider }: { provider: string }) {
                 {pendingCount}
               </span>
             )}
-
             {showNotifications && (
               <div className="absolute right-0 top-full mt-2 w-80 max-h-[70vh] overflow-y-auto bg-card border border-border rounded-md shadow-lg z-50" data-testid="dropdown-notifications">
                 <div className="p-3 border-b border-border">
                   <h3 className="text-sm font-semibold text-foreground">Notifications</h3>
                   <p className="text-xs text-muted-foreground">{pendingCount} pending request{pendingCount !== 1 ? "s" : ""}</p>
                 </div>
-                {pendingNegotiations.length === 0 ? (
-                  <div className="p-4 text-center text-sm text-muted-foreground">
-                    No pending requests
-                  </div>
+                {negotiations.filter((n) => n.status === "pending").length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">No pending requests</div>
                 ) : (
                   <div className="p-2 space-y-2">
-                    {pendingNegotiations.map((n) => (
+                    {negotiations.filter((n) => n.status === "pending").map((n) => (
                       <div
                         key={n.id}
                         className="p-3 rounded-md hover-elevate cursor-pointer bg-yellow-50/50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800"
-                        onClick={() => { setShowNotifications(false); }}
+                        onClick={() => { setShowNotifications(false); setActiveFilter("pending"); setSelectedNegotiationId(n.id); }}
                         data-testid={`notification-item-${n.id}`}
                       >
                         <p className="text-sm font-medium text-foreground">{n.customer_name}</p>
@@ -361,51 +420,142 @@ function AgentDashboard({ provider }: { provider: string }) {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center space-y-3">
               <div className="w-8 h-8 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin mx-auto" />
-              <p className="text-sm text-muted-foreground">Loading negotiations...</p>
-            </div>
-          </div>
-        ) : negotiations.length === 0 ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center space-y-3">
-              <Bell className="w-12 h-12 mx-auto text-muted-foreground/40" />
-              <h2 className="text-lg font-semibold text-foreground">No Negotiations Yet</h2>
-              <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                When a customer receives a competitive quote, you'll see retention requests here.
-              </p>
+              <p className="text-sm text-muted-foreground">Loading dashboard...</p>
             </div>
           </div>
         ) : (
           <>
-            {pendingNegotiations.length > 0 && (
-              <section className="space-y-3">
-                <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                  Pending Requests ({pendingNegotiations.length})
-                </h2>
-                <div className="space-y-3">
-                  {pendingNegotiations.map((n) => (
-                    <NegotiationCard key={n.id} negotiation={n} providerColors={colors} onRespond={handleRespond} />
-                  ))}
-                </div>
-              </section>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="stat-cards-row">
+              {statCards.map((stat) => {
+                const Icon = stat.icon;
+                const isActive = activeFilter === stat.key;
+                return (
+                  <Card
+                    key={stat.key}
+                    className={`p-4 cursor-pointer hover-elevate transition-colors overflow-visible ${isActive ? `${stat.bgClass} border ${stat.borderClass}` : ""}`}
+                    onClick={() => setActiveFilter(isActive ? "all" : stat.key)}
+                    data-testid={`stat-card-${stat.key}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 min-w-0">
+                        <p className="text-xs font-medium text-muted-foreground truncate">{stat.label}</p>
+                        <p className="text-2xl font-bold text-foreground" data-testid={`stat-count-${stat.key}`}>{stat.count}</p>
+                      </div>
+                      <div className={`p-2 rounded-md ${stat.bgClass}`}>
+                        <Icon className={`w-4 h-4 ${stat.colorClass}`} />
+                      </div>
+                    </div>
+                    {stat.actionLabel && stat.count > 0 && (
+                      <div className="mt-2">
+                        <Badge variant="outline" className="text-[10px] bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700">
+                          {stat.actionLabel}
+                        </Badge>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+
+            {activeFilter !== "all" && (
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-muted-foreground" data-testid="text-active-filter">
+                  Showing: <span className="font-medium text-foreground">{statCards.find(s => s.key === activeFilter)?.label}</span>
+                </p>
+                <Button size="sm" variant="ghost" onClick={() => setActiveFilter("all")} data-testid="button-clear-filter">
+                  <X className="w-3 h-3 mr-1" /> Clear filter
+                </Button>
+              </div>
             )}
-            {respondedNegotiations.length > 0 && (
-              <section className="space-y-3">
-                <h2 className="text-base font-semibold text-muted-foreground flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Previous Responses ({respondedNegotiations.length})
-                </h2>
-                <div className="space-y-3">
-                  {respondedNegotiations.map((n) => (
-                    <NegotiationCard key={n.id} negotiation={n} providerColors={colors} onRespond={handleRespond} />
-                  ))}
+
+            {filteredNegotiations.length === 0 ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="text-center space-y-3">
+                  <Bell className="w-10 h-10 mx-auto text-muted-foreground/40" />
+                  <h2 className="text-base font-semibold text-foreground">
+                    {negotiations.length === 0 ? "No Retention Requests Yet" : "No Results"}
+                  </h2>
+                  <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                    {negotiations.length === 0
+                      ? "When a customer receives a competitive quote, retention requests will appear here."
+                      : "No negotiations match the selected filter."}
+                  </p>
                 </div>
-              </section>
+              </div>
+            ) : (
+              <Card className="overflow-visible" data-testid="negotiations-table">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Customer</th>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden sm:table-cell">Policy No.</th>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Competitor</th>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Quote</th>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground hidden sm:table-cell">Received</th>
+                        <th className="text-left p-3 text-xs font-medium text-muted-foreground">Status</th>
+                        <th className="p-3 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredNegotiations.map((n) => {
+                        const isSelected = selectedNegotiationId === n.id;
+                        return (
+                          <tr
+                            key={n.id}
+                            className={`border-b border-border/50 cursor-pointer hover-elevate ${isSelected ? "ring-1 ring-inset ring-border" : ""}`}
+                            onClick={() => setSelectedNegotiationId(isSelected ? null : n.id)}
+                            data-testid={`table-row-${n.id}`}
+                          >
+                            <td className="p-3">
+                              <p className="font-medium text-foreground" data-testid={`table-customer-${n.id}`}>{n.customer_name}</p>
+                            </td>
+                            <td className="p-3 hidden sm:table-cell">
+                              <span className="text-muted-foreground" data-testid={`table-policy-${n.id}`}>{n.policy_number}</span>
+                            </td>
+                            <td className="p-3 hidden md:table-cell">
+                              <span className="text-muted-foreground" data-testid={`table-competitor-${n.id}`}>{n.competitor_name}</span>
+                            </td>
+                            <td className="p-3">
+                              <span className="font-medium text-green-700 dark:text-green-400" data-testid={`table-quote-${n.id}`}>£{n.competitor_quote.toFixed(2)}</span>
+                            </td>
+                            <td className="p-3 hidden sm:table-cell">
+                              <span className="text-muted-foreground text-xs" data-testid={`table-received-${n.id}`}>{formatTimeAgo(n.created_at)}</span>
+                            </td>
+                            <td className="p-3" data-testid={`table-status-${n.id}`}>
+                              {getStatusBadge(n.status, n.decision_type)}
+                            </td>
+                            <td className="p-3">
+                              <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${isSelected ? "rotate-90" : ""}`} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+
+            {selectedNegotiation && (
+              <div className="space-y-3 pt-2" data-testid="detail-panel">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-foreground" data-testid="text-detail-heading">Request Details</h3>
+                  <Button size="sm" variant="ghost" onClick={() => setSelectedNegotiationId(null)} data-testid="button-close-detail">
+                    <X className="w-3 h-3 mr-1" /> Close
+                  </Button>
+                </div>
+                <NegotiationCard
+                  negotiation={selectedNegotiation}
+                  providerColors={colors}
+                  onRespond={handleRespond}
+                />
+              </div>
             )}
           </>
         )}
