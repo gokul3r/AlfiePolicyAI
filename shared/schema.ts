@@ -431,3 +431,43 @@ export const insertQuoteHistorySchema = createInsertSchema(quoteHistory).omit({
 
 export type InsertQuoteHistory = z.infer<typeof insertQuoteHistorySchema>;
 export type QuoteHistory = typeof quoteHistory.$inferSelect;
+
+export const negotiations = pgTable("negotiations", {
+  id: serial("id").primaryKey(),
+  provider_name: text("provider_name").notNull(),
+  customer_name: text("customer_name").notNull(),
+  policy_number: text("policy_number").notNull(),
+  current_renewal_cost: real("current_renewal_cost").notNull(),
+  competitor_name: text("competitor_name").notNull(),
+  competitor_quote: real("competitor_quote").notNull(),
+  status: text("status").notNull().default("pending"),
+  agent_offer_price: real("agent_offer_price"),
+  decision_type: text("decision_type"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+  responded_at: timestamp("responded_at"),
+});
+
+export const insertNegotiationSchema = createInsertSchema(negotiations).omit({
+  id: true,
+  created_at: true,
+  responded_at: true,
+}).extend({
+  provider_name: z.string().min(1, "Provider name is required").trim(),
+  customer_name: z.string().min(1, "Customer name is required").trim(),
+  policy_number: z.string().min(1, "Policy number is required").trim(),
+  current_renewal_cost: z.number().min(0, "Cost must be positive"),
+  competitor_name: z.string().min(1, "Competitor name is required").trim(),
+  competitor_quote: z.number().min(0, "Quote must be positive"),
+  status: z.string().optional(),
+  agent_offer_price: z.number().nullable().optional(),
+  decision_type: z.string().nullable().optional(),
+});
+
+export const negotiationResponseSchema = z.object({
+  decision: z.enum(["match", "partial", "unable"]),
+  offer_price: z.number().min(0, "Price must be positive"),
+});
+
+export type InsertNegotiation = z.infer<typeof insertNegotiationSchema>;
+export type Negotiation = typeof negotiations.$inferSelect;
+export type NegotiationResponse = z.infer<typeof negotiationResponseSchema>;

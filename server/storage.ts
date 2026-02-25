@@ -8,7 +8,8 @@ import {
   personalizations, 
   notifications, 
   customRatings,
-  quoteHistory 
+  quoteHistory,
+  negotiations
 } from "@shared/schema";
 import { 
   type User, 
@@ -26,9 +27,11 @@ import {
   type CustomRatings, 
   type InsertCustomRatings,
   type QuoteHistory,
-  type InsertQuoteHistory 
+  type InsertQuoteHistory,
+  type Negotiation,
+  type InsertNegotiation
 } from "@shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, ilike } from "drizzle-orm";
 
 export interface PurchasePolicyData {
   email_id: string;
@@ -64,6 +67,11 @@ export interface IStorage {
   getQuoteHistoryByStatus(email: string, status: 'matched' | 'rejected'): Promise<QuoteHistory[]>;
   updateQuoteHistoryStatus(quoteId: string, status: 'matched' | 'rejected'): Promise<QuoteHistory>;
   deleteQuoteHistoryByEmail(email: string): Promise<number>;
+  createNegotiation(data: InsertNegotiation): Promise<Negotiation>;
+  getNegotiationsByProvider(providerName: string): Promise<Negotiation[]>;
+  getPendingNegotiationCountByProvider(providerName: string): Promise<number>;
+  respondToNegotiation(id: number, decision: string, offerPrice: number): Promise<Negotiation>;
+  getNegotiationById(id: number): Promise<Negotiation | undefined>;
 }
 
 export class DbStorage implements IStorage {
@@ -433,6 +441,55 @@ export class DbStorage implements IStorage {
       .where(eq(quoteHistory.email_id, email))
       .returning();
     return result.length;
+  }
+
+  async createNegotiation(data: InsertNegotiation): Promise<Negotiation> {
+    const result = await db.insert(negotiations).values(data).returning();
+    return result[0];
+  }
+
+  async getNegotiationsByProvider(providerName: string): Promise<Negotiation[]> {
+    return await db.select()
+      .from(negotiations)
+      .where(ilike(negotiations.provider_name, providerName))
+      .orderBy(desc(negotiations.created_at));
+  }
+
+  async getPendingNegotiationCountByProvider(providerName: string): Promise<number> {
+    const result = await db.select()
+      .from(negotiations)
+      .where(
+        and(
+          ilike(negotiations.provider_name, providerName),
+          eq(negotiations.status, "pending")
+        )
+      );
+    return result.length;
+  }
+
+  async respondToNegotiation(id: number, decision: string, offerPrice: number): Promise<Negotiation> {
+    const statusMap: Record<string, string> = {
+      match: "matched",
+      partial: "partial",
+      unable: "rejected",
+    };
+    const result = await db.update(negotiations)
+      .set({
+        status: statusMap[decision] || decision,
+        decision_type: decision,
+        agent_offer_price: offerPrice,
+        responded_at: new Date(),
+      })
+      .where(eq(negotiations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getNegotiationById(id: number): Promise<Negotiation | undefined> {
+    const result = await db.select()
+      .from(negotiations)
+      .where(eq(negotiations.id, id));
+    return result[0];
   }
 }
 

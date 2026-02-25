@@ -8,7 +8,9 @@ import {
   insertVehiclePolicySchema,
   updateVehiclePolicySchema,
   insertChatMessageSchema, 
-  VehiclePolicyWithDetails 
+  VehiclePolicyWithDetails,
+  insertNegotiationSchema,
+  negotiationResponseSchema
 } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -1252,6 +1254,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting quote history:", error);
       res.status(500).json({ error: "Failed to delete quote history" });
+    }
+  });
+
+  app.post("/api/negotiations", async (req, res) => {
+    try {
+      const validated = insertNegotiationSchema.parse(req.body);
+      const negotiation = await storage.createNegotiation(validated);
+      res.status(201).json(negotiation);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid negotiation data", details: error.errors });
+      }
+      console.error("Error creating negotiation:", error);
+      res.status(500).json({ error: "Failed to create negotiation" });
+    }
+  });
+
+  app.get("/api/negotiations", async (req, res) => {
+    try {
+      const provider = req.query.provider as string;
+      if (!provider) {
+        return res.status(400).json({ error: "Provider query parameter is required" });
+      }
+      const results = await storage.getNegotiationsByProvider(provider);
+      res.json(results);
+    } catch (error) {
+      console.error("Error fetching negotiations:", error);
+      res.status(500).json({ error: "Failed to fetch negotiations" });
+    }
+  });
+
+  app.get("/api/negotiations/pending", async (req, res) => {
+    try {
+      const provider = req.query.provider as string;
+      if (!provider) {
+        return res.status(400).json({ error: "Provider query parameter is required" });
+      }
+      const count = await storage.getPendingNegotiationCountByProvider(provider);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching pending count:", error);
+      res.status(500).json({ error: "Failed to fetch pending count" });
+    }
+  });
+
+  app.get("/api/negotiations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid negotiation ID" });
+      }
+      const negotiation = await storage.getNegotiationById(id);
+      if (!negotiation) {
+        return res.status(404).json({ error: "Negotiation not found" });
+      }
+      res.json(negotiation);
+    } catch (error) {
+      console.error("Error fetching negotiation:", error);
+      res.status(500).json({ error: "Failed to fetch negotiation" });
+    }
+  });
+
+  app.patch("/api/negotiations/:id/respond", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid negotiation ID" });
+      }
+      const validated = negotiationResponseSchema.parse(req.body);
+      const existing = await storage.getNegotiationById(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Negotiation not found" });
+      }
+      if (existing.status !== "pending") {
+        return res.status(409).json({ error: "Negotiation already responded to" });
+      }
+      const updated = await storage.respondToNegotiation(id, validated.decision, validated.offer_price);
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid response data", details: error.errors });
+      }
+      console.error("Error responding to negotiation:", error);
+      res.status(500).json({ error: "Failed to respond to negotiation" });
     }
   });
 

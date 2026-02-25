@@ -16,6 +16,7 @@ import ManualEntryForm, { type VehiclePolicyFormData } from "@/components/Manual
 import WhisperDialog from "@/components/WhisperDialog";
 import QuoteSearchDialog from "@/components/QuoteSearchDialog";
 import QuotesScreen from "@/components/QuotesScreen";
+import CustomerAgentPage from "@/pages/CustomerAgentPage";
 import type { User, InsertVehiclePolicy, VehiclePolicy, QuotesApiResponse } from "@shared/schema";
 import { apiRequest } from "./lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
@@ -538,6 +539,18 @@ function AppContent() {
 }
 
 function App() {
+  const isCustomerAgent = window.location.pathname === "/customer_agent";
+
+  if (isCustomerAgent) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <CustomerAgentPage />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
