@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Mail, Shield, CheckCircle2, XCircle, Clock, ArrowRight, AlertTriangle, X, ChevronRight } from "lucide-react";
+import { Bell, Mail, Shield, CheckCircle2, XCircle, Clock, ArrowRight, AlertTriangle, X, ChevronRight, LayoutDashboard, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import type { Negotiation } from "@shared/schema";
@@ -281,7 +281,7 @@ function getStatusBadge(status: string, decisionType: string | null) {
   );
 }
 
-function AgentDashboard({ provider }: { provider: string }) {
+function AgentDashboard({ provider, onBack }: { provider: string; onBack: () => void }) {
   const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -366,10 +366,18 @@ function AgentDashboard({ provider }: { provider: string }) {
       <header className={`${colors.headerBg} text-white shadow-md sticky top-0 z-50`}>
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
-            <Shield className="w-6 h-6" />
+            <Button
+              size="icon"
+              variant="ghost"
+              className="text-white no-default-hover-elevate"
+              onClick={onBack}
+              data-testid="button-back-home"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
             <div>
               <h1 className="text-lg font-bold leading-tight" data-testid="text-provider-name">{displayName}</h1>
-              <p className="text-xs opacity-80">Customer Retention Portal</p>
+              <p className="text-xs opacity-80">Retention Requests</p>
             </div>
           </div>
           <div className="relative">
@@ -565,10 +573,129 @@ function AgentDashboard({ provider }: { provider: string }) {
   );
 }
 
+function HomeScreen({ provider, onNavigate }: { provider: string; onNavigate: (view: "retention" | "dashboard") => void }) {
+  const colors = getProviderColors(provider);
+  const displayName = formatProviderDisplayName(provider);
+
+  const sections = [
+    {
+      key: "retention" as const,
+      title: "Retention Requests",
+      description: "Review and respond to customer retention negotiations. Match, partially match, or decline competitor quotes.",
+      icon: Shield,
+      colorClass: "text-blue-600 dark:text-blue-400",
+      bgClass: "bg-blue-50 dark:bg-blue-950/30",
+    },
+    {
+      key: "dashboard" as const,
+      title: "Dashboard",
+      description: "View performance analytics, trends, and key metrics for your retention operations.",
+      icon: LayoutDashboard,
+      colorClass: "text-emerald-600 dark:text-emerald-400",
+      bgClass: "bg-emerald-50 dark:bg-emerald-950/30",
+    },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className={`${colors.headerBg} text-white shadow-md sticky top-0 z-50`}>
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <Shield className="w-6 h-6" />
+            <div>
+              <h1 className="text-lg font-bold leading-tight" data-testid="text-provider-name-home">{displayName}</h1>
+              <p className="text-xs opacity-80">Customer Retention Portal</p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h2 className="text-xl font-bold text-foreground" data-testid="text-home-welcome">Welcome back</h2>
+          <p className="text-sm text-muted-foreground mt-1">Select a section to get started</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {sections.map((section) => {
+            const Icon = section.icon;
+            return (
+              <Card
+                key={section.key}
+                className="p-6 cursor-pointer hover-elevate overflow-visible"
+                onClick={() => onNavigate(section.key)}
+                data-testid={`card-nav-${section.key}`}
+              >
+                <div className="flex flex-col gap-4">
+                  <div className={`w-12 h-12 rounded-md ${section.bgClass} flex items-center justify-center`}>
+                    <Icon className={`w-6 h-6 ${section.colorClass}`} />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-semibold text-foreground">{section.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{section.description}</p>
+                  </div>
+                  <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground mt-2">
+                    Open <ChevronRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      </main>
+      <Toaster />
+    </div>
+  );
+}
+
+function DashboardView({ provider, onBack }: { provider: string; onBack: () => void }) {
+  const colors = getProviderColors(provider);
+  const displayName = formatProviderDisplayName(provider);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className={`${colors.headerBg} text-white shadow-md sticky top-0 z-50`}>
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="text-white no-default-hover-elevate"
+              onClick={onBack}
+              data-testid="button-dashboard-back"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-lg font-bold leading-tight" data-testid="text-provider-name-dashboard">{displayName}</h1>
+              <p className="text-xs opacity-80">Dashboard</p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-16">
+        <div className="flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 rounded-md bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center mx-auto">
+              <LayoutDashboard className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h2 className="text-lg font-semibold text-foreground" data-testid="text-dashboard-title">Dashboard</h2>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto" data-testid="text-dashboard-placeholder">
+              Performance analytics and retention metrics will appear here.
+            </p>
+          </div>
+        </div>
+      </main>
+      <Toaster />
+    </div>
+  );
+}
+
 export default function CustomerAgentPage() {
-  const [stage, setStage] = useState<"login" | "dashboard">(() => {
+  const [stage, setStage] = useState<"login" | "home" | "retention" | "dashboard">(() => {
     const hasProvider = sessionStorage.getItem("customer_agent_provider");
-    if (hasProvider) return "dashboard";
+    if (hasProvider) return "home";
     return "login";
   });
   const [provider, setProvider] = useState(() => sessionStorage.getItem("customer_agent_provider") || "");
@@ -578,11 +705,19 @@ export default function CustomerAgentPage() {
       <EmailLoginPage
         onLogin={(_email, prov) => {
           setProvider(prov);
-          setStage("dashboard");
+          setStage("home");
         }}
       />
     );
   }
 
-  return <AgentDashboard provider={provider} />;
+  if (stage === "home") {
+    return <HomeScreen provider={provider} onNavigate={(view) => setStage(view)} />;
+  }
+
+  if (stage === "dashboard") {
+    return <DashboardView provider={provider} onBack={() => setStage("home")} />;
+  }
+
+  return <AgentDashboard provider={provider} onBack={() => setStage("home")} />;
 }
