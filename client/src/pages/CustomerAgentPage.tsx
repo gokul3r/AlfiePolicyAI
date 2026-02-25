@@ -3,12 +3,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Lock, Mail, Shield, CheckCircle2, XCircle, Clock, ArrowRight } from "lucide-react";
+import { Bell, Mail, Shield, CheckCircle2, XCircle, Clock, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import type { Negotiation } from "@shared/schema";
-
-const ACCESS_KEY = "AA@ITCTO";
 
 const PROVIDER_COLORS: Record<string, { primary: string; bg: string; headerBg: string; accent: string }> = {
   admiral: { primary: "text-blue-700 dark:text-blue-300", bg: "bg-blue-50 dark:bg-blue-950/30", headerBg: "bg-blue-700 dark:bg-blue-900", accent: "border-blue-200 dark:border-blue-800" },
@@ -49,53 +47,6 @@ function formatProviderDisplayName(provider: string): string {
     soga: "Soga Insurance",
   };
   return displayNames[provider.toLowerCase()] || `${provider} Insurance`;
-}
-
-function GatePage({ onAccess }: { onAccess: () => void }) {
-  const [key, setKey] = useState("");
-  const [error, setError] = useState("");
-  const [isShaking, setIsShaking] = useState(false);
-
-  const handleSubmit = () => {
-    if (key === ACCESS_KEY) {
-      sessionStorage.setItem("customer_agent_access_granted", "true");
-      onAccess();
-    } else {
-      setError("Invalid access key. Please try again.");
-      setIsShaking(true);
-      setTimeout(() => setIsShaking(false), 500);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-6 text-center">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <Shield className="w-8 h-8 text-blue-400" />
-          <h1 className="text-2xl font-bold text-white">Provider Portal</h1>
-        </div>
-        <p className="text-sm text-slate-400">Customer Support Agent Access</p>
-        <div className={`space-y-3 ${isShaking ? "animate-shake" : ""}`}>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-            <Input
-              type="password"
-              placeholder="Enter access key"
-              value={key}
-              onChange={(e) => { setKey(e.target.value); setError(""); }}
-              onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-              className="pl-10 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
-              data-testid="input-agent-access-key"
-            />
-          </div>
-          {error && <p className="text-xs text-red-400" data-testid="text-agent-gate-error">{error}</p>}
-          <Button onClick={handleSubmit} className="w-full" data-testid="button-agent-access-submit">
-            Access Portal
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function EmailLoginPage({ onLogin }: { onLogin: (email: string, provider: string) => void }) {
@@ -465,18 +416,12 @@ function AgentDashboard({ provider }: { provider: string }) {
 }
 
 export default function CustomerAgentPage() {
-  const [stage, setStage] = useState<"gate" | "login" | "dashboard">(() => {
-    const hasAccess = sessionStorage.getItem("customer_agent_access_granted") === "true";
+  const [stage, setStage] = useState<"login" | "dashboard">(() => {
     const hasProvider = sessionStorage.getItem("customer_agent_provider");
-    if (hasAccess && hasProvider) return "dashboard";
-    if (hasAccess) return "login";
-    return "gate";
+    if (hasProvider) return "dashboard";
+    return "login";
   });
   const [provider, setProvider] = useState(() => sessionStorage.getItem("customer_agent_provider") || "");
-
-  if (stage === "gate") {
-    return <GatePage onAccess={() => setStage("login")} />;
-  }
 
   if (stage === "login") {
     return (
