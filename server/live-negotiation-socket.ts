@@ -129,7 +129,7 @@ async function sendAutoAnnieMessage(
     const response = await generateNegotiationResponse(negotiation, conversationHistory, isOpening);
 
     const cleanResponse = response
-      .replace(/\[OUTCOME:(ACCEPTED|REJECTED):£[\d.]+\]/g, "")
+      .replace(/\[OUTCOME:(ACCEPTED|REJECTED|CONSIDERING):£[\d.]+\]/g, "")
       .trim();
 
     const savedMsg = await storage.createLiveNegotiationMessage({

@@ -49,20 +49,20 @@ STEP 1 – Opening:
 
 STEP 2 – When the agent responds with an offer:
 If offer ≤ £${negotiation.competitor_quote.toFixed(2)}:
-- Accept immediately.
-- Confirm renewal.
+- This is a strong offer. Confirm that cover level and voluntary excess remain unchanged before proceeding.
+- Once confirmed, proceed to CLOSING.
 
 If offer > £${negotiation.competitor_quote.toFixed(2)} and ≤ £${toleranceMax.toFixed(2)}:
 - Ask once: "Is this your best and final offer? ${negotiation.customer_name} is prepared to switch if we cannot get closer to £${negotiation.competitor_quote.toFixed(2)}."
 - Wait for response.
-- If final offer remains within tolerance, accept.
-- If revised offer exceeds tolerance, politely decline.
+- If the revised or confirmed offer is within tolerance, confirm that cover level and voluntary excess remain unchanged, then proceed to CLOSING.
+- If the revised offer exceeds tolerance, proceed to CLOSING.
 
 If offer > £${toleranceMax.toFixed(2)}:
 - State that it is higher than both the competitor quote and beyond what the customer can accept, making renewal difficult to justify.
 - Ask once if this is the best and final offer.
-- If revised offer falls within tolerance, accept.
-- Otherwise, politely decline and confirm intention to switch.
+- If revised offer falls within tolerance, confirm that cover level and voluntary excess remain unchanged, then proceed to CLOSING.
+- Otherwise, proceed to CLOSING.
 
 IMPORTANT PROFESSIONAL RULES:
 - Do NOT negotiate voluntary excess or cover structure.
@@ -75,21 +75,19 @@ IMPORTANT PROFESSIONAL RULES:
 - Do not reveal calculations or tolerance amounts.
 - Do not continue negotiating once a decision is made.
 
-BEFORE ACCEPTING ANY OFFER:
-Briefly confirm that cover level and voluntary excess remain unchanged.
-
 CLOSING:
-If accepting:
-- Confirm renewal at agreed premium.
-- Thank the agent professionally.
-- End your final message with the tag: [OUTCOME:ACCEPTED:£<agreed_price>]
+IMPORTANT: You do NOT have authority to accept or reject an offer on the customer's behalf. You must ALWAYS pause and consult the customer first.
 
-If declining:
-- Thank them for their time.
-- Confirm the customer will proceed with the competitor.
-- End your final message with the tag: [OUTCOME:REJECTED:£<final_offer>]
+When you have received a final offer (whether acceptable or not):
+- Thank the agent for the offer.
+- Say that you need to consult with the customer before confirming, and ask them to hold on for a moment.
+- Do NOT say "we accept" or "we decline" — you are pausing to let the customer decide.
+- End your message with the tag: [OUTCOME:CONSIDERING:£<final_offer_price>]
 
-CRITICAL: You MUST include the [OUTCOME:...] tag in your closing message when you make a final decision. This is how the system detects the negotiation result. Only include it when you are making your FINAL decision — not during ongoing negotiation.`;
+Example phrasing: "Thank you for this offer of £X. I need to discuss this with ${negotiation.customer_name} before we can confirm. Could you hold on for just a moment?"
+
+CRITICAL: You MUST include the [OUTCOME:CONSIDERING:£<price>] tag when you have received the agent's final offer and are ready to consult the customer. Only include it once — when the negotiation has reached its conclusion and you are pausing. Do NOT include it during ongoing negotiation or before a final offer has been established.
+CRITICAL: NEVER say "we accept", "we will accept", "please proceed with renewal", or "the customer has decided to switch". You ONLY pause and consult. The system will handle the final acceptance or rejection message after the customer decides.`;
 }
 
 export interface ConversationMessage {
@@ -149,19 +147,24 @@ function generateFallbackResponse(
 }
 
 export interface NegotiationOutcome {
-  type: "accepted" | "rejected" | null;
+  type: "accepted" | "rejected" | "considering" | null;
   price: number | null;
 }
 
 export function parseOutcome(message: string): NegotiationOutcome {
+  const consideringMatch = message.match(/\[OUTCOME:CONSIDERING:£([\d.]+)\]/);
+  if (consideringMatch) {
+    return { type: "considering", price: parseFloat(consideringMatch[1]) };
+  }
+
   const acceptedMatch = message.match(/\[OUTCOME:ACCEPTED:£([\d.]+)\]/);
   if (acceptedMatch) {
-    return { type: "accepted", price: parseFloat(acceptedMatch[1]) };
+    return { type: "considering", price: parseFloat(acceptedMatch[1]) };
   }
 
   const rejectedMatch = message.match(/\[OUTCOME:REJECTED:£([\d.]+)\]/);
   if (rejectedMatch) {
-    return { type: "rejected", price: parseFloat(rejectedMatch[1]) };
+    return { type: "considering", price: parseFloat(rejectedMatch[1]) };
   }
 
   return { type: null, price: null };
@@ -171,10 +174,10 @@ export function determineOutcomeCategory(
   negotiation: LiveNegotiation,
   outcome: NegotiationOutcome
 ): "matched" | "partially_matched" | "rejected" {
-  if (outcome.type === "rejected") return "rejected";
-  if (outcome.type === "accepted" && outcome.price !== null) {
+  if (outcome.price !== null) {
     if (outcome.price <= negotiation.competitor_quote) return "matched";
-    return "partially_matched";
+    const toleranceMax = negotiation.competitor_quote + (negotiation.tolerance_amount || 0);
+    if (outcome.price <= toleranceMax) return "partially_matched";
   }
   return "rejected";
 }
