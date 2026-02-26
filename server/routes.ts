@@ -10,7 +10,8 @@ import {
   insertChatMessageSchema, 
   VehiclePolicyWithDetails,
   insertNegotiationSchema,
-  negotiationResponseSchema
+  negotiationResponseSchema,
+  insertLiveNegotiationSchema
 } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -1363,7 +1364,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/live-negotiations", async (req, res) => {
+    try {
+      const validated = insertLiveNegotiationSchema.parse(req.body);
+      const negotiation = await storage.createLiveNegotiation(validated);
+      res.status(201).json(negotiation);
+    } catch (error) {
+      console.error("Error creating live negotiation:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create live negotiation" });
+    }
+  });
+
+  app.get("/api/live-negotiations/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
+      const negotiation = await storage.getLiveNegotiationById(id);
+      if (!negotiation) return res.status(404).json({ error: "Not found" });
+      res.json(negotiation);
+    } catch (error) {
+      console.error("Error fetching live negotiation:", error);
+      res.status(500).json({ error: "Failed to fetch live negotiation" });
+    }
+  });
+
+  app.get("/api/live-negotiations/provider/:providerName", async (req, res) => {
+    try {
+      const providerName = req.params.providerName;
+      const negotiations = await storage.getActiveLiveNegotiationsByProvider(providerName);
+      res.json(negotiations);
+    } catch (error) {
+      console.error("Error fetching provider live negotiations:", error);
+      res.status(500).json({ error: "Failed to fetch live negotiations" });
+    }
+  });
+
+  app.get("/api/live-negotiation-messages/:negotiationId", async (req, res) => {
+    try {
+      const negotiationId = parseInt(req.params.negotiationId);
+      if (isNaN(negotiationId)) return res.status(400).json({ error: "Invalid ID" });
+      const messages = await storage.getLiveNegotiationMessages(negotiationId);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching live negotiation messages:", error);
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
   const httpServer = createServer(app);
+
+  // Initialize Socket.IO for live negotiations
+  const { initializeLiveNegotiationSocket } = await import("./live-negotiation-socket");
+  initializeLiveNegotiationSocket(httpServer);
 
   // WebSocket server for voice chat
   const wss = new WebSocketServer({ server: httpServer, path: "/api/voice-chat" });

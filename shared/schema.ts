@@ -475,3 +475,73 @@ export const negotiationResponseSchema = z.object({
 export type InsertNegotiation = z.infer<typeof insertNegotiationSchema>;
 export type Negotiation = typeof negotiations.$inferSelect;
 export type NegotiationResponse = z.infer<typeof negotiationResponseSchema>;
+
+export const liveNegotiations = pgTable("live_negotiations", {
+  id: serial("id").primaryKey(),
+  provider_name: text("provider_name").notNull(),
+  customer_name: text("customer_name").notNull(),
+  customer_email: text("customer_email").notNull(),
+  policy_number: text("policy_number").notNull(),
+  current_premium: real("current_premium").notNull(),
+  competitor_name: text("competitor_name").notNull(),
+  competitor_quote: real("competitor_quote").notNull(),
+  tolerance_amount: real("tolerance_amount").notNull(),
+  vehicle_make: text("vehicle_make").notNull(),
+  vehicle_model: text("vehicle_model").notNull(),
+  vehicle_year: integer("vehicle_year").notNull(),
+  no_claim_bonus_years: integer("no_claim_bonus_years").notNull(),
+  voluntary_excess: real("voluntary_excess").notNull(),
+  policy_start_date: text("policy_start_date"),
+  policy_end_date: text("policy_end_date"),
+  socket_room_id: text("socket_room_id").notNull(),
+  status: text("status").notNull().default("pending"),
+  outcome: text("outcome"),
+  final_offer_price: real("final_offer_price"),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertLiveNegotiationSchema = createInsertSchema(liveNegotiations).omit({
+  id: true,
+  created_at: true,
+}).extend({
+  provider_name: z.string().min(1).trim(),
+  customer_name: z.string().min(1).trim(),
+  customer_email: z.string().email().toLowerCase().trim(),
+  policy_number: z.string().min(1).trim(),
+  current_premium: z.number().min(0),
+  competitor_name: z.string().min(1).trim(),
+  competitor_quote: z.number().min(0),
+  tolerance_amount: z.number().min(0),
+  vehicle_make: z.string().min(1).trim(),
+  vehicle_model: z.string().min(1).trim(),
+  vehicle_year: z.number().int().min(1900),
+  no_claim_bonus_years: z.number().int().min(0),
+  voluntary_excess: z.number().min(0),
+  socket_room_id: z.string().min(1),
+  status: z.string().optional(),
+  outcome: z.string().nullable().optional(),
+  final_offer_price: z.number().nullable().optional(),
+});
+
+export type InsertLiveNegotiation = z.infer<typeof insertLiveNegotiationSchema>;
+export type LiveNegotiation = typeof liveNegotiations.$inferSelect;
+
+export const liveNegotiationMessages = pgTable("live_negotiation_messages", {
+  id: serial("id").primaryKey(),
+  negotiation_id: integer("negotiation_id").notNull().references(() => liveNegotiations.id),
+  sender: text("sender").notNull(),
+  message: text("message").notNull(),
+  created_at: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertLiveNegotiationMessageSchema = createInsertSchema(liveNegotiationMessages).omit({
+  id: true,
+  created_at: true,
+}).extend({
+  negotiation_id: z.number().int(),
+  sender: z.enum(["autoannie", "agent"]),
+  message: z.string().min(1).trim(),
+});
+
+export type InsertLiveNegotiationMessage = z.infer<typeof insertLiveNegotiationMessageSchema>;
+export type LiveNegotiationMessage = typeof liveNegotiationMessages.$inferSelect;

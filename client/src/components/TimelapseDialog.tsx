@@ -46,12 +46,13 @@ import {
   MessageSquare,
   UserRound,
 } from "lucide-react";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { flushSync } from "react-dom";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { IPhoneMockup } from "./IPhoneMockup";
 import { AIThinkingStep } from "./AIThinkingStep";
+import { io as socketIO, type Socket } from "socket.io-client";
 
 export interface RejectedQuoteData {
   provider: string;
@@ -66,7 +67,7 @@ interface TimelapseDialogProps {
   frequency: "weekly" | "monthly";
   userEmail: string | null;
   minSavingsThreshold?: number;
-  negotiationMode?: "human" | "ai";
+  negotiationMode?: "human" | "ai" | "live_agent";
   onQuoteAccepted?: (count?: number) => void;
   onQuoteRejected?: (quoteData: RejectedQuoteData) => void;
   quotesAccepted: number;
@@ -79,7 +80,9 @@ type TimelapseState =
   | "searching_with_phone"
   | "notification_slide"
   | "match_found"
+  | "negotiate_prompt"
   | "negotiating"
+  | "live_negotiating"
   | "no_match"
   | "timelapse_complete"
   | "confirming_purchase"
@@ -158,6 +161,21 @@ export function TimelapseDialog({
   const [allQuotesBasic, setAllQuotesBasic] = useState<{ insurer: string; price: number; features: string[] }[]>([]);
   const [policyNumber, setPolicyNumber] = useState<string>("");
   const [userName, setUserName] = useState<string>("");
+  const [vehicleMake, setVehicleMake] = useState<string>("");
+  const [vehicleModel, setVehicleModel] = useState<string>("");
+  const [vehicleYear, setVehicleYear] = useState<number>(0);
+  const [noClaimBonusYears, setNoClaimBonusYears] = useState<number>(0);
+  const [voluntaryExcess, setVoluntaryExcess] = useState<number>(0);
+  const [toleranceAmount, setToleranceAmount] = useState<number>(0);
+  const [liveNegotiationId, setLiveNegotiationId] = useState<number | null>(null);
+  const [liveNegotiationRoomId, setLiveNegotiationRoomId] = useState<string>("");
+  const [liveNegotiationOutcome, setLiveNegotiationOutcome] = useState<{
+    outcome: string;
+    finalOfferPrice: number;
+    competitorQuote: number;
+    providerName: string;
+    competitorName: string;
+  } | null>(null);
   const { toast } = useToast();
 
   const consecutiveNoMatchMonths = useMemo(() => {
@@ -467,6 +485,11 @@ export function TimelapseDialog({
       const vehicleDisplayName = `${currentPolicy.vehicle_manufacturer_name} ${currentPolicy.vehicle_model}`;
       setVehicleName(vehicleDisplayName);
       setVehicleRegNumber(currentPolicy.vehicle_registration_number || "");
+      setVehicleMake(currentPolicy.vehicle_manufacturer_name || "");
+      setVehicleModel(currentPolicy.vehicle_model || "");
+      setVehicleYear(currentPolicy.vehicle_year || 0);
+      setNoClaimBonusYears(currentPolicy.no_claim_bonus_years || 0);
+      setVoluntaryExcess(currentPolicy.voluntary_excess || 0);
       if (currentPolicy.current_policy_cost) {
         setCurrentPolicyPrice(Number(currentPolicy.current_policy_cost));
       }
@@ -842,7 +865,13 @@ export function TimelapseDialog({
             matchData={currentWeekMatches[currentMatchIndex]}
             matchNumber={currentMatchIndex + 1}
             totalMatches={currentWeekMatches.length}
-            onConfirmPurchase={() => setState("negotiating")}
+            onConfirmPurchase={() => {
+              if (negotiationMode === "live_agent") {
+                setState("negotiate_prompt");
+              } else {
+                setState("negotiating");
+              }
+            }}
             onKeepSearching={handleKeepSearching}
             onPreviousMatch={() =>
               setCurrentMatchIndex((prev) => Math.max(0, prev - 1))
@@ -863,6 +892,88 @@ export function TimelapseDialog({
             quotesRejected={quotesRejected}
             rejectedQuotes={rejectedQuotes}
             searchDate={currentDate}
+          />
+        )}
+
+        {/* Negotiate Prompt - Live Agent mode asks if customer wants to negotiate */}
+        {state === "negotiate_prompt" && currentWeekMatches.length > 0 && (
+          <NegotiatePromptState
+            currentProvider={currentProviderRef.current || currentInsuranceProvider}
+            competitorName={currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_insurer}
+            competitorQuote={currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_price}
+            onYes={async (tolerance: number) => {
+              if (!userEmail) {
+                toast({ title: "Error", description: "No email found. Please set up your profile first.", variant: "destructive" });
+                return;
+              }
+              setToleranceAmount(tolerance);
+              const roomId = `live-nego-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+              setLiveNegotiationRoomId(roomId);
+              try {
+                const res = await apiRequest("POST", "/api/live-negotiations", {
+                  provider_name: currentProviderRef.current || currentInsuranceProvider,
+                  customer_name: userName || "Customer",
+                  customer_email: userEmail,
+                  policy_number: policyNumber,
+                  current_premium: currentPolicyPrice,
+                  competitor_name: currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_insurer,
+                  competitor_quote: currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_price,
+                  tolerance_amount: tolerance,
+                  vehicle_make: vehicleMake,
+                  vehicle_model: vehicleModel,
+                  vehicle_year: vehicleYear,
+                  no_claim_bonus_years: noClaimBonusYears,
+                  voluntary_excess: voluntaryExcess,
+                  policy_start_date: policyStartDate?.toISOString().split("T")[0] || "",
+                  policy_end_date: policyEndDate?.toISOString().split("T")[0] || "",
+                  socket_room_id: roomId,
+                });
+                const negotiation = await res.json();
+                setLiveNegotiationId(negotiation.id);
+                setState("live_negotiating");
+              } catch (error) {
+                console.error("[LiveNego] Failed to create negotiation:", error);
+                toast({ title: "Error", description: "Failed to start live negotiation", variant: "destructive" });
+              }
+            }}
+            onNo={() => handleConfirmPurchase()}
+          />
+        )}
+
+        {/* Live Agent Negotiation Chat */}
+        {state === "live_negotiating" && liveNegotiationId && (
+          <LiveNegotiationChat
+            negotiationId={liveNegotiationId}
+            roomId={liveNegotiationRoomId}
+            currentProvider={currentProviderRef.current || currentInsuranceProvider}
+            competitorName={currentWeekMatches[currentMatchIndex]?.financial_breakdown?.new_quote_insurer || ""}
+            competitorQuote={currentWeekMatches[currentMatchIndex]?.financial_breakdown?.new_quote_price || 0}
+            onOutcome={(outcome) => {
+              setLiveNegotiationOutcome(outcome);
+            }}
+            onStay={async (renewalCost: number) => {
+              if (!userEmail || !vehicleRegNumber) return;
+              const provider = currentProviderRef.current || currentInsuranceProvider;
+              await apiRequest("POST", "/api/purchase-policy", {
+                email_id: userEmail,
+                vehicle_registration_number: vehicleRegNumber,
+                insurer_name: provider,
+                policy_cost: renewalCost,
+              });
+              setCurrentPolicyPrice(renewalCost);
+              const stayMonthLabel = new Date(currentDate).toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
+              setPriceHistory((prev) =>
+                prev.map((p) =>
+                  p.month === stayMonthLabel
+                    ? { ...p, status: "purchased" as const, lowestPrice: renewalCost, insurer: provider }
+                    : p,
+                ),
+              );
+              queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
+              setStayProvider(provider);
+              setState("celebration");
+            }}
+            onSwitch={() => handleConfirmPurchase()}
           />
         )}
 
@@ -2473,6 +2584,368 @@ function CelebrationState({
           Close
         </Button>
       </div>
+    </div>
+  );
+}
+
+function NegotiatePromptState({
+  currentProvider,
+  competitorName,
+  competitorQuote,
+  onYes,
+  onNo,
+}: {
+  currentProvider: string;
+  competitorName: string;
+  competitorQuote: number;
+  onYes: (tolerance: number) => void;
+  onNo: () => void;
+}) {
+  const defaultTolerance = Math.round(competitorQuote * 0.02 * 100) / 100;
+  const [tolerance, setTolerance] = useState<string>(defaultTolerance.toFixed(2));
+  const [showTolerance, setShowTolerance] = useState(false);
+  const [toleranceError, setToleranceError] = useState("");
+
+  const handleYes = () => {
+    if (!showTolerance) {
+      setShowTolerance(true);
+      return;
+    }
+    const val = parseFloat(tolerance);
+    if (isNaN(val) || val < 0) {
+      setToleranceError("Please enter a valid amount");
+      return;
+    }
+    onYes(val);
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full space-y-6 p-8 bg-gradient-to-br from-background via-background to-blue-500/5">
+      <div className="text-center space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <Scale className="h-16 w-16 text-blue-500 mx-auto" />
+        <h2 className="text-2xl md:text-3xl font-bold text-foreground" data-testid="text-negotiate-heading">
+          Negotiate before switching?
+        </h2>
+        <p className="text-base text-muted-foreground max-w-md mx-auto">
+          AutoAnnie can negotiate with <span className="font-semibold text-foreground">{currentProvider}</span> on your behalf to see if they can match or beat the{" "}
+          <span className="font-semibold text-green-600 dark:text-green-400">£{competitorQuote.toFixed(2)}</span> quote from{" "}
+          <span className="font-semibold text-foreground">{competitorName}</span>.
+        </p>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+          AutoAnnie will chat live with a {currentProvider} agent as your personal insurance advisor.
+        </p>
+      </div>
+
+      {showTolerance && (
+        <div className="w-full max-w-sm space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-300" data-testid="tolerance-section">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">
+              Tolerance above competitor quote (£)
+            </label>
+            <p className="text-xs text-muted-foreground">
+              The maximum amount above £{competitorQuote.toFixed(2)} you'd accept to stay with {currentProvider}.
+            </p>
+            <Input
+              type="number"
+              value={tolerance}
+              onChange={(e) => {
+                setTolerance(e.target.value);
+                setToleranceError("");
+              }}
+              min="0"
+              step="0.01"
+              data-testid="input-tolerance"
+            />
+            {toleranceError && (
+              <p className="text-xs text-red-500">{toleranceError}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Max acceptable: £{(competitorQuote + (parseFloat(tolerance) || 0)).toFixed(2)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm pt-4">
+        <Button
+          size="lg"
+          onClick={handleYes}
+          className="flex-1 text-lg py-6"
+          data-testid="button-negotiate-yes"
+        >
+          {showTolerance ? "Start Negotiation" : "Yes, Negotiate"}
+        </Button>
+        <Button
+          size="lg"
+          variant="outline"
+          onClick={onNo}
+          className="flex-1 text-lg py-6"
+          data-testid="button-negotiate-no"
+        >
+          No, Switch Directly
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+interface LiveChatMessage {
+  id: number;
+  negotiation_id: number;
+  sender: string;
+  message: string;
+  created_at: string;
+}
+
+function LiveNegotiationChat({
+  negotiationId,
+  roomId,
+  currentProvider,
+  competitorName,
+  competitorQuote,
+  onOutcome,
+  onStay,
+  onSwitch,
+}: {
+  negotiationId: number;
+  roomId: string;
+  currentProvider: string;
+  competitorName: string;
+  competitorQuote: number;
+  onOutcome: (outcome: {
+    outcome: string;
+    finalOfferPrice: number;
+    competitorQuote: number;
+    providerName: string;
+    competitorName: string;
+  }) => void;
+  onStay: (renewalCost: number) => void;
+  onSwitch: () => void;
+}) {
+  const [messages, setMessages] = useState<LiveChatMessage[]>([]);
+  const [isAutoAnnieTyping, setIsAutoAnnieTyping] = useState(false);
+  const [agentJoined, setAgentJoined] = useState(false);
+  const [outcome, setOutcome] = useState<{
+    outcome: string;
+    finalOfferPrice: number;
+  } | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [customerDecisionMade, setCustomerDecisionMade] = useState(false);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isAutoAnnieTyping]);
+
+  useEffect(() => {
+    const socket = socketIO({
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
+    });
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      console.log("[LiveNego] Socket connected:", socket.id);
+      socket.emit("join_negotiation", { roomId, role: "customer" });
+    });
+
+    socket.on("message_history", (history: LiveChatMessage[]) => {
+      setMessages(history);
+    });
+
+    socket.on("agent_joined", () => {
+      setAgentJoined(true);
+    });
+
+    socket.on("new_message", (msg: LiveChatMessage) => {
+      setMessages((prev) => {
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    });
+
+    socket.on("autoannie_typing", (typing: boolean) => {
+      setIsAutoAnnieTyping(typing);
+    });
+
+    socket.on("negotiation_outcome", (data: any) => {
+      setOutcome({
+        outcome: data.outcome,
+        finalOfferPrice: data.finalOfferPrice,
+      });
+      onOutcome(data);
+    });
+
+    socket.on("negotiation_closed", () => {
+      setCustomerDecisionMade(true);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [roomId, negotiationId]);
+
+  const handleStay = () => {
+    if (!outcome) return;
+    socketRef.current?.emit("customer_decision", { roomId, decision: "stay" });
+    onStay(outcome.finalOfferPrice);
+  };
+
+  const handleSwitch = () => {
+    socketRef.current?.emit("customer_decision", { roomId, decision: "switch" });
+    onSwitch();
+  };
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden p-4 sm:p-6" data-testid="live-negotiation-chat">
+      <div className="flex items-center gap-3 pb-4 border-b border-border mb-4 shrink-0">
+        <div className="relative">
+          <Avatar className="h-10 w-10">
+            <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 text-sm font-semibold">
+              AA
+            </AvatarFallback>
+          </Avatar>
+          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-base font-semibold text-foreground" data-testid="text-live-chat-title">
+            Live Negotiation with {currentProvider}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            {agentJoined ? (
+              <span className="text-green-600 dark:text-green-400">Agent connected</span>
+            ) : (
+              <span className="animate-pulse">Waiting for agent to join...</span>
+            )}
+          </p>
+        </div>
+        {outcome && (
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+            outcome.outcome === "matched" ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400" :
+            outcome.outcome === "partially_matched" ? "bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400" :
+            "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400"
+          }`} data-testid="text-negotiation-status">
+            {outcome.outcome === "matched" ? "Matched" :
+             outcome.outcome === "partially_matched" ? "Partially Matched" :
+             "Not Matched"}
+          </span>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto space-y-3 min-h-0" data-testid="chat-messages-container">
+        {!agentJoined && messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full space-y-3 text-center animate-pulse">
+            <MessageSquare className="w-12 h-12 text-muted-foreground/50" />
+            <p className="text-sm text-muted-foreground">
+              Waiting for a {currentProvider} agent to join the chat...
+            </p>
+            <p className="text-xs text-muted-foreground/70">
+              AutoAnnie will begin negotiating once the agent connects.
+            </p>
+          </div>
+        )}
+
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`flex gap-2.5 ${msg.sender === "autoannie" ? "justify-start" : "justify-end"}`}
+            data-testid={`chat-message-${msg.sender}-${msg.id}`}
+          >
+            {msg.sender === "autoannie" && (
+              <Avatar className="h-7 w-7 shrink-0 mt-0.5">
+                <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 text-[10px] font-semibold">
+                  AA
+                </AvatarFallback>
+              </Avatar>
+            )}
+            <div
+              className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                msg.sender === "autoannie"
+                  ? "bg-muted text-foreground"
+                  : "bg-primary text-primary-foreground"
+              }`}
+            >
+              <p className="whitespace-pre-wrap">{msg.message}</p>
+              <p className={`text-[10px] mt-1 ${
+                msg.sender === "autoannie" ? "text-muted-foreground" : "text-primary-foreground/70"
+              }`}>
+                {msg.sender === "autoannie" ? "AutoAnnie" : `${currentProvider} Agent`}
+                {" · "}
+                {new Date(msg.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+              </p>
+            </div>
+            {msg.sender === "agent" && (
+              <Avatar className="h-7 w-7 shrink-0 mt-0.5">
+                <AvatarFallback className="bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400 text-[10px] font-semibold">
+                  {currentProvider.substring(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            )}
+          </div>
+        ))}
+
+        {isAutoAnnieTyping && (
+          <div className="flex gap-2.5 justify-start" data-testid="autoannie-typing-indicator">
+            <Avatar className="h-7 w-7 shrink-0 mt-0.5">
+              <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 text-[10px] font-semibold">
+                AA
+              </AvatarFallback>
+            </Avatar>
+            <div className="bg-muted rounded-lg px-3 py-2">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {outcome && !customerDecisionMade && (
+        <div className="mt-4 pt-4 border-t border-border shrink-0 animate-in fade-in slide-in-from-bottom-2 duration-300" data-testid="stay-switch-decision">
+          <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+            <h4 className="text-sm font-semibold text-foreground">
+              {outcome.outcome === "matched"
+                ? `${currentProvider} matched the price!`
+                : outcome.outcome === "partially_matched"
+                ? `${currentProvider} partially matched — within your tolerance`
+                : `${currentProvider} could not match the competitor quote`}
+            </h4>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">
+                {currentProvider}: <span className="font-semibold text-foreground">£{outcome.finalOfferPrice.toFixed(2)}</span>
+              </span>
+              <span className="text-muted-foreground">
+                {competitorName}: <span className="font-semibold text-green-600 dark:text-green-400">£{competitorQuote.toFixed(2)}</span>
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              {(outcome.outcome === "matched" || outcome.outcome === "partially_matched") && (
+                <Button
+                  size="lg"
+                  onClick={handleStay}
+                  className="flex-1"
+                  data-testid="button-live-stay"
+                >
+                  Stay with {currentProvider} (£{outcome.finalOfferPrice.toFixed(2)})
+                </Button>
+              )}
+              <Button
+                size="lg"
+                variant={outcome.outcome === "rejected" ? "default" : "outline"}
+                onClick={handleSwitch}
+                className="flex-1"
+                data-testid="button-live-switch"
+              >
+                Switch to {competitorName} (£{competitorQuote.toFixed(2)})
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

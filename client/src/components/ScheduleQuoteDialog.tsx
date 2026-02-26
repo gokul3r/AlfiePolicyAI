@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Calendar, Sparkles, UserRound, Bot } from "lucide-react";
+import { Calendar, Sparkles, UserRound, Bot, MessageCircle } from "lucide-react";
 import type { VehiclePolicy } from "@shared/schema";
 import { TimelapseDialog, RejectedQuoteData } from "./TimelapseDialog";
 
@@ -77,9 +77,9 @@ export function ScheduleQuoteDialog({
     return "50";
   });
   const [thresholdError, setThresholdError] = useState<string>("");
-  const [negotiationMode, setNegotiationMode] = useState<"human" | "ai">(() => {
+  const [negotiationMode, setNegotiationMode] = useState<"human" | "ai" | "live_agent">(() => {
     const stored = localStorage.getItem("negotiationMode");
-    if (stored === "human" || stored === "ai") return stored;
+    if (stored === "human" || stored === "ai" || stored === "live_agent") return stored;
     return "ai";
   });
 
@@ -199,7 +199,7 @@ export function ScheduleQuoteDialog({
   };
 
   const handleNegotiationModeChange = (value: string) => {
-    if (value === "human" || value === "ai") {
+    if (value === "human" || value === "ai" || value === "live_agent") {
       setNegotiationMode(value);
       localStorage.setItem("negotiationMode", value);
     }
@@ -346,6 +346,13 @@ export function ScheduleQuoteDialog({
                 <Label htmlFor="negotiation-ai" className="flex items-center gap-1.5 text-sm font-normal cursor-pointer">
                   <Bot className="w-3.5 h-3.5 text-muted-foreground" />
                   AI Agent
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem value="live_agent" id="negotiation-live-agent" data-testid="radio-negotiation-live-agent" />
+                <Label htmlFor="negotiation-live-agent" className="flex items-center gap-1.5 text-sm font-normal cursor-pointer">
+                  <MessageCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                  Live Agent
                 </Label>
               </div>
             </RadioGroup>

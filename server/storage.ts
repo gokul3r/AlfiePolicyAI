@@ -9,7 +9,9 @@ import {
   notifications, 
   customRatings,
   quoteHistory,
-  negotiations
+  negotiations,
+  liveNegotiations,
+  liveNegotiationMessages
 } from "@shared/schema";
 import { 
   type User, 
@@ -29,9 +31,13 @@ import {
   type QuoteHistory,
   type InsertQuoteHistory,
   type Negotiation,
-  type InsertNegotiation
+  type InsertNegotiation,
+  type LiveNegotiation,
+  type InsertLiveNegotiation,
+  type LiveNegotiationMessage,
+  type InsertLiveNegotiationMessage
 } from "@shared/schema";
-import { eq, and, desc, ilike } from "drizzle-orm";
+import { eq, and, desc, ilike, or, inArray } from "drizzle-orm";
 
 export interface PurchasePolicyData {
   email_id: string;
@@ -72,6 +78,13 @@ export interface IStorage {
   getPendingNegotiationCountByProvider(providerName: string): Promise<number>;
   respondToNegotiation(id: number, decision: string, offerPrice: number): Promise<Negotiation>;
   getNegotiationById(id: number): Promise<Negotiation | undefined>;
+  createLiveNegotiation(data: InsertLiveNegotiation): Promise<LiveNegotiation>;
+  getLiveNegotiationById(id: number): Promise<LiveNegotiation | undefined>;
+  getLiveNegotiationByRoom(roomId: string): Promise<LiveNegotiation | undefined>;
+  getActiveLiveNegotiationsByProvider(providerName: string): Promise<LiveNegotiation[]>;
+  updateLiveNegotiationStatus(id: number, status: string, outcome?: string, finalOfferPrice?: number): Promise<LiveNegotiation>;
+  createLiveNegotiationMessage(data: InsertLiveNegotiationMessage): Promise<LiveNegotiationMessage>;
+  getLiveNegotiationMessages(negotiationId: number): Promise<LiveNegotiationMessage[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -498,6 +511,56 @@ export class DbStorage implements IStorage {
       .where(eq(negotiations.id, id))
       .returning();
     return result[0];
+  }
+
+  async createLiveNegotiation(data: InsertLiveNegotiation): Promise<LiveNegotiation> {
+    const result = await db.insert(liveNegotiations).values(data).returning();
+    return result[0];
+  }
+
+  async getLiveNegotiationById(id: number): Promise<LiveNegotiation | undefined> {
+    const result = await db.select().from(liveNegotiations).where(eq(liveNegotiations.id, id));
+    return result[0];
+  }
+
+  async getLiveNegotiationByRoom(roomId: string): Promise<LiveNegotiation | undefined> {
+    const result = await db.select().from(liveNegotiations).where(eq(liveNegotiations.socket_room_id, roomId));
+    return result[0];
+  }
+
+  async getActiveLiveNegotiationsByProvider(providerName: string): Promise<LiveNegotiation[]> {
+    return await db.select()
+      .from(liveNegotiations)
+      .where(
+        and(
+          ilike(liveNegotiations.provider_name, `%${providerName}%`),
+          inArray(liveNegotiations.status, ["pending", "active", "awaiting_customer"])
+        )
+      )
+      .orderBy(desc(liveNegotiations.created_at));
+  }
+
+  async updateLiveNegotiationStatus(id: number, status: string, outcome?: string, finalOfferPrice?: number): Promise<LiveNegotiation> {
+    const updates: Record<string, any> = { status };
+    if (outcome !== undefined) updates.outcome = outcome;
+    if (finalOfferPrice !== undefined) updates.final_offer_price = finalOfferPrice;
+    const result = await db.update(liveNegotiations)
+      .set(updates)
+      .where(eq(liveNegotiations.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async createLiveNegotiationMessage(data: InsertLiveNegotiationMessage): Promise<LiveNegotiationMessage> {
+    const result = await db.insert(liveNegotiationMessages).values(data).returning();
+    return result[0];
+  }
+
+  async getLiveNegotiationMessages(negotiationId: number): Promise<LiveNegotiationMessage[]> {
+    return await db.select()
+      .from(liveNegotiationMessages)
+      .where(eq(liveNegotiationMessages.negotiation_id, negotiationId))
+      .orderBy(liveNegotiationMessages.created_at);
   }
 }
 

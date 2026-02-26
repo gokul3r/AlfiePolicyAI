@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Mail, Shield, CheckCircle2, XCircle, Clock, ArrowRight, AlertTriangle, X, ChevronRight, LayoutDashboard, ArrowLeft, Users, UserMinus, TrendingDown, DollarSign } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Bell, Mail, Shield, CheckCircle2, XCircle, Clock, ArrowRight, AlertTriangle, X, ChevronRight, LayoutDashboard, ArrowLeft, Users, UserMinus, TrendingDown, DollarSign, MessageCircle, Send } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
-import type { Negotiation } from "@shared/schema";
+import type { Negotiation, LiveNegotiation } from "@shared/schema";
+import { io as socketIO, type Socket } from "socket.io-client";
 
 const PROVIDER_COLORS: Record<string, { primary: string; bg: string; headerBg: string; accent: string }> = {
   admiral: { primary: "text-blue-700 dark:text-blue-300", bg: "bg-blue-50 dark:bg-blue-950/30", headerBg: "bg-blue-700 dark:bg-blue-900", accent: "border-blue-200 dark:border-blue-800" },
@@ -627,7 +629,7 @@ function AgentDashboard({ provider, onBack }: { provider: string; onBack: () => 
   );
 }
 
-function HomeScreen({ provider, onNavigate }: { provider: string; onNavigate: (view: "retention" | "dashboard") => void }) {
+function HomeScreen({ provider, onNavigate, liveChatCount }: { provider: string; onNavigate: (view: "retention" | "dashboard" | "livechat") => void; liveChatCount: number }) {
   const colors = getProviderColors(provider);
   const displayName = formatProviderDisplayName(provider);
 
@@ -639,6 +641,16 @@ function HomeScreen({ provider, onNavigate }: { provider: string; onNavigate: (v
       icon: Shield,
       colorClass: "text-blue-600 dark:text-blue-400",
       bgClass: "bg-blue-50 dark:bg-blue-950/30",
+      badge: 0,
+    },
+    {
+      key: "livechat" as const,
+      title: "Live Chat",
+      description: "Join live negotiation chats with AutoAnnie, an AI insurance advisor representing customers in real time.",
+      icon: MessageCircle,
+      colorClass: "text-violet-600 dark:text-violet-400",
+      bgClass: "bg-violet-50 dark:bg-violet-950/30",
+      badge: liveChatCount,
     },
     {
       key: "dashboard" as const,
@@ -647,6 +659,7 @@ function HomeScreen({ provider, onNavigate }: { provider: string; onNavigate: (v
       icon: LayoutDashboard,
       colorClass: "text-emerald-600 dark:text-emerald-400",
       bgClass: "bg-emerald-50 dark:bg-emerald-950/30",
+      badge: 0,
     },
   ];
 
@@ -685,7 +698,14 @@ function HomeScreen({ provider, onNavigate }: { provider: string; onNavigate: (v
                     <Icon className={`w-6 h-6 ${section.colorClass}`} />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-lg font-semibold text-foreground">{section.title}</h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-lg font-semibold text-foreground">{section.title}</h3>
+                      {section.badge > 0 && (
+                        <Badge variant="outline" className="text-xs bg-violet-50 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 border-violet-300 dark:border-violet-700" data-testid={`badge-${section.key}-count`}>
+                          {section.badge} active
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground leading-relaxed">{section.description}</p>
                   </div>
                   <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground mt-2">
@@ -893,13 +913,396 @@ function DashboardView({ provider, onBack }: { provider: string; onBack: () => v
   );
 }
 
+interface LiveChatMsg {
+  id: number;
+  negotiation_id: number;
+  sender: string;
+  message: string;
+  created_at: string;
+}
+
+function AgentChatRoom({
+  negotiation,
+  providerColors,
+}: {
+  negotiation: LiveNegotiation;
+  providerColors: ReturnType<typeof getProviderColors>;
+}) {
+  const [messages, setMessages] = useState<LiveChatMsg[]>([]);
+  const [inputText, setInputText] = useState("");
+  const [isAutoAnnieTyping, setIsAutoAnnieTyping] = useState(false);
+  const [isClosed, setIsClosed] = useState(negotiation.status === "completed");
+  const [outcome, setOutcome] = useState<string | null>(negotiation.outcome);
+  const socketRef = useRef<Socket | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isAutoAnnieTyping]);
+
+  useEffect(() => {
+    const socket = socketIO({
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
+    });
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      socket.emit("join_negotiation", { roomId: negotiation.socket_room_id, role: "agent" });
+    });
+
+    socket.on("message_history", (history: LiveChatMsg[]) => {
+      setMessages(history);
+    });
+
+    socket.on("new_message", (msg: LiveChatMsg) => {
+      setMessages((prev) => {
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    });
+
+    socket.on("autoannie_typing", (typing: boolean) => {
+      setIsAutoAnnieTyping(typing);
+    });
+
+    socket.on("negotiation_outcome", (data: any) => {
+      setOutcome(data.outcome);
+    });
+
+    socket.on("negotiation_closed", () => {
+      setIsClosed(true);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [negotiation.socket_room_id]);
+
+  const handleSend = () => {
+    const text = inputText.trim();
+    if (!text || isClosed) return;
+    socketRef.current?.emit("agent_message", { roomId: negotiation.socket_room_id, message: text });
+    setInputText("");
+  };
+
+  return (
+    <div className="flex flex-col h-full" data-testid={`agent-chatroom-${negotiation.id}`}>
+      <div className={`px-4 py-3 border-b ${providerColors.accent} ${providerColors.bg} flex items-center justify-between gap-2 flex-wrap shrink-0`}>
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 text-xs font-semibold">
+              AA
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <h4 className="text-sm font-semibold text-foreground truncate" data-testid="text-chat-customer-name">
+              {negotiation.customer_name} — Policy {negotiation.policy_number}
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              AutoAnnie representing customer · {negotiation.vehicle_make} {negotiation.vehicle_model} ({negotiation.vehicle_year})
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {outcome && (
+            <Badge variant="outline" className={`text-xs ${
+              outcome === "matched" ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700" :
+              outcome === "partially_matched" ? "bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700" :
+              "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"
+            }`} data-testid={`badge-outcome-${negotiation.id}`}>
+              {outcome === "matched" ? "Matched" : outcome === "partially_matched" ? "Partial Match" : "Declined"}
+            </Badge>
+          )}
+          {isClosed && (
+            <Badge variant="outline" className="text-xs" data-testid={`badge-closed-${negotiation.id}`}>
+              Closed
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      <div className="px-4 py-2 border-b border-border bg-muted/30 text-xs text-muted-foreground flex items-center justify-between gap-2 flex-wrap shrink-0">
+        <span>Current: £{negotiation.current_premium.toFixed(2)}</span>
+        <span>Competitor ({negotiation.competitor_name}): £{negotiation.competitor_quote.toFixed(2)}</span>
+        {negotiation.final_offer_price && <span>Your Offer: £{negotiation.final_offer_price.toFixed(2)}</span>}
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-center space-y-2">
+            <MessageCircle className="w-10 h-10 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">Connecting to AutoAnnie...</p>
+          </div>
+        )}
+
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`flex gap-2.5 ${msg.sender === "agent" ? "justify-end" : "justify-start"}`}
+            data-testid={`agent-msg-${msg.sender}-${msg.id}`}
+          >
+            {msg.sender === "autoannie" && (
+              <Avatar className="h-7 w-7 shrink-0 mt-0.5">
+                <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 text-[10px] font-semibold">
+                  AA
+                </AvatarFallback>
+              </Avatar>
+            )}
+            <div
+              className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                msg.sender === "agent"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-foreground"
+              }`}
+            >
+              <p className="whitespace-pre-wrap">{msg.message}</p>
+              <p className={`text-[10px] mt-1 ${
+                msg.sender === "agent" ? "text-primary-foreground/70" : "text-muted-foreground"
+              }`}>
+                {msg.sender === "agent" ? "You" : "AutoAnnie"}
+                {" · "}
+                {new Date(msg.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+              </p>
+            </div>
+            {msg.sender === "agent" && (
+              <Avatar className="h-7 w-7 shrink-0 mt-0.5">
+                <AvatarFallback className={`${providerColors.bg} ${providerColors.primary} text-[10px] font-semibold`}>
+                  AG
+                </AvatarFallback>
+              </Avatar>
+            )}
+          </div>
+        ))}
+
+        {isAutoAnnieTyping && (
+          <div className="flex gap-2.5 justify-start" data-testid="agent-autoannie-typing">
+            <Avatar className="h-7 w-7 shrink-0 mt-0.5">
+              <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 text-[10px] font-semibold">
+                AA
+              </AvatarFallback>
+            </Avatar>
+            <div className="bg-muted rounded-lg px-3 py-2">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {!isClosed && (
+        <div className="px-4 py-3 border-t border-border bg-background shrink-0">
+          <div className="flex gap-2">
+            <Input
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+              placeholder="Type your response..."
+              disabled={isClosed}
+              data-testid={`input-agent-chat-${negotiation.id}`}
+            />
+            <Button
+              size="icon"
+              onClick={handleSend}
+              disabled={!inputText.trim() || isClosed}
+              data-testid={`button-send-${negotiation.id}`}
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {isClosed && (
+        <div className="px-4 py-3 border-t border-border bg-muted/30 text-center shrink-0">
+          <p className="text-sm text-muted-foreground" data-testid={`text-chat-closed-${negotiation.id}`}>
+            This negotiation has been closed.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LiveChatView({ provider, onBack }: { provider: string; onBack: () => void }) {
+  const colors = getProviderColors(provider);
+  const displayName = formatProviderDisplayName(provider);
+  const [negotiations, setNegotiations] = useState<LiveNegotiation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedNegotiation, setSelectedNegotiation] = useState<LiveNegotiation | null>(null);
+
+  const fetchNegotiations = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/live-negotiations/provider/${encodeURIComponent(provider)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setNegotiations(data);
+      }
+    } catch {
+    } finally {
+      setIsLoading(false);
+    }
+  }, [provider]);
+
+  useEffect(() => {
+    fetchNegotiations();
+    const interval = setInterval(fetchNegotiations, 5000);
+    return () => clearInterval(interval);
+  }, [fetchNegotiations]);
+
+  if (selectedNegotiation) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className={`${colors.headerBg} text-white shadow-md sticky top-0 z-50`}>
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <Button size="icon" variant="ghost" className="text-white" onClick={() => setSelectedNegotiation(null)} data-testid="button-back-to-chat-list">
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div>
+                <h1 className="text-lg font-bold leading-tight" data-testid="text-chat-title">Live Chat</h1>
+                <p className="text-xs opacity-80">{selectedNegotiation.customer_name} — {selectedNegotiation.vehicle_make} {selectedNegotiation.vehicle_model}</p>
+              </div>
+            </div>
+          </div>
+        </header>
+        <div className="flex-1 max-w-5xl mx-auto w-full overflow-hidden">
+          <AgentChatRoom negotiation={selectedNegotiation} providerColors={colors} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className={`${colors.headerBg} text-white shadow-md sticky top-0 z-50`}>
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <Button size="icon" variant="ghost" className="text-white" onClick={onBack} data-testid="button-back-from-livechat">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-lg font-bold leading-tight" data-testid="text-livechat-heading">{displayName}</h1>
+              <p className="text-xs opacity-80">Live Chat Negotiations</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-5 h-5" />
+            {negotiations.length > 0 && (
+              <span className="bg-white/20 rounded-full px-2 py-0.5 text-xs font-semibold" data-testid="text-live-chat-count">
+                {negotiations.length}
+              </span>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2].map((i) => (
+              <Card key={i} className="p-4 animate-pulse overflow-visible">
+                <div className="h-4 bg-muted rounded w-1/3 mb-2" />
+                <div className="h-3 bg-muted rounded w-2/3" />
+              </Card>
+            ))}
+          </div>
+        ) : negotiations.length === 0 ? (
+          <div className="text-center py-16">
+            <MessageCircle className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+            <h2 className="text-base font-semibold text-foreground" data-testid="text-no-live-chats">No Active Live Chats</h2>
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+              When a customer initiates a live negotiation, it will appear here for you to join and respond.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {negotiations.map((nego) => (
+              <Card
+                key={nego.id}
+                className="overflow-visible cursor-pointer hover-elevate"
+                onClick={() => setSelectedNegotiation(nego)}
+                data-testid={`card-live-nego-${nego.id}`}
+              >
+                <div className={`px-4 py-3 border-b ${colors.accent} ${colors.bg} rounded-t-md`}>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-semibold text-foreground">Live Negotiation</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={`text-xs ${
+                        nego.status === "pending" ? "bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700" :
+                        nego.status === "active" ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700" :
+                        "bg-muted text-muted-foreground"
+                      }`} data-testid={`badge-status-${nego.id}`}>
+                        {nego.status === "pending" ? (
+                          <><Clock className="w-3 h-3 mr-1" /> Waiting</>
+                        ) : nego.status === "active" ? (
+                          <><CheckCircle2 className="w-3 h-3 mr-1" /> Active</>
+                        ) : (
+                          <><CheckCircle2 className="w-3 h-3 mr-1" /> {nego.status}</>
+                        )}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-foreground" data-testid={`text-nego-customer-${nego.id}`}>
+                      {nego.customer_name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {nego.vehicle_make} {nego.vehicle_model} ({nego.vehicle_year})
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 flex-wrap text-xs text-muted-foreground">
+                    <span>Current: £{nego.current_premium.toFixed(2)}</span>
+                    <span>Competitor: £{nego.competitor_quote.toFixed(2)} ({nego.competitor_name})</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground mt-2">
+                    {nego.status === "pending" ? "Join Chat" : "Open Chat"} <ChevronRight className="w-4 h-4" />
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </main>
+      <Toaster />
+    </div>
+  );
+}
+
 export default function CustomerAgentPage() {
-  const [stage, setStage] = useState<"login" | "home" | "retention" | "dashboard">(() => {
+  const [stage, setStage] = useState<"login" | "home" | "retention" | "dashboard" | "livechat">(() => {
     const hasProvider = sessionStorage.getItem("customer_agent_provider");
     if (hasProvider) return "home";
     return "login";
   });
   const [provider, setProvider] = useState(() => sessionStorage.getItem("customer_agent_provider") || "");
+  const [liveChatCount, setLiveChatCount] = useState(0);
+
+  useEffect(() => {
+    if (!provider) return;
+    const fetchCount = async () => {
+      try {
+        const res = await fetch(`/api/live-negotiations/provider/${encodeURIComponent(provider)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setLiveChatCount(data.length);
+        }
+      } catch {}
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 5000);
+    return () => clearInterval(interval);
+  }, [provider]);
 
   if (stage === "login") {
     return (
@@ -913,11 +1316,15 @@ export default function CustomerAgentPage() {
   }
 
   if (stage === "home") {
-    return <HomeScreen provider={provider} onNavigate={(view) => setStage(view)} />;
+    return <HomeScreen provider={provider} onNavigate={(view) => setStage(view)} liveChatCount={liveChatCount} />;
   }
 
   if (stage === "dashboard") {
     return <DashboardView provider={provider} onBack={() => setStage("home")} />;
+  }
+
+  if (stage === "livechat") {
+    return <LiveChatView provider={provider} onBack={() => setStage("home")} />;
   }
 
   return <AgentDashboard provider={provider} onBack={() => setStage("home")} />;
