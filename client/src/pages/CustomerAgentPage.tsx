@@ -867,6 +867,17 @@ function DashboardView({ provider, onBack }: { provider: string; onBack: () => v
                   );
                 })}
               </div>
+              {(retained + lost) > 0 && (
+                <div className="mt-3 px-1 flex items-center gap-2" data-testid="metric-retention-rate">
+                  <span className="text-sm text-muted-foreground">Retention Rate:</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {Math.round((retained / (retained + lost)) * 100)}%
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    ({retained} retained / {retained + lost} total)
+                  </span>
+                </div>
+              )}
             </div>
 
             {retained === 0 && lost === 0 && (
