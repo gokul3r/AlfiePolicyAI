@@ -18,6 +18,7 @@ export function getIO(): SocketIOServer | null {
 export function initializeLiveNegotiationSocket(httpServer: HTTPServer) {
   io = new SocketIOServer(httpServer, {
     path: "/socket.io",
+    transports: ["websocket"],
     cors: {
       origin: "*",
       methods: ["GET", "POST"],

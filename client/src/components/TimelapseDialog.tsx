@@ -2740,7 +2740,7 @@ function LiveNegotiationChat({
   useEffect(() => {
     const socket = socketIO({
       path: "/socket.io",
-      transports: ["websocket", "polling"],
+      transports: ["websocket"],
     });
     socketRef.current = socket;
 

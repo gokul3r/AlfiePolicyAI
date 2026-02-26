@@ -1420,11 +1420,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { initializeLiveNegotiationSocket } = await import("./live-negotiation-socket");
   initializeLiveNegotiationSocket(httpServer);
 
-  // WebSocket server for voice chat
-  const wss = new WebSocketServer({ server: httpServer, path: "/api/voice-chat" });
+  // WebSocket server for voice chat — use noServer mode to avoid
+  // conflicting with Socket.IO's upgrade handler (ws library aborts
+  // non-matching upgrade requests, which kills Socket.IO connections)
+  const wss = new WebSocketServer({ noServer: true });
 
   wss.on("connection", (ws, req) => {
-    // Extract email from query params
     const url = new URL(req.url || "", `http://${req.headers.host}`);
     const emailId = url.searchParams.get("email");
 
@@ -1436,6 +1437,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     console.log(`[WebSocket] New voice chat connection: ${emailId}`);
     handleVoiceChat(ws, emailId);
+  });
+
+  httpServer.on("upgrade", (req, socket, head) => {
+    const pathname = req.url ? req.url.split("?")[0] : "";
+    if (pathname === "/api/voice-chat") {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit("connection", ws, req);
+      });
+    }
   });
 
   return httpServer;
