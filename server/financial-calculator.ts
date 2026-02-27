@@ -61,7 +61,7 @@ export function calculateFinancialBreakdown(
   currentPolicyCost: number,
   policyStartDate: string,
   policyEndDate: string,
-  cancellationFee: number = 20, // Default £20
+  cancellationFee: number = 55, // Default £55
   switchDate: Date = new Date()
 ): FinancialBreakdown {
   // Calculate total policy days (same as in refund calculation)

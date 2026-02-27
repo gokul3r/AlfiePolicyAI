@@ -335,7 +335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             policy.current_policy_cost,
             policy.policy_start_date,
             policy.policy_end_date,
-            20, // £20 cancellation fee
+            55, // £55 cancellation fee
             currentDate
           );
 
@@ -513,7 +513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           policy.current_policy_cost,
           policy.policy_start_date,
           policy.policy_end_date,
-          20, // £20 cancellation fee
+          55, // £55 cancellation fee
           new Date(search_date)
         );
 
