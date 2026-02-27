@@ -1141,7 +1141,9 @@ function VoiceAgentChatRoom({
   const [transcript, setTranscript] = useState<{ sender: string; text: string }[]>([]);
   const [isClosed, setIsClosed] = useState(negotiation.status === "completed");
   const wsRef = useRef<WebSocket | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const micContextRef = useRef<AudioContext | null>(null);
+  const playbackContextRef = useRef<AudioContext | null>(null);
+  const nextPlayTimeRef = useRef(0);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1234,10 +1236,10 @@ function VoiceAgentChatRoom({
       });
       mediaStreamRef.current = stream;
 
-      const audioContext = new AudioContext({ sampleRate: 16000 });
-      audioContextRef.current = audioContext;
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      const micCtx = new AudioContext({ sampleRate: 16000 });
+      micContextRef.current = micCtx;
+      const source = micCtx.createMediaStreamSource(stream);
+      const processor = micCtx.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 
       processor.onaudioprocess = (e) => {
@@ -1253,7 +1255,13 @@ function VoiceAgentChatRoom({
       };
 
       source.connect(processor);
-      processor.connect(audioContext.destination);
+      processor.connect(micCtx.destination);
+
+      if (!playbackContextRef.current || playbackContextRef.current.state === "closed") {
+        playbackContextRef.current = new AudioContext({ sampleRate: 24000 });
+      }
+      nextPlayTimeRef.current = 0;
+
       setIsMicActive(true);
     } catch (error) {
       console.error("[VoiceNego] Mic error:", error);
@@ -1263,16 +1271,19 @@ function VoiceAgentChatRoom({
   const stopMicrophone = () => {
     processorRef.current?.disconnect();
     mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
-    audioContextRef.current?.close();
+    if (micContextRef.current && micContextRef.current.state !== "closed") {
+      micContextRef.current.close();
+    }
     setIsMicActive(false);
   };
 
   const playAudio = (base64Audio: string) => {
     try {
-      if (!audioContextRef.current || audioContextRef.current.state === "closed") {
-        audioContextRef.current = new AudioContext({ sampleRate: 24000 });
+      if (!playbackContextRef.current || playbackContextRef.current.state === "closed") {
+        playbackContextRef.current = new AudioContext({ sampleRate: 24000 });
+        nextPlayTimeRef.current = 0;
       }
-      const ctx = audioContextRef.current;
+      const ctx = playbackContextRef.current;
       const binaryString = atob(base64Audio);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
@@ -1288,7 +1299,9 @@ function VoiceAgentChatRoom({
       const source = ctx.createBufferSource();
       source.buffer = buffer;
       source.connect(ctx.destination);
-      source.start();
+      const startTime = Math.max(ctx.currentTime, nextPlayTimeRef.current);
+      source.start(startTime);
+      nextPlayTimeRef.current = startTime + buffer.duration;
     } catch {
     }
   };
@@ -1296,6 +1309,10 @@ function VoiceAgentChatRoom({
   const handleDisconnect = () => {
     wsRef.current?.close();
     stopMicrophone();
+    if (playbackContextRef.current && playbackContextRef.current.state !== "closed") {
+      playbackContextRef.current.close();
+    }
+    nextPlayTimeRef.current = 0;
     setIsConnected(false);
   };
 
@@ -1303,6 +1320,9 @@ function VoiceAgentChatRoom({
     return () => {
       wsRef.current?.close();
       stopMicrophone();
+      if (playbackContextRef.current && playbackContextRef.current.state !== "closed") {
+        playbackContextRef.current.close();
+      }
     };
   }, []);
 
