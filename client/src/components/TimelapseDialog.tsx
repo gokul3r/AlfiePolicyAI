@@ -2661,12 +2661,12 @@ function NegotiatePromptState({
           Negotiate before switching?
         </h2>
         <p className="text-base text-muted-foreground max-w-md mx-auto">
-          AutoAnnie can negotiate with <span className="font-semibold text-foreground">{currentProvider}</span> on your behalf to see if they can match or beat the{" "}
+          AutoAnnie can contact <span className="font-semibold text-foreground">{currentProvider}</span> to try and match your{" "}
           <span className="font-semibold text-green-600 dark:text-green-400">£{competitorQuote.toFixed(2)}</span> quote from{" "}
           <span className="font-semibold text-foreground">{competitorName}</span>.
         </p>
-        <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-          AutoAnnie will {negotiationMode === "voice" ? "call" : "chat live with"} a {currentProvider} agent as your personal insurance advisor.
+        <p className="text-xs text-muted-foreground/80 max-w-xs mx-auto italic">
+          By continuing, you authorise AutoAnnie to negotiate on your behalf.
         </p>
       </div>
 
@@ -2730,7 +2730,7 @@ function NegotiatePromptState({
           className="flex-1 text-lg py-6"
           data-testid="button-negotiate-yes"
         >
-          {showTolerance ? "Start Negotiation" : "Yes, Negotiate"}
+          {showTolerance ? "Start Negotiation" : "Yes, Authorise & Negotiate"}
         </Button>
         <Button
           size="lg"
