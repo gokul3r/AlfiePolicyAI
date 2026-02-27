@@ -2658,15 +2658,18 @@ function NegotiatePromptState({
       <div className="text-center space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <Scale className="h-16 w-16 text-blue-500 mx-auto" />
         <h2 className="text-2xl md:text-3xl font-bold text-foreground" data-testid="text-negotiate-heading">
-          Negotiate before switching?
+          Negotiate with {currentProvider} before switching?
         </h2>
         <p className="text-base text-muted-foreground max-w-md mx-auto">
-          AutoAnnie can contact <span className="font-semibold text-foreground">{currentProvider}</span> to try and match your{" "}
-          <span className="font-semibold text-green-600 dark:text-green-400">£{competitorQuote.toFixed(2)}</span> quote from{" "}
-          <span className="font-semibold text-foreground">{competitorName}</span>.
+          AutoAnnie can contact <span className="font-semibold text-foreground">{currentProvider}</span> to match your{" "}
+          <span className="font-semibold text-green-600 dark:text-green-400">£{competitorQuote.toFixed(2)}</span>{" "}
+          <span className="font-semibold text-foreground">{competitorName}</span> quote.
         </p>
-        <p className="text-xs text-muted-foreground/80 max-w-xs mx-auto italic">
-          By continuing, you authorise AutoAnnie to negotiate on your behalf.
+        <p className="text-base font-bold text-foreground max-w-md mx-auto">
+          By continuing, you authorise AutoAnnie to negotiate with {currentProvider} on your behalf using your policy details.
+        </p>
+        <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+          AutoAnnie will never accept a quote, purchase a policy, or make any changes without your explicit confirmation.
         </p>
       </div>
 
@@ -2730,7 +2733,7 @@ function NegotiatePromptState({
           className="flex-1 text-lg py-6"
           data-testid="button-negotiate-yes"
         >
-          {showTolerance ? "Start Negotiation" : "Yes, Authorise & Negotiate"}
+          {showTolerance ? "Start Negotiation" : "Authorise & Negotiate"}
         </Button>
         <Button
           size="lg"
@@ -2739,7 +2742,7 @@ function NegotiatePromptState({
           className="flex-1 text-lg py-6"
           data-testid="button-negotiate-no"
         >
-          No, Switch Directly
+          Switch Directly
         </Button>
       </div>
     </div>
