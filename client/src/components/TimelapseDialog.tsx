@@ -2668,9 +2668,6 @@ function NegotiatePromptState({
         <p className="text-base font-bold text-foreground max-w-md mx-auto">
           By continuing, you authorise AutoAnnie to negotiate with {currentProvider} on your behalf using your policy details.
         </p>
-        <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-          AutoAnnie will never accept a quote, purchase a policy, or make any changes without your explicit confirmation.
-        </p>
       </div>
 
       <div className="flex gap-2 p-1 bg-muted rounded-lg" data-testid="mode-toggle">
@@ -2726,24 +2723,29 @@ function NegotiatePromptState({
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-sm pt-4">
-        <Button
-          size="lg"
-          onClick={handleYes}
-          className="flex-1 text-lg py-6"
-          data-testid="button-negotiate-yes"
-        >
-          {showTolerance ? "Start Negotiation" : "Authorise & Negotiate"}
-        </Button>
-        <Button
-          size="lg"
-          variant="outline"
-          onClick={onNo}
-          className="flex-1 text-lg py-6"
-          data-testid="button-negotiate-no"
-        >
-          Switch Directly
-        </Button>
+      <div className="flex flex-col items-center gap-3 w-full pt-2">
+        <div className="flex flex-row gap-3 justify-center w-full max-w-xs mx-auto">
+          <Button
+            size="default"
+            onClick={handleYes}
+            className="flex-1"
+            data-testid="button-negotiate-yes"
+          >
+            {showTolerance ? "Start Negotiation" : "Authorise & Negotiate"}
+          </Button>
+          <Button
+            size="default"
+            variant="outline"
+            onClick={onNo}
+            className="flex-1"
+            data-testid="button-negotiate-no"
+          >
+            Switch Directly
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground text-center max-w-xs mx-auto">
+          AutoAnnie will never accept a quote, purchase a policy, or make any changes without your explicit confirmation.
+        </p>
       </div>
     </div>
   );
