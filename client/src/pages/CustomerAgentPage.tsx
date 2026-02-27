@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bell, Mail, Shield, CheckCircle2, XCircle, Clock, ArrowRight, AlertTriangle, X, ChevronRight, LayoutDashboard, ArrowLeft, Users, UserMinus, TrendingDown, DollarSign, MessageCircle, Send } from "lucide-react";
+import { Bell, Mail, Shield, CheckCircle2, XCircle, Clock, ArrowRight, AlertTriangle, X, ChevronRight, LayoutDashboard, ArrowLeft, Users, UserMinus, TrendingDown, DollarSign, MessageCircle, Send, Mic, MicOff, Phone, PhoneOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import type { Negotiation, LiveNegotiation } from "@shared/schema";
@@ -1129,6 +1129,280 @@ function AgentChatRoom({
   );
 }
 
+function VoiceAgentChatRoom({
+  negotiation,
+  providerColors,
+}: {
+  negotiation: LiveNegotiation;
+  providerColors: ReturnType<typeof getProviderColors>;
+}) {
+  const [isConnected, setIsConnected] = useState(false);
+  const [isMicActive, setIsMicActive] = useState(false);
+  const [transcript, setTranscript] = useState<{ sender: string; text: string }[]>([]);
+  const [isClosed, setIsClosed] = useState(negotiation.status === "completed");
+  const wsRef = useRef<WebSocket | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const currentAgentTextRef = useRef("");
+  const currentAATextRef = useRef("");
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [transcript]);
+
+  useEffect(() => {
+    const socket = socketIO({ path: "/socket.io", transports: ["websocket"] });
+    socketRef.current = socket;
+    socket.on("connect", () => {
+      socket.emit("join_negotiation", { roomId: negotiation.socket_room_id, role: "agent" });
+    });
+    socket.on("negotiation_closed", () => setIsClosed(true));
+    return () => { socket.disconnect(); };
+  }, [negotiation.socket_room_id]);
+
+  const connectVoice = async () => {
+    try {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const ws = new WebSocket(
+        `${protocol}//${window.location.host}/api/voice-negotiation?negotiationId=${negotiation.id}&roomId=${encodeURIComponent(negotiation.socket_room_id)}`
+      );
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        console.log("[VoiceNego] WebSocket connected");
+      };
+
+      ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+
+        if (msg.type === "session_ready") {
+          setIsConnected(true);
+          startMicrophone();
+        }
+
+        if (msg.type === "audio") {
+          playAudio(msg.audio);
+        }
+
+        if (msg.type === "user_transcript_delta") {
+          currentAgentTextRef.current += msg.delta;
+        }
+
+        if (msg.type === "assistant_transcript_delta") {
+          currentAATextRef.current += msg.delta;
+        }
+
+        if (msg.type === "turn_complete") {
+          if (msg.userTranscript) {
+            setTranscript((prev) => [...prev, { sender: "agent", text: msg.userTranscript }]);
+          }
+          if (msg.assistantTranscript) {
+            const clean = msg.assistantTranscript
+              .replace(/\[OUTCOME:(ACCEPTED|REJECTED|CONSIDERING):£[\d.]+\]/g, "")
+              .trim();
+            if (clean) {
+              setTranscript((prev) => [...prev, { sender: "autoannie", text: clean }]);
+            }
+          }
+          currentAgentTextRef.current = "";
+          currentAATextRef.current = "";
+        }
+
+        if (msg.type === "session_closed" || msg.type === "error") {
+          setIsConnected(false);
+          setIsMicActive(false);
+        }
+      };
+
+      ws.onclose = () => {
+        setIsConnected(false);
+        setIsMicActive(false);
+        stopMicrophone();
+      };
+    } catch (error) {
+      console.error("[VoiceNego] Connection error:", error);
+    }
+  };
+
+  const startMicrophone = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
+      });
+      mediaStreamRef.current = stream;
+
+      const audioContext = new AudioContext({ sampleRate: 16000 });
+      audioContextRef.current = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      processorRef.current = processor;
+
+      processor.onaudioprocess = (e) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        const inputData = e.inputBuffer.getChannelData(0);
+        const pcm16 = new Int16Array(inputData.length);
+        for (let i = 0; i < inputData.length; i++) {
+          const s = Math.max(-1, Math.min(1, inputData[i]));
+          pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(pcm16.buffer)));
+        wsRef.current.send(JSON.stringify({ type: "audio", audio: base64 }));
+      };
+
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+      setIsMicActive(true);
+    } catch (error) {
+      console.error("[VoiceNego] Mic error:", error);
+    }
+  };
+
+  const stopMicrophone = () => {
+    processorRef.current?.disconnect();
+    mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+    audioContextRef.current?.close();
+    setIsMicActive(false);
+  };
+
+  const playAudio = (base64Audio: string) => {
+    try {
+      if (!audioContextRef.current || audioContextRef.current.state === "closed") {
+        audioContextRef.current = new AudioContext({ sampleRate: 24000 });
+      }
+      const ctx = audioContextRef.current;
+      const binaryString = atob(base64Audio);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const pcm16 = new Int16Array(bytes.buffer);
+      const float32 = new Float32Array(pcm16.length);
+      for (let i = 0; i < pcm16.length; i++) {
+        float32[i] = pcm16[i] / 32768;
+      }
+      const buffer = ctx.createBuffer(1, float32.length, 24000);
+      buffer.getChannelData(0).set(float32);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start();
+    } catch {
+    }
+  };
+
+  const handleDisconnect = () => {
+    wsRef.current?.close();
+    stopMicrophone();
+    setIsConnected(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      wsRef.current?.close();
+      stopMicrophone();
+    };
+  }, []);
+
+  return (
+    <div className="flex flex-col h-full" data-testid={`voice-chatroom-${negotiation.id}`}>
+      <div className={`px-4 py-3 border-b ${providerColors.accent} ${providerColors.bg} flex items-center justify-between gap-2 flex-wrap shrink-0`}>
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 text-xs font-semibold">
+              AA
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <h4 className="text-sm font-semibold text-foreground truncate">
+              {negotiation.customer_name} — Policy {negotiation.policy_number}
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              Voice Negotiation · {negotiation.vehicle_make} {negotiation.vehicle_model} ({negotiation.vehicle_year})
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className={`text-xs ${isConnected ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700" : "bg-muted text-muted-foreground"}`}>
+            {isConnected ? "Connected" : "Disconnected"}
+          </Badge>
+          {isMicActive && (
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {!isConnected && !isClosed && transcript.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full space-y-4">
+            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+              <Phone className="w-10 h-10 text-primary" />
+            </div>
+            <p className="text-sm text-muted-foreground text-center max-w-xs">
+              Click the button below to connect and start the voice negotiation with AutoAnnie
+            </p>
+            <Button onClick={connectVoice} className="gap-2" data-testid="button-connect-voice">
+              <Phone className="w-4 h-4" />
+              Join Voice Call
+            </Button>
+          </div>
+        )}
+
+        {transcript.map((entry, i) => (
+          <div
+            key={i}
+            className={`flex gap-2 ${entry.sender === "agent" ? "flex-row-reverse" : "flex-row"}`}
+          >
+            <Avatar className="h-7 w-7 shrink-0 mt-1">
+              <AvatarFallback className={`text-[10px] font-semibold ${
+                entry.sender === "agent"
+                  ? "bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400"
+                  : "bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400"
+              }`}>
+                {entry.sender === "agent" ? "AG" : "AA"}
+              </AvatarFallback>
+            </Avatar>
+            <div className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
+              entry.sender === "agent"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted"
+            }`}>
+              <p>{entry.text}</p>
+            </div>
+          </div>
+        ))}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {isConnected && !isClosed && (
+        <div className="px-4 py-3 border-t border-border flex items-center justify-center gap-4 shrink-0">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {isMicActive ? (
+              <><Mic className="w-4 h-4 text-red-500 animate-pulse" /> Mic active — speak to AutoAnnie</>
+            ) : (
+              <><MicOff className="w-4 h-4" /> Mic off</>
+            )}
+          </div>
+          <Button size="icon" variant="destructive" onClick={handleDisconnect} data-testid="button-end-voice-call">
+            <PhoneOff className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
+
+      {isClosed && (
+        <div className="px-4 py-3 border-t border-border bg-muted/30 text-center shrink-0">
+          <p className="text-sm text-muted-foreground">
+            This voice negotiation has been closed.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LiveChatView({ provider, onBack }: { provider: string; onBack: () => void }) {
   const colors = getProviderColors(provider);
   const displayName = formatProviderDisplayName(provider);
@@ -1165,14 +1439,20 @@ function LiveChatView({ provider, onBack }: { provider: string; onBack: () => vo
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-lg font-bold leading-tight" data-testid="text-chat-title">Live Chat</h1>
+                <h1 className="text-lg font-bold leading-tight" data-testid="text-chat-title">
+                  {selectedNegotiation.mode === "voice" ? "Voice Call" : "Live Chat"}
+                </h1>
                 <p className="text-xs opacity-80">{selectedNegotiation.customer_name} — {selectedNegotiation.vehicle_make} {selectedNegotiation.vehicle_model}</p>
               </div>
             </div>
           </div>
         </header>
         <div className="flex-1 max-w-5xl mx-auto w-full overflow-hidden">
-          <AgentChatRoom negotiation={selectedNegotiation} providerColors={colors} />
+          {selectedNegotiation.mode === "voice" ? (
+            <VoiceAgentChatRoom negotiation={selectedNegotiation} providerColors={colors} />
+          ) : (
+            <AgentChatRoom negotiation={selectedNegotiation} providerColors={colors} />
+          )}
         </div>
       </div>
     );
@@ -1232,8 +1512,14 @@ function LiveChatView({ provider, onBack }: { provider: string; onBack: () => vo
                 <div className={`px-4 py-3 border-b ${colors.accent} ${colors.bg} rounded-t-md`}>
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2">
-                      <MessageCircle className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-semibold text-foreground">Live Negotiation</span>
+                      {nego.mode === "voice" ? (
+                        <Mic className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <MessageCircle className="w-4 h-4 text-muted-foreground" />
+                      )}
+                      <span className="text-sm font-semibold text-foreground">
+                        {nego.mode === "voice" ? "Voice Negotiation" : "Live Negotiation"}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className={`text-xs ${
@@ -1266,7 +1552,10 @@ function LiveChatView({ provider, onBack }: { provider: string; onBack: () => vo
                     <span>Competitor: £{nego.competitor_quote.toFixed(2)} ({nego.competitor_name})</span>
                   </div>
                   <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground mt-2">
-                    {nego.status === "pending" ? "Join Chat" : "Open Chat"} <ChevronRight className="w-4 h-4" />
+                    {nego.mode === "voice"
+                      ? (nego.status === "pending" ? "Join Voice Call" : "Open Voice Call")
+                      : (nego.status === "pending" ? "Join Chat" : "Open Chat")
+                    } <ChevronRight className="w-4 h-4" />
                   </div>
                 </div>
               </Card>

@@ -45,6 +45,7 @@ import {
   Bot,
   MessageSquare,
   UserRound,
+  Mic,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { flushSync } from "react-dom";
@@ -169,6 +170,7 @@ export function TimelapseDialog({
   const [toleranceAmount, setToleranceAmount] = useState<number>(0);
   const [liveNegotiationId, setLiveNegotiationId] = useState<number | null>(null);
   const [liveNegotiationRoomId, setLiveNegotiationRoomId] = useState<string>("");
+  const [liveNegotiationMode, setLiveNegotiationMode] = useState<"text" | "voice">("text");
   const [liveNegotiationOutcome, setLiveNegotiationOutcome] = useState<{
     outcome: string;
     finalOfferPrice: number;
@@ -901,12 +903,13 @@ export function TimelapseDialog({
             currentProvider={currentProviderRef.current || currentInsuranceProvider}
             competitorName={currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_insurer}
             competitorQuote={currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_price}
-            onYes={async (tolerance: number) => {
+            onYes={async (tolerance: number, mode: "text" | "voice") => {
               if (!userEmail) {
                 toast({ title: "Error", description: "No email found. Please set up your profile first.", variant: "destructive" });
                 return;
               }
               setToleranceAmount(tolerance);
+              setLiveNegotiationMode(mode);
               const roomId = `live-nego-${Date.now()}-${Math.random().toString(36).substring(7)}`;
               setLiveNegotiationRoomId(roomId);
               try {
@@ -927,6 +930,7 @@ export function TimelapseDialog({
                   policy_start_date: policyStartDate?.toISOString().split("T")[0] || "",
                   policy_end_date: policyEndDate?.toISOString().split("T")[0] || "",
                   socket_room_id: roomId,
+                  mode: mode,
                 });
                 const negotiation = await res.json();
                 setLiveNegotiationId(negotiation.id);
@@ -941,8 +945,45 @@ export function TimelapseDialog({
         )}
 
         {/* Live Agent Negotiation Chat */}
-        {state === "live_negotiating" && liveNegotiationId && (
+        {state === "live_negotiating" && liveNegotiationId && liveNegotiationMode === "text" && (
           <LiveNegotiationChat
+            negotiationId={liveNegotiationId}
+            roomId={liveNegotiationRoomId}
+            currentProvider={currentProviderRef.current || currentInsuranceProvider}
+            competitorName={currentWeekMatches[currentMatchIndex]?.financial_breakdown?.new_quote_insurer || ""}
+            competitorQuote={currentWeekMatches[currentMatchIndex]?.financial_breakdown?.new_quote_price || 0}
+            matchData={currentWeekMatches[currentMatchIndex]}
+            onOutcome={(outcome) => {
+              setLiveNegotiationOutcome(outcome);
+            }}
+            onStay={async (renewalCost: number) => {
+              if (!userEmail || !vehicleRegNumber) return;
+              const provider = currentProviderRef.current || currentInsuranceProvider;
+              await apiRequest("POST", "/api/purchase-policy", {
+                email_id: userEmail,
+                vehicle_registration_number: vehicleRegNumber,
+                insurer_name: provider,
+                policy_cost: renewalCost,
+              });
+              setCurrentPolicyPrice(renewalCost);
+              const stayMonthLabel = new Date(currentDate).toLocaleDateString("en-GB", { month: "short", year: "2-digit" });
+              setPriceHistory((prev) =>
+                prev.map((p) =>
+                  p.month === stayMonthLabel
+                    ? { ...p, status: "purchased" as const, lowestPrice: renewalCost, insurer: provider }
+                    : p,
+                ),
+              );
+              queryClient.invalidateQueries({ queryKey: ["/api/vehicle-policies", userEmail] });
+              setStayProvider(provider);
+              setState("celebration");
+            }}
+            onSwitch={() => handleConfirmPurchase()}
+          />
+        )}
+
+        {state === "live_negotiating" && liveNegotiationId && liveNegotiationMode === "voice" && (
+          <LiveNegotiationVoice
             negotiationId={liveNegotiationId}
             roomId={liveNegotiationRoomId}
             currentProvider={currentProviderRef.current || currentInsuranceProvider}
@@ -2599,13 +2640,14 @@ function NegotiatePromptState({
   currentProvider: string;
   competitorName: string;
   competitorQuote: number;
-  onYes: (tolerance: number) => void;
+  onYes: (tolerance: number, mode: "text" | "voice") => void;
   onNo: () => void;
 }) {
   const defaultTolerance = Math.round(competitorQuote * 0.02 * 100) / 100;
   const [tolerance, setTolerance] = useState<string>(defaultTolerance.toFixed(2));
   const [showTolerance, setShowTolerance] = useState(false);
   const [toleranceError, setToleranceError] = useState("");
+  const [negotiationMode, setNegotiationMode] = useState<"text" | "voice">("text");
 
   const handleYes = () => {
     if (!showTolerance) {
@@ -2617,7 +2659,7 @@ function NegotiatePromptState({
       setToleranceError("Please enter a valid amount");
       return;
     }
-    onYes(val);
+    onYes(val, negotiationMode);
   };
 
   return (
@@ -2633,8 +2675,31 @@ function NegotiatePromptState({
           <span className="font-semibold text-foreground">{competitorName}</span>.
         </p>
         <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-          AutoAnnie will chat live with a {currentProvider} agent as your personal insurance advisor.
+          AutoAnnie will {negotiationMode === "voice" ? "call" : "chat live with"} a {currentProvider} agent as your personal insurance advisor.
         </p>
+      </div>
+
+      <div className="flex gap-2 p-1 bg-muted rounded-lg" data-testid="mode-toggle">
+        <Button
+          variant={negotiationMode === "text" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setNegotiationMode("text")}
+          className="gap-2"
+          data-testid="button-mode-text"
+        >
+          <MessageSquare className="w-4 h-4" />
+          Text
+        </Button>
+        <Button
+          variant={negotiationMode === "voice" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setNegotiationMode("voice")}
+          className="gap-2"
+          data-testid="button-mode-voice"
+        >
+          <Mic className="w-4 h-4" />
+          Voice
+        </Button>
       </div>
 
       {showTolerance && (
@@ -2985,6 +3050,323 @@ function LiveNegotiationChat({
                   className="w-full"
                   onClick={handleSwitch}
                   data-testid="button-live-switch"
+                >
+                  Switch to {competitorName}
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+function LiveNegotiationVoice({
+  negotiationId,
+  roomId,
+  currentProvider,
+  competitorName,
+  competitorQuote,
+  matchData,
+  onOutcome,
+  onStay,
+  onSwitch,
+}: {
+  negotiationId: number;
+  roomId: string;
+  currentProvider: string;
+  competitorName: string;
+  competitorQuote: number;
+  matchData: MatchData;
+  onOutcome: (outcome: {
+    outcome: string;
+    finalOfferPrice: number;
+    competitorQuote: number;
+    providerName: string;
+    competitorName: string;
+  }) => void;
+  onStay: (renewalCost: number) => void;
+  onSwitch: () => void;
+}) {
+  const [transcript, setTranscript] = useState<{ sender: string; text: string; id: string }[]>([]);
+  const [agentJoined, setAgentJoined] = useState(false);
+  const [outcome, setOutcome] = useState<{
+    outcome: string;
+    finalOfferPrice: number;
+  } | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [customerDecisionMade, setCustomerDecisionMade] = useState(false);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [transcript]);
+
+  useEffect(() => {
+    const socket = socketIO({
+      path: "/socket.io",
+      transports: ["websocket"],
+    });
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      socket.emit("join_negotiation", { roomId, role: "customer" });
+    });
+
+    socket.on("agent_joined", () => {
+      setAgentJoined(true);
+    });
+
+    socket.on("message_history", (history: { id: number; sender: string; message: string }[]) => {
+      if (history.length > 0) {
+        setAgentJoined(true);
+        const mapped = history.map((m) => ({
+          sender: m.sender,
+          text: m.message,
+          id: `history-${m.id}`,
+        }));
+        setTranscript(mapped);
+      }
+    });
+
+    socket.on("voice_transcript", (data: { sender: string; text: string; isFinal: boolean }) => {
+      if (data.isFinal && data.text.trim()) {
+        const clean = data.text
+          .replace(/\[OUTCOME:(ACCEPTED|REJECTED|CONSIDERING):£[\d.]+\]/g, "")
+          .trim();
+        if (clean) {
+          const id = `${data.sender}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+          setTranscript((prev) => [...prev, { sender: data.sender, text: clean, id }]);
+        }
+      }
+    });
+
+    socket.on("negotiation_outcome", (data: any) => {
+      setOutcome({
+        outcome: data.outcome,
+        finalOfferPrice: data.finalOfferPrice,
+      });
+      onOutcome(data);
+    });
+
+    socket.on("negotiation_closed", () => {
+      setCustomerDecisionMade(true);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [roomId, negotiationId]);
+
+  const handleStay = () => {
+    if (!outcome) return;
+    socketRef.current?.emit("customer_decision", { roomId, decision: "stay" });
+    onStay(outcome.finalOfferPrice);
+  };
+
+  const handleSwitch = () => {
+    socketRef.current?.emit("customer_decision", { roomId, decision: "switch" });
+    onSwitch();
+  };
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden p-4 sm:p-6" data-testid="live-negotiation-voice">
+      <div className="flex items-center gap-3 pb-4 border-b border-border mb-4 shrink-0">
+        <div className="relative">
+          <Avatar className="h-10 w-10">
+            <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 text-sm font-semibold">
+              AA
+            </AvatarFallback>
+          </Avatar>
+          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-base font-semibold text-foreground" data-testid="text-voice-nego-title">
+            Voice Negotiation with {currentProvider}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            {agentJoined ? (
+              <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                <Mic className="w-3 h-3" /> Agent on voice call
+              </span>
+            ) : (
+              <span className="animate-pulse">Waiting for agent to join voice call...</span>
+            )}
+          </p>
+        </div>
+        {agentJoined && !outcome && (
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-end gap-0.5 h-4">
+              <span className="w-1 bg-primary rounded-full animate-pulse" style={{ height: "40%", animationDelay: "0ms" }} />
+              <span className="w-1 bg-primary rounded-full animate-pulse" style={{ height: "80%", animationDelay: "150ms" }} />
+              <span className="w-1 bg-primary rounded-full animate-pulse" style={{ height: "60%", animationDelay: "300ms" }} />
+              <span className="w-1 bg-primary rounded-full animate-pulse" style={{ height: "100%", animationDelay: "450ms" }} />
+              <span className="w-1 bg-primary rounded-full animate-pulse" style={{ height: "50%", animationDelay: "600ms" }} />
+            </div>
+          </div>
+        )}
+        {outcome && (
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+            outcome.outcome === "matched" ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400" :
+            outcome.outcome === "partially_matched" ? "bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400" :
+            "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400"
+          }`} data-testid="text-voice-negotiation-status">
+            {outcome.outcome === "matched" ? "Matched" :
+             outcome.outcome === "partially_matched" ? "Partially Matched" :
+             "Not Matched"}
+          </span>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto space-y-3 min-h-0" data-testid="voice-transcript-container">
+        {!agentJoined && transcript.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full space-y-3 text-center">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
+              <Mic className="w-8 h-8 text-primary/60" />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Waiting for the {currentProvider} agent to join the voice call...
+            </p>
+            <p className="text-xs text-muted-foreground/70">
+              AutoAnnie will negotiate on your behalf by voice. You'll see the live transcript here.
+            </p>
+          </div>
+        )}
+
+        {agentJoined && transcript.length === 0 && !outcome && (
+          <div className="flex flex-col items-center justify-center h-full space-y-3 text-center animate-in fade-in duration-500">
+            <div className="flex items-end gap-1 h-8">
+              <span className="w-1.5 bg-primary/40 rounded-full animate-pulse" style={{ height: "30%", animationDelay: "0ms" }} />
+              <span className="w-1.5 bg-primary/40 rounded-full animate-pulse" style={{ height: "70%", animationDelay: "100ms" }} />
+              <span className="w-1.5 bg-primary/40 rounded-full animate-pulse" style={{ height: "50%", animationDelay: "200ms" }} />
+              <span className="w-1.5 bg-primary/40 rounded-full animate-pulse" style={{ height: "90%", animationDelay: "300ms" }} />
+              <span className="w-1.5 bg-primary/40 rounded-full animate-pulse" style={{ height: "40%", animationDelay: "400ms" }} />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Voice call in progress — transcript will appear shortly...
+            </p>
+          </div>
+        )}
+
+        {transcript.map((entry) => (
+          <div
+            key={entry.id}
+            className={`flex gap-2.5 ${entry.sender === "autoannie" ? "justify-start" : "justify-end"}`}
+            data-testid={`voice-transcript-${entry.sender}-${entry.id}`}
+          >
+            {entry.sender === "autoannie" && (
+              <Avatar className="h-7 w-7 shrink-0 mt-0.5">
+                <AvatarFallback className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 text-[10px] font-semibold">
+                  AA
+                </AvatarFallback>
+              </Avatar>
+            )}
+            <div
+              className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                entry.sender === "autoannie"
+                  ? "bg-muted text-foreground"
+                  : "bg-primary text-primary-foreground"
+              }`}
+            >
+              <p className="whitespace-pre-wrap">{entry.text}</p>
+              <p className={`text-[10px] mt-1 ${
+                entry.sender === "autoannie" ? "text-muted-foreground" : "text-primary-foreground/70"
+              }`}>
+                {entry.sender === "autoannie" ? "AutoAnnie" : `${currentProvider} Agent`}
+              </p>
+            </div>
+            {entry.sender === "agent" && (
+              <Avatar className="h-7 w-7 shrink-0 mt-0.5">
+                <AvatarFallback className="bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400 text-[10px] font-semibold">
+                  {currentProvider.substring(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            )}
+          </div>
+        ))}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {outcome && !customerDecisionMade && (() => {
+        const fb = matchData.financial_breakdown;
+        const stayCost = outcome.finalOfferPrice;
+        const switchCost = fb.switch_cost_12m;
+        const stayIsCheaper = stayCost <= switchCost;
+        const switchIsCheaper = switchCost < stayCost;
+        const savings = Math.abs(stayCost - switchCost);
+        const isMatchedOrPartial = outcome.outcome === "matched" || outcome.outcome === "partially_matched";
+
+        return (
+          <div className="mt-4 pt-4 border-t border-border shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-500" data-testid="voice-stay-switch-decision">
+            <div className="rounded-md border border-border bg-card p-3 space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                {outcome.outcome === "matched"
+                  ? `${currentProvider} matched the price!`
+                  : outcome.outcome === "partially_matched"
+                  ? `${currentProvider} partially matched — within your tolerance`
+                  : `${currentProvider} could not match the competitor quote`}
+              </p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cost over next 12 months</p>
+
+              <div className={`flex items-start justify-between gap-2 p-2 rounded-md ${stayIsCheaper ? "bg-green-50 dark:bg-green-900/20" : ""}`}>
+                <div className="space-y-0.5">
+                  <p className="text-sm font-semibold" data-testid="text-voice-stay-label">If you stay with {currentProvider}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {outcome.outcome === "matched" ? "Matched renewal rate" : "Best renewal offer"}
+                  </p>
+                </div>
+                <p className={`text-sm font-bold whitespace-nowrap ${stayIsCheaper ? "text-green-700 dark:text-green-400" : ""}`} data-testid="text-voice-stay-price">
+                  £{stayCost.toFixed(2)}
+                </p>
+              </div>
+
+              <div className={`flex items-start justify-between gap-2 p-2 rounded-md ${switchIsCheaper ? "bg-green-50 dark:bg-green-900/20" : ""}`}>
+                <div className="space-y-0.5">
+                  <p className="text-sm font-semibold" data-testid="text-voice-switch-label">If you switch to {competitorName}</p>
+                  {fb.cancellation_fee > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Includes £{fb.cancellation_fee.toFixed(2)} cancellation fee
+                    </p>
+                  )}
+                  {fb.upfront_impact !== 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {fb.upfront_impact < 0
+                        ? `£${Math.abs(fb.upfront_impact).toFixed(2)} to pay today`
+                        : `£${fb.upfront_impact.toFixed(2)} refund today`}
+                    </p>
+                  )}
+                </div>
+                <p className={`text-sm font-bold whitespace-nowrap ${switchIsCheaper ? "text-green-700 dark:text-green-400" : ""}`} data-testid="text-voice-switch-price">
+                  £{switchCost.toFixed(2)}
+                </p>
+              </div>
+
+              {savings > 0.01 && (
+                <p className="text-xs text-center text-green-700 dark:text-green-400 font-medium" data-testid="text-voice-savings-summary">
+                  {stayIsCheaper ? "Staying" : "Switching"} saves £{savings.toFixed(2)} over 12 months
+                </p>
+              )}
+
+              <div className="flex flex-col gap-2 pt-1">
+                {isMatchedOrPartial && (
+                  <Button
+                    size="lg"
+                    variant={stayIsCheaper ? "default" : "outline"}
+                    className="w-full"
+                    onClick={handleStay}
+                    data-testid="button-voice-stay"
+                  >
+                    Stay with {currentProvider}
+                  </Button>
+                )}
+                <Button
+                  size="lg"
+                  variant={!isMatchedOrPartial || switchIsCheaper ? "default" : "outline"}
+                  className="w-full"
+                  onClick={handleSwitch}
+                  data-testid="button-voice-switch"
                 >
                   Switch to {competitorName}
                 </Button>

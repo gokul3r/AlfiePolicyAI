@@ -12,7 +12,7 @@ function getAIClient(): GoogleGenAI | null {
   return ai;
 }
 
-function buildSystemPrompt(negotiation: LiveNegotiation): string {
+export function buildSystemPrompt(negotiation: LiveNegotiation): string {
   const toleranceMax = negotiation.competitor_quote + negotiation.tolerance_amount;
 
   return `You are AutoAnnie, a professional UK motor insurance retention negotiator acting on behalf of the customer.

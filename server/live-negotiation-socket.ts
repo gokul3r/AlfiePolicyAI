@@ -8,6 +8,7 @@ import {
   type ConversationMessage,
 } from "./live-negotiation-agent";
 import type { LiveNegotiation } from "@shared/schema";
+import { voiceDecisionEmitter } from "./live-negotiation-voice";
 
 let io: SocketIOServer | null = null;
 
@@ -83,6 +84,11 @@ export function initializeLiveNegotiationSocket(httpServer: HTTPServer) {
       const { roomId, decision } = data;
       const negotiation = await storage.getLiveNegotiationByRoom(roomId);
       if (!negotiation) return;
+
+      if (negotiation.mode === "voice") {
+        voiceDecisionEmitter.emit("customer_decision", { roomId, decision });
+        return;
+      }
 
       if (decision === "stay") {
         const stayMessage = `Thank you. ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name}. Please confirm the renewal at £${negotiation.final_offer_price?.toFixed(2) || negotiation.current_premium.toFixed(2)}. We appreciate your time.`;

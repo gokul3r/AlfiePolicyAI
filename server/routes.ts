@@ -1417,12 +1417,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
   // Initialize Socket.IO for live negotiations
-  const { initializeLiveNegotiationSocket } = await import("./live-negotiation-socket");
+  const { initializeLiveNegotiationSocket, getIO } = await import("./live-negotiation-socket");
   initializeLiveNegotiationSocket(httpServer);
 
-  // WebSocket server for voice chat — use noServer mode to avoid
-  // conflicting with Socket.IO's upgrade handler (ws library aborts
-  // non-matching upgrade requests, which kills Socket.IO connections)
+  const { handleVoiceNegotiation, setSocketIOInstance } = await import("./live-negotiation-voice");
+  const io = getIO();
+  if (io) setSocketIOInstance(io);
+
   const wss = new WebSocketServer({ noServer: true });
 
   wss.on("connection", (ws, req) => {
@@ -1439,11 +1440,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     handleVoiceChat(ws, emailId);
   });
 
+  const voiceNegoWss = new WebSocketServer({ noServer: true });
+
+  voiceNegoWss.on("connection", (ws, req) => {
+    const url = new URL(req.url || "", `http://${req.headers.host}`);
+    const negotiationId = parseInt(url.searchParams.get("negotiationId") || "0");
+    const roomId = url.searchParams.get("roomId") || "";
+
+    if (!negotiationId || !roomId) {
+      console.error("[WebSocket] Voice negotiation missing params");
+      ws.close(1008, "negotiationId and roomId required");
+      return;
+    }
+
+    console.log(`[WebSocket] New voice negotiation: id=${negotiationId}, room=${roomId}`);
+    handleVoiceNegotiation(ws, negotiationId, roomId);
+  });
+
   httpServer.on("upgrade", (req, socket, head) => {
     const pathname = req.url ? req.url.split("?")[0] : "";
     if (pathname === "/api/voice-chat") {
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit("connection", ws, req);
+      });
+    } else if (pathname === "/api/voice-negotiation") {
+      voiceNegoWss.handleUpgrade(req, socket, head, (ws) => {
+        voiceNegoWss.emit("connection", ws, req);
       });
     }
   });
