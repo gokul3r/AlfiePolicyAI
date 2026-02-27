@@ -1836,8 +1836,8 @@ function MatchFoundState({
   const formatFeatureName = (name: string) =>
     name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   const [showAllFeatures, setShowAllFeatures] = useState(false);
-  const [showDeltaBreakdown, setShowDeltaBreakdown] = useState(false);
-  const [showSwitchCostBreakdown, setShowSwitchCostBreakdown] = useState(false);
+  const [showDeltaBreakdown, setShowDeltaBreakdown] = useState(true);
+  const [showSwitchCostBreakdown, setShowSwitchCostBreakdown] = useState(true);
   const requestedFeatures = matchData.requested_features ?? [];
   const missingFeatures = matchData.missing_features ?? [];
 
@@ -1879,15 +1879,14 @@ function MatchFoundState({
             className="text-lg text-green-600 dark:text-green-400"
             data-testid="text-savings-headline"
           >
-            Switching to{" "}
-            <span className="text-xl font-bold">
+            By cancelling your current policy and starting a new 12-month policy with{" "}
+            <span className="font-bold">
               {matchData.financial_breakdown.new_quote_insurer}
-            </span>{" "}
-            will save you{" "}
-            <span className="text-xl font-bold">
+            </span>
+            , you would save{" "}
+            <span className="font-bold">
               £{matchData.financial_breakdown.annual_savings.toFixed(2)}
-            </span>{" "}
-            over the next 12 months
+            </span>
           </p>
           <p
             className="text-xs text-muted-foreground"
@@ -1998,11 +1997,6 @@ function MatchFoundState({
             >
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">Cost to switch</span>
-                {!showSwitchCostBreakdown && (
-                  <span className="text-xs text-muted-foreground">
-                    (details)
-                  </span>
-                )}
               </div>
               <div className="flex items-center gap-2">
                 <span
@@ -2077,9 +2071,6 @@ function MatchFoundState({
             >
               <div className="flex items-center gap-2">
                 <span className="font-semibold">Annual Savings</span>
-                <span className="text-xs text-muted-foreground">
-                  {showDeltaBreakdown ? "" : "(tap for details)"}
-                </span>
               </div>
               <div className="flex items-center gap-2">
                 <span
