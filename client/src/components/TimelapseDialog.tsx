@@ -948,6 +948,7 @@ export function TimelapseDialog({
             currentProvider={currentProviderRef.current || currentInsuranceProvider}
             competitorName={currentWeekMatches[currentMatchIndex]?.financial_breakdown?.new_quote_insurer || ""}
             competitorQuote={currentWeekMatches[currentMatchIndex]?.financial_breakdown?.new_quote_price || 0}
+            matchData={currentWeekMatches[currentMatchIndex]}
             onOutcome={(outcome) => {
               setLiveNegotiationOutcome(outcome);
             }}
@@ -2703,6 +2704,7 @@ function LiveNegotiationChat({
   currentProvider,
   competitorName,
   competitorQuote,
+  matchData,
   onOutcome,
   onStay,
   onSwitch,
@@ -2712,6 +2714,7 @@ function LiveNegotiationChat({
   currentProvider: string;
   competitorName: string;
   competitorQuote: number;
+  matchData: MatchData;
   onOutcome: (outcome: {
     outcome: string;
     finalOfferPrice: number;
@@ -2904,48 +2907,92 @@ function LiveNegotiationChat({
         <div ref={messagesEndRef} />
       </div>
 
-      {outcome && !customerDecisionMade && (
-        <div className="mt-4 pt-4 border-t border-border shrink-0 animate-in fade-in slide-in-from-bottom-2 duration-300" data-testid="stay-switch-decision">
-          <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
-            <h4 className="text-sm font-semibold text-foreground">
-              {outcome.outcome === "matched"
-                ? `${currentProvider} matched the price!`
-                : outcome.outcome === "partially_matched"
-                ? `${currentProvider} partially matched — within your tolerance`
-                : `${currentProvider} could not match the competitor quote`}
-            </h4>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">
-                {currentProvider}: <span className="font-semibold text-foreground">£{outcome.finalOfferPrice.toFixed(2)}</span>
-              </span>
-              <span className="text-muted-foreground">
-                {competitorName}: <span className="font-semibold text-green-600 dark:text-green-400">£{competitorQuote.toFixed(2)}</span>
-              </span>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              {(outcome.outcome === "matched" || outcome.outcome === "partially_matched") && (
+      {outcome && !customerDecisionMade && (() => {
+        const fb = matchData.financial_breakdown;
+        const stayCost = outcome.finalOfferPrice;
+        const switchCost = fb.switch_cost_12m;
+        const stayIsCheaper = stayCost <= switchCost;
+        const switchIsCheaper = switchCost < stayCost;
+        const savings = Math.abs(stayCost - switchCost);
+        const isMatchedOrPartial = outcome.outcome === "matched" || outcome.outcome === "partially_matched";
+
+        return (
+          <div className="mt-4 pt-4 border-t border-border shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-500" data-testid="stay-switch-decision">
+            <div className="rounded-md border border-border bg-card p-3 space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                {outcome.outcome === "matched"
+                  ? `${currentProvider} matched the price!`
+                  : outcome.outcome === "partially_matched"
+                  ? `${currentProvider} partially matched — within your tolerance`
+                  : `${currentProvider} could not match the competitor quote`}
+              </p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cost over next 12 months</p>
+
+              <div className={`flex items-start justify-between gap-2 p-2 rounded-md ${stayIsCheaper ? "bg-green-50 dark:bg-green-900/20" : ""}`}>
+                <div className="space-y-0.5">
+                  <p className="text-sm font-semibold" data-testid="text-stay-label">If you stay with {currentProvider}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {outcome.outcome === "matched" ? "Matched renewal rate" : "Best renewal offer"}
+                  </p>
+                </div>
+                <p className={`text-sm font-bold whitespace-nowrap ${stayIsCheaper ? "text-green-700 dark:text-green-400" : ""}`} data-testid="text-stay-price">
+                  £{stayCost.toFixed(2)}
+                </p>
+              </div>
+
+              <div className={`flex items-start justify-between gap-2 p-2 rounded-md ${switchIsCheaper ? "bg-green-50 dark:bg-green-900/20" : ""}`}>
+                <div className="space-y-0.5">
+                  <p className="text-sm font-semibold" data-testid="text-switch-label">If you switch to {competitorName}</p>
+                  {fb.cancellation_fee > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Includes £{fb.cancellation_fee.toFixed(2)} cancellation fee
+                    </p>
+                  )}
+                  {fb.upfront_impact !== 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {fb.upfront_impact < 0
+                        ? `£${Math.abs(fb.upfront_impact).toFixed(2)} to pay today`
+                        : `£${fb.upfront_impact.toFixed(2)} refund today`}
+                    </p>
+                  )}
+                </div>
+                <p className={`text-sm font-bold whitespace-nowrap ${switchIsCheaper ? "text-green-700 dark:text-green-400" : ""}`} data-testid="text-switch-price">
+                  £{switchCost.toFixed(2)}
+                </p>
+              </div>
+
+              {savings > 0.01 && (
+                <p className="text-xs text-center text-green-700 dark:text-green-400 font-medium" data-testid="text-savings-summary">
+                  {stayIsCheaper ? "Staying" : "Switching"} saves £{savings.toFixed(2)} over 12 months
+                </p>
+              )}
+
+              <div className="flex flex-col gap-2 pt-1">
+                {isMatchedOrPartial && (
+                  <Button
+                    size="lg"
+                    variant={stayIsCheaper ? "default" : "outline"}
+                    className="w-full"
+                    onClick={handleStay}
+                    data-testid="button-live-stay"
+                  >
+                    Stay with {currentProvider}
+                  </Button>
+                )}
                 <Button
                   size="lg"
-                  onClick={handleStay}
-                  className="flex-1"
-                  data-testid="button-live-stay"
+                  variant={!isMatchedOrPartial || switchIsCheaper ? "default" : "outline"}
+                  className="w-full"
+                  onClick={handleSwitch}
+                  data-testid="button-live-switch"
                 >
-                  Stay with {currentProvider} (£{outcome.finalOfferPrice.toFixed(2)})
+                  Switch to {competitorName}
                 </Button>
-              )}
-              <Button
-                size="lg"
-                variant={outcome.outcome === "rejected" ? "default" : "outline"}
-                onClick={handleSwitch}
-                className="flex-1"
-                data-testid="button-live-switch"
-              >
-                Switch to {competitorName} (£{competitorQuote.toFixed(2)})
-              </Button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
