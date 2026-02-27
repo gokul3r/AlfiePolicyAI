@@ -3033,20 +3033,18 @@ function LiveNegotiationChat({
               )}
 
               <div className="flex flex-col gap-2 pt-1">
-                {isMatchedOrPartial && (
-                  <Button
-                    size="lg"
-                    variant={stayIsCheaper ? "default" : "outline"}
-                    className="w-full"
-                    onClick={handleStay}
-                    data-testid="button-live-stay"
-                  >
-                    Stay with {currentProvider}
-                  </Button>
-                )}
                 <Button
                   size="lg"
-                  variant={!isMatchedOrPartial || switchIsCheaper ? "default" : "outline"}
+                  variant={stayIsCheaper ? "default" : "outline"}
+                  className="w-full"
+                  onClick={handleStay}
+                  data-testid="button-live-stay"
+                >
+                  Stay with {currentProvider}
+                </Button>
+                <Button
+                  size="lg"
+                  variant={switchIsCheaper ? "default" : "outline"}
                   className="w-full"
                   onClick={handleSwitch}
                   data-testid="button-live-switch"
@@ -3350,20 +3348,18 @@ function LiveNegotiationVoice({
               )}
 
               <div className="flex flex-col gap-2 pt-1">
-                {isMatchedOrPartial && (
-                  <Button
-                    size="lg"
-                    variant={stayIsCheaper ? "default" : "outline"}
-                    className="w-full"
-                    onClick={handleStay}
-                    data-testid="button-voice-stay"
-                  >
-                    Stay with {currentProvider}
-                  </Button>
-                )}
                 <Button
                   size="lg"
-                  variant={!isMatchedOrPartial || switchIsCheaper ? "default" : "outline"}
+                  variant={stayIsCheaper ? "default" : "outline"}
+                  className="w-full"
+                  onClick={handleStay}
+                  data-testid="button-voice-stay"
+                >
+                  Stay with {currentProvider}
+                </Button>
+                <Button
+                  size="lg"
+                  variant={switchIsCheaper ? "default" : "outline"}
                   className="w-full"
                   onClick={handleSwitch}
                   data-testid="button-voice-switch"
