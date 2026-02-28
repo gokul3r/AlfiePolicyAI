@@ -40,3 +40,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_database:1.0.0"]
+
+[userenv]
+
+[userenv.shared]
+GPT_API_KEY = "autoannie-gpt-1c534bc6-f4df-4881-aae2-d4a600fbf894"

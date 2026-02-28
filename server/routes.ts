@@ -160,6 +160,281 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ─── ChatGPT Custom GPT Integration ────────────────────────────────────────
+
+  // API key middleware for GPT routes
+  function requireGptApiKey(req: any, res: any, next: any) {
+    const key = req.headers["x-api-key"];
+    const expected = process.env.GPT_API_KEY;
+    if (!expected) {
+      return res.status(500).json({ error: "GPT_API_KEY is not configured on the server." });
+    }
+    if (!key || key !== expected) {
+      return res.status(401).json({ error: "Unauthorized. A valid X-API-Key header is required." });
+    }
+    next();
+  }
+
+  // Self-contained quote search for ChatGPT Custom GPT — no user session needed
+  app.post("/api/gpt/search-quotes", requireGptApiKey, async (req, res) => {
+    try {
+      const {
+        registration,
+        manufacturer,
+        model,
+        year,
+        fuel_type,
+        driver_age,
+        no_claims_bonus,
+        voluntary_excess,
+        current_insurer,
+        policy_end_date,
+        current_premium,
+        preferences,
+      } = req.body;
+
+      if (!registration || driver_age === undefined || no_claims_bonus === undefined) {
+        return res.status(400).json({
+          error: "Missing required fields: registration, driver_age, and no_claims_bonus are required.",
+        });
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+
+      // Normalise fuel type to the exact values the API accepts
+      const normaliseFuel = (f: string | undefined): string => {
+        if (!f) return "Petrol";
+        const map: Record<string, string> = {
+          petrol: "Petrol", diesel: "Diesel",
+          electric: "Electric", hybrid: "Hybrid",
+        };
+        return map[f.toLowerCase()] || "Petrol";
+      };
+
+      const quoteRequestBody = {
+        insurance_details: {
+          email_id: "gpt-user@autoannie.ai",
+          current_date: today,
+          current_insurance_provider: current_insurer || "Unknown",
+          policy_id: "GPT-SESSION",
+          policy_type: "Comprehensive",
+          driver_age: driver_age,
+          vehicle_registration_number: registration,
+          vehicle_manufacturer_name: manufacturer || "Unknown",
+          vehicle_model: model || "Unknown",
+          vehicle_year: year || new Date().getFullYear() - 5,
+          type_of_fuel: normaliseFuel(fuel_type),
+          type_of_Cover_needed: "comprehensive",
+          No_Claim_bonus_years: no_claims_bonus,
+          Voluntary_Excess: voluntary_excess ?? 250,
+        },
+        user_preferences: preferences || "Please find the best value comprehensive insurance.",
+        conversation_history: [],
+        trust_pilot_data: null,
+        defacto_ratings: null,
+      };
+
+      console.log("[GPT] Quote search request:", JSON.stringify(quoteRequestBody, null, 2));
+
+      const response = await fetch(
+        "https://alfie-657860957693.europe-west4.run.app/complete-analysis",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(quoteRequestBody),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "Unknown error");
+        console.error(`[GPT] Quote API error (${response.status}):`, errorText);
+        throw new Error(`Quote API returned ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      // Build a clean, GPT-friendly summary from the raw response
+      const rawQuotes: any[] = data.quotes_with_insights || data.quotes || [];
+      const topQuotes = rawQuotes.slice(0, 5).map((q: any) => ({
+        insurer: q.insurer || q.provider || q.company || "Unknown",
+        annual_premium_gbp: q.annual_premium ?? q.price ?? q.quote_price ?? null,
+        monthly_premium_gbp: q.monthly_premium ?? null,
+        key_features: q.features ?? q.key_features ?? [],
+        ai_insight: q.insight ?? q.ai_insight ?? q.recommendation ?? null,
+        match_score: q.match_score ?? null,
+      }));
+
+      const summary = {
+        quotes_found: rawQuotes.length,
+        top_quotes: topQuotes,
+        search_criteria: {
+          registration,
+          driver_age,
+          no_claims_bonus,
+          voluntary_excess: voluntary_excess ?? null,
+          current_premium: current_premium ?? null,
+          preferences: preferences ?? null,
+        },
+        raw_analysis: data.analysis ?? data.summary ?? null,
+      };
+
+      res.json(summary);
+    } catch (error: any) {
+      console.error("[GPT] Error searching quotes:", error);
+      res.status(500).json({ error: "Failed to search quotes", message: error.message });
+    }
+  });
+
+  // OpenAPI schema — paste this into ChatGPT Custom GPT → Actions
+  app.get("/api/gpt/openapi.json", (req, res) => {
+    const host = req.headers.host || "your-app.replit.app";
+    const protocol = req.headers["x-forwarded-proto"] || "https";
+    const serverUrl = `${protocol}://${host}`;
+
+    const schema = {
+      openapi: "3.1.0",
+      info: {
+        title: "Autoannie Quote Search",
+        description:
+          "Search UK motor insurance quotes for a customer. Collect the customer's vehicle registration, driver age, and years of no-claims bonus, then call this action to retrieve real quotes.",
+        version: "1.0.0",
+      },
+      servers: [{ url: serverUrl }],
+      paths: {
+        "/api/gpt/search-quotes": {
+          post: {
+            operationId: "searchQuotes",
+            summary: "Search for motor insurance quotes",
+            description:
+              "Returns up to 5 ranked insurance quotes based on the customer's vehicle and driver details. Always collect registration, driver_age, and no_claims_bonus before calling this action.",
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    required: ["registration", "driver_age", "no_claims_bonus"],
+                    properties: {
+                      registration: {
+                        type: "string",
+                        description: "UK vehicle registration number, e.g. AB12 CDE",
+                      },
+                      manufacturer: {
+                        type: "string",
+                        description: "Vehicle make, e.g. Ford, BMW, Toyota",
+                      },
+                      model: {
+                        type: "string",
+                        description: "Vehicle model, e.g. Focus, 3 Series, Yaris",
+                      },
+                      year: {
+                        type: "integer",
+                        description: "Year the vehicle was manufactured, e.g. 2019",
+                      },
+                      fuel_type: {
+                        type: "string",
+                        description: "Fuel type: Petrol, Diesel, Electric, or Hybrid",
+                      },
+                      driver_age: {
+                        type: "integer",
+                        description: "Age of the main driver in years",
+                      },
+                      no_claims_bonus: {
+                        type: "integer",
+                        description:
+                          "Number of years of no-claims bonus (NCB) the driver has, e.g. 5",
+                      },
+                      voluntary_excess: {
+                        type: "integer",
+                        description:
+                          "Voluntary excess amount in GBP the customer is willing to pay, e.g. 250",
+                      },
+                      current_insurer: {
+                        type: "string",
+                        description: "Name of the customer's current insurance provider",
+                      },
+                      policy_end_date: {
+                        type: "string",
+                        description:
+                          "Customer's current policy end/renewal date in ISO format, e.g. 2025-06-01",
+                      },
+                      current_premium: {
+                        type: "number",
+                        description:
+                          "Customer's current annual insurance premium in GBP, e.g. 650.00",
+                      },
+                      preferences: {
+                        type: "string",
+                        description:
+                          "Any specific cover preferences the customer has mentioned, e.g. 'I want breakdown cover and a courtesy car'",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            responses: {
+              "200": {
+                description: "Insurance quotes retrieved successfully",
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      properties: {
+                        quotes_found: {
+                          type: "integer",
+                          description: "Total number of quotes found",
+                        },
+                        top_quotes: {
+                          type: "array",
+                          description: "Top 5 ranked quotes",
+                          items: {
+                            type: "object",
+                            properties: {
+                              insurer: { type: "string" },
+                              annual_premium_gbp: { type: "number" },
+                              monthly_premium_gbp: { type: "number" },
+                              key_features: {
+                                type: "array",
+                                items: { type: "string" },
+                              },
+                              ai_insight: { type: "string" },
+                              match_score: { type: "number" },
+                            },
+                          },
+                        },
+                        search_criteria: { type: "object" },
+                        raw_analysis: { type: "string" },
+                      },
+                    },
+                  },
+                },
+              },
+              "400": { description: "Missing required fields" },
+              "401": { description: "Invalid or missing API key" },
+              "500": { description: "Internal server error" },
+            },
+            security: [{ ApiKeyAuth: [] }],
+          },
+        },
+      },
+      components: {
+        securitySchemes: {
+          ApiKeyAuth: {
+            type: "apiKey",
+            in: "header",
+            name: "X-API-Key",
+          },
+        },
+      },
+    };
+
+    res.setHeader("Content-Type", "application/json");
+    res.json(schema);
+  });
+
+  // ─── End ChatGPT Custom GPT Integration ─────────────────────────────────────
+
   // Timelapse search endpoint - simulates scheduled quote search over time
   app.post("/api/timelapse-search", async (req, res) => {
     try {

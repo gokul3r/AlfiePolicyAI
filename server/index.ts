@@ -9,6 +9,28 @@ declare module 'http' {
     rawBody: unknown
   }
 }
+
+// CORS for ChatGPT Custom GPT Actions
+app.use((req, res, next) => {
+  const allowedOrigins = [
+    "https://chat.openai.com",
+    "https://chatgpt.com",
+  ];
+  const origin = req.headers.origin as string | undefined;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, X-API-Key, Authorization"
+  );
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;

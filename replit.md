@@ -28,6 +28,13 @@ The backend uses Express.js with TypeScript for a RESTful API (`/api`). It inclu
 -   User authentication and management.
 -   CRUD operations for vehicle policies, including cancellation and purchase.
 -   Proxies for PDF extraction and quote searches.
+
+### ChatGPT Custom GPT Integration (Iteration 10)
+A dedicated, session-less API surface for use as a ChatGPT Custom GPT Action:
+-   **`POST /api/gpt/search-quotes`** — API-key protected endpoint. Accepts flat vehicle/driver details (registration, driver_age, no_claims_bonus, etc.), transforms them into the nested `insurance_details` structure required by the Cloud Run quote API, and returns a clean top-5 quote summary.
+-   **`GET /api/gpt/openapi.json`** — Serves the OpenAPI 3.1 schema document. Paste this into ChatGPT Custom GPT → Actions to configure the integration.
+-   **Authentication**: `X-API-Key` header. Key is stored in `GPT_API_KEY` environment variable. CORS is enabled for `https://chatgpt.com` and `https://chat.openai.com`.
+-   **Setup Steps**: (1) Deploy the app, (2) Create Custom GPT on chatgpt.com, (3) Paste the OpenAPI schema URL into Actions, (4) Enter the `GPT_API_KEY` value as the API key in ChatGPT's Action auth settings.
 -   AI chat and voice chat interactions.
 -   Gmail OAuth integration.
 -   Custom ratings management.
