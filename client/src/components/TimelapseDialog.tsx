@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   HoverCard,
@@ -903,6 +904,7 @@ export function TimelapseDialog({
             currentProvider={currentProviderRef.current || currentInsuranceProvider}
             competitorName={currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_insurer}
             competitorQuote={currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_price}
+            currentPolicyPrice={currentPolicyPrice}
             onYes={async (tolerance: number, mode: "text" | "voice") => {
               if (!userEmail) {
                 toast({ title: "Error", description: "No email found. Please set up your profile first.", variant: "destructive" });
@@ -2625,27 +2627,31 @@ function NegotiatePromptState({
   currentProvider,
   competitorName,
   competitorQuote,
+  currentPolicyPrice,
   onYes,
   onNo,
 }: {
   currentProvider: string;
   competitorName: string;
   competitorQuote: number;
+  currentPolicyPrice: number;
   onYes: (tolerance: number, mode: "text" | "voice") => void;
   onNo: () => void;
 }) {
+  const sliderMin = competitorQuote;
+  const sliderMax = currentPolicyPrice > competitorQuote ? currentPolicyPrice : competitorQuote + 100;
   const defaultTolerance = Math.round(competitorQuote * 0.02 * 100) / 100;
-  const [tolerance, setTolerance] = useState<string>(defaultTolerance.toFixed(2));
-  const [toleranceError, setToleranceError] = useState("");
+  const defaultSliderValue = Math.min(sliderMin + defaultTolerance, sliderMax);
+  const [sliderValue, setSliderValue] = useState<number>(defaultSliderValue);
   const [negotiationMode, setNegotiationMode] = useState<"text" | "voice">("text");
 
+  const tolerance = Math.round((sliderValue - sliderMin) * 100) / 100;
+  const tolerancePct = sliderMax > sliderMin
+    ? Math.round(((sliderValue - sliderMin) / (sliderMax - sliderMin)) * 100)
+    : 0;
+
   const handleYes = () => {
-    const val = parseFloat(tolerance);
-    if (isNaN(val) || val < 0) {
-      setToleranceError("Please enter a valid amount");
-      return;
-    }
-    onYes(val, negotiationMode);
+    onYes(tolerance, negotiationMode);
   };
 
   return (
@@ -2688,32 +2694,48 @@ function NegotiatePromptState({
         </Button>
       </div>
 
-      <div className="w-full max-w-sm space-y-3" data-testid="tolerance-section">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">
-              Tolerance above competitor quote (£)
-            </label>
-            <p className="text-xs text-muted-foreground">
-              The maximum amount above £{competitorQuote.toFixed(2)} you'd accept to stay with {currentProvider}.
-            </p>
-            <Input
-              type="text"
-              inputMode="decimal"
-              value={tolerance}
-              onChange={(e) => {
-                setTolerance(e.target.value);
-                setToleranceError("");
-              }}
-              data-testid="input-tolerance"
+      <div className="w-full max-w-sm space-y-4" data-testid="tolerance-section">
+        <div className="space-y-1 text-center">
+          <p className="text-sm font-medium text-foreground">Your tolerance threshold</p>
+          <p className="text-xs text-muted-foreground">
+            Drag to set the max you'd pay to stay with {currentProvider}
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between text-xs text-muted-foreground px-0.5">
+            <span>{competitorName}</span>
+            <span>Current rate</span>
+          </div>
+
+          <div className="relative">
+            <Slider
+              min={sliderMin}
+              max={sliderMax}
+              step={0.5}
+              value={[sliderValue]}
+              onValueChange={([v]) => setSliderValue(v)}
+              data-testid="slider-tolerance"
             />
-            {toleranceError && (
-              <p className="text-xs text-destructive">{toleranceError}</p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              Max acceptable: £{(competitorQuote + (parseFloat(tolerance) || 0)).toFixed(2)}
-            </p>
+          </div>
+
+          <div className="flex items-center justify-between text-xs font-medium px-0.5">
+            <span className="text-green-600 dark:text-green-400">£{sliderMin.toFixed(2)}</span>
+            <span className="text-muted-foreground">£{sliderMax.toFixed(2)}</span>
           </div>
         </div>
+
+        <div className="rounded-md bg-muted/60 px-4 py-3 space-y-1 text-center">
+          <p className="text-base font-semibold text-foreground" data-testid="text-max-acceptable">
+            Max acceptable: £{sliderValue.toFixed(2)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {tolerance === 0
+              ? "No tolerance — exact competitor price only"
+              : `+£${tolerance.toFixed(2)} above ${competitorName} quote (${tolerancePct}% of gap)`}
+          </p>
+        </div>
+      </div>
 
       <div className="flex flex-col items-center gap-3 w-full pt-2">
         <div className="flex flex-row gap-3 justify-center w-full max-w-xs mx-auto">
