@@ -179,6 +179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/gpt/search-quotes", requireGptApiKey, async (req, res) => {
     try {
       const {
+        passcode,
         registration,
         manufacturer,
         model,
@@ -193,9 +194,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         preferences,
       } = req.body;
 
+      // Passcode validation — second layer of access control beyond the API key
+      const expectedPasscode = process.env.GPT_PASSCODE;
+      if (expectedPasscode && (!passcode || passcode !== expectedPasscode)) {
+        return res.status(401).json({
+          error: "Invalid passcode. Please provide the correct Autoannie access passcode.",
+        });
+      }
+
       if (!registration || driver_age === undefined || no_claims_bonus === undefined) {
         return res.status(400).json({
           error: "Missing required fields: registration, driver_age, and no_claims_bonus are required.",
+        });
+      }
+
+      if (!manufacturer || !model || !year || !fuel_type) {
+        return res.status(400).json({
+          error: "Missing vehicle details: manufacturer, model, year, and fuel_type are required for accurate quotes.",
         });
       }
 
@@ -306,15 +321,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             operationId: "searchQuotes",
             summary: "Search for motor insurance quotes",
             description:
-              "Returns up to 5 ranked insurance quotes based on the customer's vehicle and driver details. Always collect registration, driver_age, and no_claims_bonus before calling this action.",
+              "Returns up to 5 ranked insurance quotes. All required fields must be collected from the customer before calling this action. The passcode must be sent with every request.",
             requestBody: {
               required: true,
               content: {
                 "application/json": {
                   schema: {
                     type: "object",
-                    required: ["registration", "driver_age", "no_claims_bonus"],
+                    required: [
+                      "passcode",
+                      "registration",
+                      "manufacturer",
+                      "model",
+                      "year",
+                      "fuel_type",
+                      "driver_age",
+                      "no_claims_bonus",
+                    ],
                     properties: {
+                      passcode: {
+                        type: "string",
+                        description:
+                          "The Autoannie access passcode provided by the user at the start of the conversation. Must be sent with every request.",
+                      },
                       registration: {
                         type: "string",
                         description: "UK vehicle registration number, e.g. AB12 CDE",
@@ -333,7 +362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       },
                       fuel_type: {
                         type: "string",
-                        description: "Fuel type: Petrol, Diesel, Electric, or Hybrid",
+                        description: "Fuel type — must be exactly one of: Petrol, Diesel, Electric, Hybrid",
                       },
                       driver_age: {
                         type: "integer",
@@ -347,7 +376,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       voluntary_excess: {
                         type: "integer",
                         description:
-                          "Voluntary excess amount in GBP the customer is willing to pay, e.g. 250",
+                          "Voluntary excess amount in GBP the customer is willing to pay, e.g. 250. Defaults to 250 if not provided.",
                       },
                       current_insurer: {
                         type: "string",
