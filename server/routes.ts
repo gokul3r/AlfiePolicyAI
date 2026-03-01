@@ -179,7 +179,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/gpt/search-quotes", requireGptApiKey, async (req, res) => {
     try {
       const {
-        passcode,
         registration,
         manufacturer,
         model,
@@ -193,14 +192,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         current_premium,
         preferences,
       } = req.body;
-
-      // Passcode validation — second layer of access control beyond the API key
-      const expectedPasscode = process.env.GPT_PASSCODE;
-      if (expectedPasscode && (!passcode || passcode !== expectedPasscode)) {
-        return res.status(401).json({
-          error: "Invalid passcode. Please provide the correct Autoannie access passcode.",
-        });
-      }
 
       if (!registration || driver_age === undefined || no_claims_bonus === undefined) {
         return res.status(400).json({
@@ -270,14 +261,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Build a clean, GPT-friendly summary from the raw response
       const rawQuotes: any[] = data.quotes_with_insights || data.quotes || [];
-      const topQuotes = rawQuotes.slice(0, 5).map((q: any) => ({
-        insurer: q.insurer || q.provider || q.company || "Unknown",
-        annual_premium_gbp: q.annual_premium ?? q.price ?? q.quote_price ?? null,
-        monthly_premium_gbp: q.monthly_premium ?? null,
-        key_features: q.features ?? q.key_features ?? [],
-        ai_insight: q.insight ?? q.ai_insight ?? q.recommendation ?? null,
-        match_score: q.match_score ?? null,
-      }));
+      const topQuotes = rawQuotes.slice(0, 5).map((q: any) => {
+        const annualPremium =
+          q.original_quote?.output?.policy_cost ??
+          q.original_quote?.output?.post_discount_cost ??
+          q.annual_premium ?? q.price ?? null;
+        const monthlyPremium =
+          q.original_quote?.output?.monthly_cost ??
+          (annualPremium ? Math.round((annualPremium / 12) * 100) / 100 : null);
+        const features: string[] =
+          q.available_features ??
+          q.features_matching_requirements ??
+          q.features ?? q.key_features ?? [];
+        return {
+          insurer: q.insurer_name || q.insurer || q.provider || "Unknown",
+          annual_premium_gbp: annualPremium,
+          monthly_premium_gbp: monthlyPremium,
+          key_features: Array.isArray(features) ? features.slice(0, 5) : [],
+          ai_insight: q.autoannie_message ?? q.alfie_message ?? q.insight ?? null,
+          match_score: q.alfie_touch_score ?? q.match_score ?? null,
+        };
+      });
 
       const summary = {
         quotes_found: rawQuotes.length,
@@ -321,7 +325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             operationId: "searchQuotes",
             summary: "Search for motor insurance quotes",
             description:
-              "Returns up to 5 ranked insurance quotes. All required fields must be collected from the customer before calling this action. The passcode must be sent with every request.",
+              "Returns up to 5 ranked insurance quotes. All required fields must be collected from the customer conversationally before calling this action.",
             requestBody: {
               required: true,
               content: {
@@ -329,7 +333,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   schema: {
                     type: "object",
                     required: [
-                      "passcode",
                       "registration",
                       "manufacturer",
                       "model",
@@ -339,11 +342,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       "no_claims_bonus",
                     ],
                     properties: {
-                      passcode: {
-                        type: "string",
-                        description:
-                          "The Autoannie access passcode provided by the user at the start of the conversation. Must be sent with every request.",
-                      },
                       registration: {
                         type: "string",
                         description: "UK vehicle registration number, e.g. AB12 CDE",
