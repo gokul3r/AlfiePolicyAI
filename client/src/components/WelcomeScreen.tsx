@@ -328,23 +328,23 @@ export default function WelcomeScreen({
                       className="w-full text-left p-4 rounded-lg border border-border hover-elevate active-elevate-2 transition-all"
                       data-testid={`button-vehicle-${policy.vehicle_id}`}
                     >
-                      <div className="flex items-start justify-between">
-                        <div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold text-foreground">
                             {policy.vehicle_manufacturer_name} {policy.vehicle_model}
                           </h3>
-                          <p className="text-sm text-muted-foreground">
-                            {policy.vehicle_registration_number}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {policy.vehicle_year} • {policy.type_of_fuel}
-                          </p>
+                          {policy.type_of_cover_needed && (
+                            <Badge variant="secondary" className="text-xs capitalize shrink-0">
+                              {policy.type_of_cover_needed.replace(/_/g, " ")}
+                            </Badge>
+                          )}
                         </div>
-                        <div className="text-right">
-                          <span className="text-xs font-medium text-primary">
-                            {policy.type_of_cover_needed}
-                          </span>
-                        </div>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          {policy.vehicle_registration_number}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {policy.vehicle_year} • {policy.type_of_fuel}
+                        </p>
                       </div>
                     </button>
                   ))}
