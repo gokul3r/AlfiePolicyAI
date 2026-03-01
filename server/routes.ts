@@ -331,7 +331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           logo_url: `https://autosage.replit.app/logos/${insurerSlug}.svg`,
           annual_premium_gbp: annualPremium,
           monthly_premium_gbp: monthlyPremium,
-          key_features: Array.isArray(features) ? features.slice(0, 3) : [],
+          key_features: Array.isArray(features) ? features.slice(0, 5) : [],
           ai_insight: trim(q.autoannie_message ?? q.alfie_message ?? q.insight),
           match_score: score,
           stars,
