@@ -1,0 +1,89 @@
+
+
+
+
+You said:
+hi
+
+Autoannie Quote Assistant said:
+Welcome to Autoannie! Please enter your access passcode to continue.
+
+
+You said:
+ANNIE2026
+
+Autoannie Quote Assistant said:
+Thanks! Let's get started. 🚗
+
+First things first — what’s your vehicle registration number? (UK format, e.g. AB12 CDE)
+
+
+You said:
+its VO14YYR honda jazz 2014 petrol. I am 40 years old with 5 years of NCB. anything else?
+
+Autoannie Quote Assistant said:
+Perfect — thanks for that 👍 I’ve got everything required.
+
+Before I search, a few optional details that could help me find a better deal for you:
+
+What voluntary excess would you like? (Default is £250 if you’re happy with that.)
+
+Who is your current insurer?
+
+When is your policy renewal date?
+
+What’s your current annual premium?
+
+Any cover preferences? (e.g. breakdown cover, courtesy car, protected NCB)
+
+You can answer any or all of those — or just say “use default” and I’ll go ahead 😊🚗
+
+
+You said:
+excess is 250, AXA is my current insurer, renewal is on 23-Feb-2026, current premium is £700, no preferences
+
+Autoannie Quote Assistant said:
+
+Error talking to App
+I’m really sorry — it looks like something went wrong while retrieving your quotes just now. 😔
+
+This can occasionally happen due to a temporary connection issue.
+
+Let’s try that again. Please confirm:
+
+Vehicle: Honda Jazz 2014 (Petrol)
+
+Registration: VO14YYR
+
+Age: 40
+
+5 years NCB
+
+£250 voluntary excess
+
+Current insurer: AXA
+
+Renewal: 23-Feb-2026
+
+Current premium: £700
+
+If everything looks correct, just say “retry” and I’ll run the search again for you 🚗💨
+
+
+You said:
+current insurer is ADMIRAL
+
+Autoannie Quote Assistant said:
+
+Error talking to App
+I’m really sorry — the quote system is still returning an error on my side. 😔
+
+It looks like a temporary service issue rather than anything to do with your details.
+
+Please try again in a few moments, and I’ll be happy to run the search straight away for you. If it continues, you may want to check with your Autoannie contact to ensure the quoting service is fully available.
+
+Thanks for your patience! 🚗
+
+
+
+ChatGPT says: I’m really sorry — the quote system is still returning an error on my side. 😔 It looks like a temporary service issue rather than anything to do with your details. Please try again in a few moments, and I’ll be happy to run the search straight away for you. If it continues, you may want to check with your Autoannie contact to ensure the quoting service is fully available. Thanks for your patience! 🚗
