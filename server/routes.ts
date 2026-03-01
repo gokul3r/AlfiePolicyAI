@@ -223,6 +223,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         current_premium,
         preferences,
         preferred_features,
+        postcode,
+        annual_mileage,
+        has_claims,
+        has_convictions,
       } = req.body;
 
       if (!registration || driver_age === undefined || no_claims_bonus === undefined) {
@@ -267,13 +271,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           Voluntary_Excess: voluntary_excess ?? 250,
         },
         user_preferences: (() => {
+          const parts: string[] = [];
+          if (postcode) parts.push(`Customer postcode: ${postcode}.`);
+          if (annual_mileage) parts.push(`Annual mileage: ${annual_mileage} miles.`);
+          if (has_claims === true) parts.push(`Customer has declared a claim in the last 5 years — pricing shown is indicative only.`);
+          if (has_convictions === true) parts.push(`Customer has declared a motoring conviction — pricing shown is indicative only.`);
           const featureList = Array.isArray(preferred_features) && preferred_features.length > 0
             ? preferred_features
             : null;
-          if (featureList) {
-            return `Customer requires the following features: ${featureList.join(", ")}. Please prioritise quotes that include these features and find the best value comprehensive insurance.`;
-          }
-          return preferences || "Please find the best value comprehensive insurance.";
+          if (featureList) parts.push(`Customer requires the following features: ${featureList.join(", ")}. Please prioritise quotes that include these features.`);
+          parts.push(preferences || "Please find the best value comprehensive insurance.");
+          return parts.join(" ");
         })(),
         conversation_history: [],
         trust_pilot_data: null,
@@ -446,6 +454,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                         items: { type: "string" },
                         description:
                           "List of required cover features mapped to API format. Valid values: legal_cover_included, windshield_cover_included, courtesy_car_included, breakdown_cover_included, personal_Accident_cover_included, european_cover_included, no_claim_bonus_protection_included",
+                      },
+                      postcode: {
+                        type: "string",
+                        description: "Customer's home postcode, e.g. SW1A 1AA. Used for regional pricing context.",
+                      },
+                      annual_mileage: {
+                        type: "integer",
+                        description: "Estimated annual mileage the customer drives, e.g. 8000.",
+                      },
+                      has_claims: {
+                        type: "boolean",
+                        description: "Whether the customer has made any insurance claims in the last 5 years. If true, quotes are indicative only.",
+                      },
+                      has_convictions: {
+                        type: "boolean",
+                        description: "Whether the customer has any motoring convictions. If true, do NOT call this action — inform the customer to contact the insurer directly.",
                       },
                     },
                   },
