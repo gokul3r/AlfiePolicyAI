@@ -222,6 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         policy_end_date,
         current_premium,
         preferences,
+        preferred_features,
       } = req.body;
 
       if (!registration || driver_age === undefined || no_claims_bonus === undefined) {
@@ -265,7 +266,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           No_Claim_bonus_years: no_claims_bonus,
           Voluntary_Excess: voluntary_excess ?? 250,
         },
-        user_preferences: preferences || "Please find the best value comprehensive insurance.",
+        user_preferences: (() => {
+          const featureList = Array.isArray(preferred_features) && preferred_features.length > 0
+            ? preferred_features
+            : null;
+          if (featureList) {
+            return `Customer requires the following features: ${featureList.join(", ")}. Please prioritise quotes that include these features and find the best value comprehensive insurance.`;
+          }
+          return preferences || "Please find the best value comprehensive insurance.";
+        })(),
         conversation_history: [],
         trust_pilot_data: null,
         defacto_ratings: null,
@@ -425,7 +434,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       preferences: {
                         type: "string",
                         description:
-                          "Any specific cover preferences the customer has mentioned, e.g. 'I want breakdown cover and a courtesy car'",
+                          "Any specific cover preferences the customer has mentioned as free text",
+                      },
+                      preferred_features: {
+                        type: "array",
+                        items: { type: "string" },
+                        description:
+                          "List of required cover features mapped to API format. Valid values: legal_cover_included, windshield_cover_included, courtesy_car_included, breakdown_cover_included, personal_Accident_cover_included, european_cover_included, no_claim_bonus_protection_included",
                       },
                     },
                   },
