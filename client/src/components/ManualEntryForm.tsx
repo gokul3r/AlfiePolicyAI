@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -29,14 +29,21 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
-// Form schema - includes both policy and vehicle details fields
+const isValidPositiveNumber = (val: string) => {
+  const n = Number(val.trim());
+  return !isNaN(n) && n >= 0;
+};
+
+// Internal form schema — cost/excess fields are text to avoid browser NaN issues with type="number"
 const manualEntryFormSchema = z.object({
   // Policy fields
   policy_number: z.string().min(1, "Policy number is required").trim(),
   policy_start_date: z.string().min(1, "Policy start date is required"),
   policy_end_date: z.string().min(1, "Policy end date is required"),
   current_insurance_provider: z.string().min(1, "Insurance provider is required").trim(),
-  current_policy_cost: z.coerce.number().min(0, "Policy cost must be positive"),
+  current_policy_cost: z.string()
+    .min(1, "Policy cost is required")
+    .refine(isValidPositiveNumber, "Please enter a valid positive amount"),
   // Vehicle details fields
   driver_age: z.coerce.number().int().min(18, "Driver must be at least 18 years old").max(100, "Age must be 100 or less"),
   vehicle_registration_number: z.string().min(1, "Registration number is required").trim(),
@@ -48,7 +55,9 @@ const manualEntryFormSchema = z.object({
   }),
   type_of_cover_needed: z.string().min(1, "Please select a cover type"),
   no_claim_bonus_years: z.coerce.number().int().min(0, "Must be 0 or more").max(20, "Maximum 20 years"),
-  voluntary_excess: z.coerce.number().min(0, "Must be 0 or more"),
+  voluntary_excess: z.string()
+    .min(1, "Voluntary excess is required")
+    .refine(isValidPositiveNumber, "Please enter a valid positive amount"),
 }).refine((data) => {
   if (data.policy_start_date && data.policy_end_date) {
     const start = new Date(data.policy_start_date);
@@ -72,7 +81,13 @@ const manualEntryFormSchema = z.object({
   path: ["policy_end_date"],
 });
 
-export type VehiclePolicyFormData = z.infer<typeof manualEntryFormSchema>;
+type FormValues = z.infer<typeof manualEntryFormSchema>;
+
+// Public type that callers receive — cost/excess are numbers
+export type VehiclePolicyFormData = Omit<FormValues, "current_policy_cost" | "voluntary_excess"> & {
+  current_policy_cost: number;
+  voluntary_excess: number;
+};
 
 interface ManualEntryFormProps {
   open: boolean;
@@ -95,45 +110,32 @@ export default function ManualEntryForm({
   onCancel,
   isEditMode = false,
 }: ManualEntryFormProps) {
-  const form = useForm<VehiclePolicyFormData>({
+  const buildFormValues = (vals?: Partial<VehiclePolicyFormData>): FormValues => ({
+    policy_number: vals?.policy_number ?? "",
+    policy_start_date: vals?.policy_start_date ?? "",
+    policy_end_date: vals?.policy_end_date ?? "",
+    current_insurance_provider: vals?.current_insurance_provider ?? "",
+    current_policy_cost: vals?.current_policy_cost != null ? String(vals.current_policy_cost) : "",
+    driver_age: vals?.driver_age ?? (undefined as unknown as number),
+    vehicle_registration_number: vals?.vehicle_registration_number ?? "",
+    vehicle_manufacturer_name: vals?.vehicle_manufacturer_name ?? "",
+    vehicle_model: vals?.vehicle_model ?? "",
+    vehicle_year: vals?.vehicle_year ?? (undefined as unknown as number),
+    type_of_fuel: vals?.type_of_fuel ?? (undefined as unknown as "Electric" | "Hybrid" | "Petrol" | "Diesel"),
+    type_of_cover_needed: vals?.type_of_cover_needed ?? "",
+    no_claim_bonus_years: vals?.no_claim_bonus_years ?? (undefined as unknown as number),
+    voluntary_excess: vals?.voluntary_excess != null ? String(vals.voluntary_excess) : "",
+  });
+
+  const form = useForm<FormValues>({
     resolver: zodResolver(manualEntryFormSchema),
-    defaultValues: {
-      policy_number: initialValues?.policy_number ?? "",
-      policy_start_date: initialValues?.policy_start_date ?? "",
-      policy_end_date: initialValues?.policy_end_date ?? "",
-      current_insurance_provider: initialValues?.current_insurance_provider ?? "",
-      current_policy_cost: initialValues?.current_policy_cost ?? undefined,
-      driver_age: initialValues?.driver_age ?? undefined,
-      vehicle_registration_number: initialValues?.vehicle_registration_number ?? "",
-      vehicle_manufacturer_name: initialValues?.vehicle_manufacturer_name ?? "",
-      vehicle_model: initialValues?.vehicle_model ?? "",
-      vehicle_year: initialValues?.vehicle_year ?? undefined,
-      type_of_fuel: initialValues?.type_of_fuel ?? undefined,
-      type_of_cover_needed: initialValues?.type_of_cover_needed ?? "",
-      no_claim_bonus_years: initialValues?.no_claim_bonus_years ?? undefined,
-      voluntary_excess: initialValues?.voluntary_excess ?? undefined,
-    },
+    defaultValues: buildFormValues(initialValues),
   });
 
   // Reset form when initialValues change
   useEffect(() => {
     if (initialValues) {
-      form.reset({
-        policy_number: initialValues?.policy_number ?? "",
-        policy_start_date: initialValues?.policy_start_date ?? "",
-        policy_end_date: initialValues?.policy_end_date ?? "",
-        current_insurance_provider: initialValues?.current_insurance_provider ?? "",
-        current_policy_cost: initialValues?.current_policy_cost ?? undefined,
-        driver_age: initialValues?.driver_age ?? undefined,
-        vehicle_registration_number: initialValues?.vehicle_registration_number ?? "",
-        vehicle_manufacturer_name: initialValues?.vehicle_manufacturer_name ?? "",
-        vehicle_model: initialValues?.vehicle_model ?? "",
-        vehicle_year: initialValues?.vehicle_year ?? undefined,
-        type_of_fuel: initialValues?.type_of_fuel ?? undefined,
-        type_of_cover_needed: initialValues?.type_of_cover_needed ?? "",
-        no_claim_bonus_years: initialValues?.no_claim_bonus_years ?? undefined,
-        voluntary_excess: initialValues?.voluntary_excess ?? undefined,
-      });
+      form.reset(buildFormValues(initialValues));
     }
   }, [initialValues, form]);
 
@@ -142,8 +144,28 @@ export default function ManualEntryForm({
     return missingFields.includes(fieldName);
   };
 
-  const handleSubmit = (data: VehiclePolicyFormData) => {
-    onSubmit(data);
+  const watchedCost = form.watch("current_policy_cost");
+  const watchedExcess = form.watch("voluntary_excess");
+
+  const policyCostWarning = useMemo(() => {
+    const n = Number(watchedCost);
+    if (!isNaN(n) && watchedCost !== "" && n > 10000) return "This seems unusually high — please double-check.";
+    return null;
+  }, [watchedCost]);
+
+  const voluntaryExcessWarning = useMemo(() => {
+    const n = Number(watchedExcess);
+    if (!isNaN(n) && watchedExcess !== "" && n > 2000) return "This seems unusually high — please double-check.";
+    return null;
+  }, [watchedExcess]);
+
+  const handleSubmit = (data: FormValues) => {
+    const processedData: VehiclePolicyFormData = {
+      ...data,
+      current_policy_cost: Number(data.current_policy_cost),
+      voluntary_excess: Number(data.voluntary_excess),
+    };
+    onSubmit(processedData);
     form.reset();
   };
 
@@ -225,8 +247,8 @@ export default function ManualEntryForm({
                     <FormLabel>Current Policy Cost (£)</FormLabel>
                     <FormControl>
                       <Input
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="e.g., 1200.00"
                         {...field}
                         className={cn(
@@ -237,6 +259,9 @@ export default function ManualEntryForm({
                       />
                     </FormControl>
                     <FormMessage />
+                    {policyCostWarning && !form.formState.errors.current_policy_cost && (
+                      <p className="text-sm text-amber-600 dark:text-amber-400" data-testid="warning-policy-cost">{policyCostWarning}</p>
+                    )}
                   </FormItem>
                 )}
               />
@@ -468,8 +493,8 @@ export default function ManualEntryForm({
                     <FormLabel>Voluntary Excess</FormLabel>
                     <FormControl>
                       <Input
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="e.g., 500.00"
                         {...field}
                         className={cn(
@@ -480,6 +505,9 @@ export default function ManualEntryForm({
                       />
                     </FormControl>
                     <FormMessage />
+                    {voluntaryExcessWarning && !form.formState.errors.voluntary_excess && (
+                      <p className="text-sm text-amber-600 dark:text-amber-400" data-testid="warning-voluntary-excess">{voluntaryExcessWarning}</p>
+                    )}
                   </FormItem>
                 )}
               />
