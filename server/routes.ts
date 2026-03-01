@@ -176,7 +176,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Self-contained quote search for ChatGPT Custom GPT — no user session needed
-  app.post("/api/gpt/search-quotes", requireGptApiKey, async (req, res) => {
+  // Note: requireGptApiKey removed while debugging ChatGPT Action connectivity.
+  // Re-apply once end-to-end flow is confirmed working.
+  app.post("/api/gpt/search-quotes", async (req, res) => {
+    console.log("[GPT INBOUND]", new Date().toISOString(), "ip:", req.ip, "body:", JSON.stringify(req.body));
     try {
       const {
         registration,
@@ -425,30 +428,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
                             },
                           },
                         },
-                        search_criteria: { type: "object" },
-                        raw_analysis: { type: "string" },
                       },
                     },
                   },
                 },
               },
               "400": { description: "Missing required fields" },
-              "401": { description: "Invalid or missing API key" },
               "500": { description: "Internal server error" },
             },
-            security: [{ ApiKeyAuth: [] }],
           },
         },
       },
       components: {
         schemas: {},
-        securitySchemes: {
-          ApiKeyAuth: {
-            type: "apiKey",
-            in: "header",
-            name: "X-API-Key",
-          },
-        },
       },
     };
 
