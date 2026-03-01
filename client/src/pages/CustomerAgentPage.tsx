@@ -1429,6 +1429,7 @@ function LiveChatView({ provider, onBack }: { provider: string; onBack: () => vo
   const [negotiations, setNegotiations] = useState<LiveNegotiation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedNegotiation, setSelectedNegotiation] = useState<LiveNegotiation | null>(null);
+  const [activeFilter, setActiveFilter] = useState<"pending" | "completed" | null>(null);
 
   const fetchNegotiations = useCallback(async () => {
     try {
@@ -1448,6 +1449,40 @@ function LiveChatView({ provider, onBack }: { provider: string; onBack: () => vo
     const interval = setInterval(fetchNegotiations, 5000);
     return () => clearInterval(interval);
   }, [fetchNegotiations]);
+
+  const isPending = (n: LiveNegotiation) => n.status === "pending" || n.status === "active";
+  const isCompleted = (n: LiveNegotiation) => !isPending(n);
+
+  const counts = {
+    pending: negotiations.filter(isPending).length,
+    completed: negotiations.filter(isCompleted).length,
+  };
+
+  const filteredNegotiations = activeFilter === null ? [] : negotiations.filter(
+    activeFilter === "pending" ? isPending : isCompleted
+  );
+
+  const statCards = [
+    {
+      key: "pending" as const,
+      label: "Pending Requests",
+      count: counts.pending,
+      icon: Clock,
+      colorClass: "text-yellow-600 dark:text-yellow-400",
+      bgClass: "bg-yellow-50 dark:bg-yellow-950/30",
+      borderClass: "border-yellow-200 dark:border-yellow-800",
+      actionLabel: counts.pending > 0 ? "Action Required" : undefined,
+    },
+    {
+      key: "completed" as const,
+      label: "Completed Requests",
+      count: counts.completed,
+      icon: CheckCircle2,
+      colorClass: "text-green-600 dark:text-green-400",
+      bgClass: "bg-green-50 dark:bg-green-950/30",
+      borderClass: "border-green-200 dark:border-green-800",
+    },
+  ];
 
   if (selectedNegotiation) {
     return (
@@ -1493,9 +1528,9 @@ function LiveChatView({ provider, onBack }: { provider: string; onBack: () => vo
           </div>
           <div className="flex items-center gap-2">
             <MessageCircle className="w-5 h-5" />
-            {negotiations.length > 0 && (
+            {counts.pending > 0 && (
               <span className="bg-white/20 rounded-full px-2 py-0.5 text-xs font-semibold" data-testid="text-live-chat-count">
-                {negotiations.length}
+                {counts.pending}
               </span>
             )}
           </div>
@@ -1504,83 +1539,143 @@ function LiveChatView({ provider, onBack }: { provider: string; onBack: () => vo
 
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-4">
         {isLoading ? (
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             {[1, 2].map((i) => (
               <Card key={i} className="p-4 animate-pulse overflow-visible">
-                <div className="h-4 bg-muted rounded w-1/3 mb-2" />
-                <div className="h-3 bg-muted rounded w-2/3" />
+                <div className="h-4 bg-muted rounded w-1/2 mb-3" />
+                <div className="h-7 bg-muted rounded w-1/4" />
               </Card>
             ))}
-          </div>
-        ) : negotiations.length === 0 ? (
-          <div className="text-center py-16">
-            <MessageCircle className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-            <h2 className="text-base font-semibold text-foreground" data-testid="text-no-live-chats">No Active Live Chats</h2>
-            <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
-              When a customer initiates a live negotiation, it will appear here for you to join and respond.
-            </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {negotiations.map((nego) => (
-              <Card
-                key={nego.id}
-                className="overflow-visible cursor-pointer hover-elevate"
-                onClick={() => setSelectedNegotiation(nego)}
-                data-testid={`card-live-nego-${nego.id}`}
-              >
-                <div className={`px-4 py-3 border-b ${colors.accent} ${colors.bg} rounded-t-md`}>
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      {nego.mode === "voice" ? (
-                        <Mic className="w-4 h-4 text-muted-foreground" />
-                      ) : (
-                        <MessageCircle className="w-4 h-4 text-muted-foreground" />
-                      )}
-                      <span className="text-sm font-semibold text-foreground">
-                        {nego.mode === "voice" ? "Voice Negotiation" : "Live Negotiation"}
-                      </span>
+          <>
+            <div className="grid grid-cols-2 gap-3" data-testid="live-chat-stat-cards">
+              {statCards.map((stat) => {
+                const Icon = stat.icon;
+                const isActive = activeFilter === stat.key;
+                return (
+                  <Card
+                    key={stat.key}
+                    className={`p-4 cursor-pointer hover-elevate transition-colors overflow-visible ${isActive ? `${stat.bgClass} border ${stat.borderClass}` : ""}`}
+                    onClick={() => setActiveFilter(isActive ? null : stat.key)}
+                    data-testid={`stat-card-livechat-${stat.key}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 min-w-0">
+                        <p className="text-xs font-medium text-muted-foreground truncate">{stat.label}</p>
+                        <p className="text-2xl font-bold text-foreground" data-testid={`stat-count-livechat-${stat.key}`}>{stat.count}</p>
+                      </div>
+                      <div className={`p-2 rounded-md ${stat.bgClass}`}>
+                        <Icon className={`w-4 h-4 ${stat.colorClass}`} />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={`text-xs ${
-                        nego.status === "pending" ? "bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700" :
-                        nego.status === "active" ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700" :
-                        "bg-muted text-muted-foreground"
-                      }`} data-testid={`badge-status-${nego.id}`}>
-                        {nego.status === "pending" ? (
-                          <><Clock className="w-3 h-3 mr-1" /> Waiting</>
-                        ) : nego.status === "active" ? (
-                          <><CheckCircle2 className="w-3 h-3 mr-1" /> Active</>
-                        ) : (
-                          <><CheckCircle2 className="w-3 h-3 mr-1" /> {nego.status}</>
-                        )}
-                      </Badge>
+                    {stat.actionLabel && (
+                      <div className="mt-2">
+                        <Badge variant="outline" className="text-[10px] bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700">
+                          {stat.actionLabel}
+                        </Badge>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+
+            {activeFilter !== null && (
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-muted-foreground" data-testid="text-livechat-active-filter">
+                  Showing: <span className="font-medium text-foreground">{statCards.find(s => s.key === activeFilter)?.label}</span>
+                </p>
+                <Button size="sm" variant="ghost" onClick={() => setActiveFilter(null)} data-testid="button-livechat-clear-filter">
+                  <X className="w-3 h-3 mr-1" /> Clear
+                </Button>
+              </div>
+            )}
+
+            {activeFilter === null ? (
+              negotiations.length === 0 ? (
+                <div className="text-center py-16">
+                  <MessageCircle className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+                  <h2 className="text-base font-semibold text-foreground" data-testid="text-no-live-chats">No Active Live Chats</h2>
+                  <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+                    When a customer initiates a live negotiation, it will appear here for you to join and respond.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-select-prompt">
+                  Select a category above to view negotiations
+                </p>
+              )
+            ) : filteredNegotiations.length === 0 ? (
+              <div className="text-center py-12">
+                <MessageCircle className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">
+                  No {activeFilter === "pending" ? "pending" : "completed"} negotiations
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredNegotiations.map((nego) => (
+                  <Card
+                    key={nego.id}
+                    className="overflow-visible cursor-pointer hover-elevate"
+                    onClick={() => setSelectedNegotiation(nego)}
+                    data-testid={`card-live-nego-${nego.id}`}
+                  >
+                    <div className={`px-4 py-3 border-b ${colors.accent} ${colors.bg} rounded-t-md`}>
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          {nego.mode === "voice" ? (
+                            <Mic className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <MessageCircle className="w-4 h-4 text-muted-foreground" />
+                          )}
+                          <span className="text-sm font-semibold text-foreground">
+                            {nego.mode === "voice" ? "Voice Negotiation" : "Live Negotiation"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={`text-xs ${
+                            nego.status === "pending" ? "bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700" :
+                            nego.status === "active" ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700" :
+                            "bg-muted text-muted-foreground"
+                          }`} data-testid={`badge-status-${nego.id}`}>
+                            {nego.status === "pending" ? (
+                              <><Clock className="w-3 h-3 mr-1" /> Waiting</>
+                            ) : nego.status === "active" ? (
+                              <><CheckCircle2 className="w-3 h-3 mr-1" /> Active</>
+                            ) : (
+                              <><CheckCircle2 className="w-3 h-3 mr-1" /> {nego.status}</>
+                            )}
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                <div className="p-4 space-y-2">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-foreground" data-testid={`text-nego-customer-${nego.id}`}>
-                      {nego.customer_name}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {nego.vehicle_make} {nego.vehicle_model} ({nego.vehicle_year})
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 flex-wrap text-xs text-muted-foreground">
-                    <span>Current: £{nego.current_premium.toFixed(2)}</span>
-                    <span>Competitor: £{nego.competitor_quote.toFixed(2)} ({nego.competitor_name})</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground mt-2">
-                    {nego.mode === "voice"
-                      ? (nego.status === "pending" ? "Join Voice Call" : "Open Voice Call")
-                      : (nego.status === "pending" ? "Join Chat" : "Open Chat")
-                    } <ChevronRight className="w-4 h-4" />
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                    <div className="p-4 space-y-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-foreground" data-testid={`text-nego-customer-${nego.id}`}>
+                          {nego.customer_name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {nego.vehicle_make} {nego.vehicle_model} ({nego.vehicle_year})
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 flex-wrap text-xs text-muted-foreground">
+                        <span>Current: £{nego.current_premium.toFixed(2)}</span>
+                        <span>Competitor: £{nego.competitor_quote.toFixed(2)} ({nego.competitor_name})</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm font-medium text-muted-foreground mt-2">
+                        {nego.mode === "voice"
+                          ? (nego.status === "pending" ? "Join Voice Call" : "Open Voice Call")
+                          : (nego.status === "pending" ? "Join Chat" : "Open Chat")
+                        } <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </main>
       <Toaster />
