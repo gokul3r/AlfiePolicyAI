@@ -448,6 +448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       },
       components: {
+        schemas: {},
         securitySchemes: {
           ApiKeyAuth: {
             type: "apiKey",
@@ -460,6 +461,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     res.setHeader("Content-Type", "application/json");
     res.json(schema);
+  });
+
+  // Privacy policy page — required by ChatGPT for GPTs that have Actions
+  app.get("/privacy-policy", (_req, res) => {
+    res.setHeader("Content-Type", "text/html");
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Autoannie</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 48px auto; padding: 0 24px; color: #1a1a1a; line-height: 1.7; }
+    h1 { font-size: 1.8rem; margin-bottom: 4px; }
+    h2 { font-size: 1.1rem; margin-top: 32px; margin-bottom: 8px; }
+    p, li { font-size: 0.95rem; color: #333; }
+    ul { padding-left: 20px; }
+    .updated { font-size: 0.85rem; color: #888; margin-bottom: 32px; }
+    footer { margin-top: 48px; font-size: 0.8rem; color: #aaa; border-top: 1px solid #eee; padding-top: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: March 2026</p>
+
+  <p>Autoannie ("we", "our", or "the service") is a UK motor insurance quote assistant. This policy explains how we handle information when you use Autoannie, including via the Autoannie ChatGPT Custom GPT.</p>
+
+  <h2>1. What information we collect</h2>
+  <p>When you request an insurance quote through Autoannie, you may provide:</p>
+  <ul>
+    <li>Vehicle details: registration number, make, model, year of manufacture, fuel type</li>
+    <li>Driver details: age, years of no-claims bonus, voluntary excess</li>
+    <li>Policy details: current insurer, renewal date, current annual premium</li>
+    <li>Cover preferences: any stated preferences such as breakdown cover or courtesy car</li>
+  </ul>
+
+  <h2>2. How we use this information</h2>
+  <p>The information you provide is used solely to search for UK motor insurance quotes on your behalf. It is passed to our quote search engine in real time and is not stored, retained, or used for any other purpose.</p>
+
+  <h2>3. Data retention</h2>
+  <p>Autoannie does not store or log the vehicle or driver details you enter during a ChatGPT conversation. Each quote search is stateless — no personal data is retained after the session ends.</p>
+
+  <h2>4. Third-party services</h2>
+  <p>Quote results are retrieved from an insurance market data API. We do not share your details with insurers directly; results are informational only. This service is not FCA-regulated and does not constitute a formal insurance quote or offer.</p>
+
+  <h2>5. ChatGPT integration</h2>
+  <p>When using Autoannie through a ChatGPT Custom GPT, your conversation is also subject to OpenAI's privacy policy, available at <a href="https://openai.com/policies/privacy-policy" target="_blank">openai.com/policies/privacy-policy</a>.</p>
+
+  <h2>6. Contact</h2>
+  <p>If you have any questions about this privacy policy, please contact the Autoannie team through your usual Autoannie representative.</p>
+
+  <footer>Autoannie &mdash; UK Motor Insurance Assistant &mdash; &copy; 2026</footer>
+</body>
+</html>`);
   });
 
   // ─── End ChatGPT Custom GPT Integration ─────────────────────────────────────
