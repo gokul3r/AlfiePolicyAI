@@ -2636,15 +2636,10 @@ function NegotiatePromptState({
 }) {
   const defaultTolerance = Math.round(competitorQuote * 0.02 * 100) / 100;
   const [tolerance, setTolerance] = useState<string>(defaultTolerance.toFixed(2));
-  const [showTolerance, setShowTolerance] = useState(false);
   const [toleranceError, setToleranceError] = useState("");
   const [negotiationMode, setNegotiationMode] = useState<"text" | "voice">("text");
 
   const handleYes = () => {
-    if (!showTolerance) {
-      setShowTolerance(true);
-      return;
-    }
     const val = parseFloat(tolerance);
     if (isNaN(val) || val < 0) {
       setToleranceError("Please enter a valid amount");
@@ -2693,8 +2688,7 @@ function NegotiatePromptState({
         </Button>
       </div>
 
-      {showTolerance && (
-        <div className="w-full max-w-sm space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-300" data-testid="tolerance-section">
+      <div className="w-full max-w-sm space-y-3" data-testid="tolerance-section">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">
               Tolerance above competitor quote (£)
@@ -2703,25 +2697,23 @@ function NegotiatePromptState({
               The maximum amount above £{competitorQuote.toFixed(2)} you'd accept to stay with {currentProvider}.
             </p>
             <Input
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={tolerance}
               onChange={(e) => {
                 setTolerance(e.target.value);
                 setToleranceError("");
               }}
-              min="0"
-              step="0.01"
               data-testid="input-tolerance"
             />
             {toleranceError && (
-              <p className="text-xs text-red-500">{toleranceError}</p>
+              <p className="text-xs text-destructive">{toleranceError}</p>
             )}
             <p className="text-xs text-muted-foreground">
               Max acceptable: £{(competitorQuote + (parseFloat(tolerance) || 0)).toFixed(2)}
             </p>
           </div>
         </div>
-      )}
 
       <div className="flex flex-col items-center gap-3 w-full pt-2">
         <div className="flex flex-row gap-3 justify-center w-full max-w-xs mx-auto">
@@ -2731,7 +2723,7 @@ function NegotiatePromptState({
             className="flex-1"
             data-testid="button-negotiate-yes"
           >
-            {showTolerance ? "Start Negotiation" : "Authorise & Negotiate"}
+            Authorise & Negotiate
           </Button>
           <Button
             size="default"
