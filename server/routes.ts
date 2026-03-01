@@ -259,9 +259,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const data = await response.json();
 
-      // Build a clean, GPT-friendly summary from the raw response
+      // Build a compact, GPT-friendly summary — keep payload small so ChatGPT can process it
       const rawQuotes: any[] = data.quotes_with_insights || data.quotes || [];
-      const topQuotes = rawQuotes.slice(0, 5).map((q: any) => {
+      const trim = (s: any, max = 250): string | null => {
+        if (!s || typeof s !== "string") return null;
+        return s.length > max ? s.slice(0, max).trimEnd() + "..." : s;
+      };
+      const topQuotes = rawQuotes.slice(0, 3).map((q: any) => {
         const annualPremium =
           q.original_quote?.output?.policy_cost ??
           q.original_quote?.output?.post_discount_cost ??
@@ -277,8 +281,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           insurer: q.insurer_name || q.insurer || q.provider || "Unknown",
           annual_premium_gbp: annualPremium,
           monthly_premium_gbp: monthlyPremium,
-          key_features: Array.isArray(features) ? features.slice(0, 5) : [],
-          ai_insight: q.autoannie_message ?? q.alfie_message ?? q.insight ?? null,
+          key_features: Array.isArray(features) ? features.slice(0, 3) : [],
+          ai_insight: trim(q.autoannie_message ?? q.alfie_message ?? q.insight),
           match_score: q.alfie_touch_score ?? q.match_score ?? null,
         };
       });
@@ -286,15 +290,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const summary = {
         quotes_found: rawQuotes.length,
         top_quotes: topQuotes,
-        search_criteria: {
-          registration,
-          driver_age,
-          no_claims_bonus,
-          voluntary_excess: voluntary_excess ?? null,
-          current_premium: current_premium ?? null,
-          preferences: preferences ?? null,
-        },
-        raw_analysis: data.analysis ?? data.summary ?? null,
       };
 
       res.json(summary);
