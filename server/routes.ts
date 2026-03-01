@@ -321,7 +321,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const insurerSlug = insurerName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
         const score: number | null = q.alfie_touch_score ?? q.match_score ?? null;
         const stars = score ? "⭐".repeat(Math.round(score)) : null;
+        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+        const abbr = insurerName.replace(/\s+/g, "").slice(0, 3).toUpperCase();
+        const rand4 = String(Math.floor(1000 + Math.random() * 9000));
+        const quote_id = `AA-${dateStr}-${abbr}-${rand4}`;
         return {
+          quote_id,
           insurer: insurerName,
           logo_url: `https://autosage.replit.app/logos/${insurerSlug}.svg`,
           annual_premium_gbp: annualPremium,
