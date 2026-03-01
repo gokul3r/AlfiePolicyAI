@@ -162,6 +162,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ─── ChatGPT Custom GPT Integration ────────────────────────────────────────
 
+  // Dynamic SVG logo generator for insurers
+  const INSURER_COLOURS: Record<string, { bg: string; text: string }> = {
+    admiral:      { bg: "#C0392B", text: "#ffffff" },
+    paxa:         { bg: "#1A7A4A", text: "#ffffff" },
+    baviva:       { bg: "#2471A3", text: "#ffffff" },
+    churchwell:   { bg: "#6C3483", text: "#ffffff" },
+    hestingsdrive:{ bg: "#D35400", text: "#ffffff" },
+  };
+
+  app.get("/logos/:insurer.svg", (req, res) => {
+    const slug = req.params.insurer.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const colours = INSURER_COLOURS[slug] ?? { bg: "#566573", text: "#ffffff" };
+    const label = req.params.insurer.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="50" viewBox="0 0 160 50">
+  <rect width="160" height="50" rx="8" fill="${colours.bg}"/>
+  <!-- shield icon -->
+  <path d="M14 10 L22 10 L22 22 Q22 28 18 30 Q14 28 14 22 Z" fill="${colours.text}" opacity="0.9"/>
+  <!-- insurer name -->
+  <text x="32" y="32" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="bold"
+        fill="${colours.text}" letter-spacing="0.5">${label}</text>
+</svg>`;
+
+    res.setHeader("Content-Type", "image/svg+xml");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(svg);
+  });
+
   // API key middleware for GPT routes
   function requireGptApiKey(req: any, res: any, next: any) {
     const key = req.headers["x-api-key"];
@@ -280,13 +308,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           q.available_features ??
           q.features_matching_requirements ??
           q.features ?? q.key_features ?? [];
+        const insurerName: string = q.insurer_name || q.insurer || q.provider || "Unknown";
+        const insurerSlug = insurerName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+        const score: number | null = q.alfie_touch_score ?? q.match_score ?? null;
+        const stars = score ? "⭐".repeat(Math.round(score)) : null;
         return {
-          insurer: q.insurer_name || q.insurer || q.provider || "Unknown",
+          insurer: insurerName,
+          logo_url: `https://autosage.replit.app/logos/${insurerSlug}.svg`,
           annual_premium_gbp: annualPremium,
           monthly_premium_gbp: monthlyPremium,
           key_features: Array.isArray(features) ? features.slice(0, 3) : [],
           ai_insight: trim(q.autoannie_message ?? q.alfie_message ?? q.insight),
-          match_score: q.alfie_touch_score ?? q.match_score ?? null,
+          match_score: score,
+          stars,
         };
       });
 
