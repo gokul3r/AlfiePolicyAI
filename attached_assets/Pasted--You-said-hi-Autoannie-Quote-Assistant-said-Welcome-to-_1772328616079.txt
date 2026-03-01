@@ -1,0 +1,148 @@
+
+
+
+
+You said:
+hi
+
+Autoannie Quote Assistant said:
+Welcome to Autoannie! Please enter your access passcode to continue.
+
+
+You said:
+ANNIE2026
+
+Autoannie Quote Assistant said:
+Thanks! Let’s get started. 🚗
+
+First, please tell me your vehicle registration number (UK format, e.g. AB12 CDE).
+
+
+You said:
+Registration: VO14YYR
+
+Honda Jazz
+
+2014
+
+Petrol
+
+Age 40
+
+5 years NCB
+
+£250 voluntary excess
+
+Current insurer: PAXA
+
+Renewal: 23-Feb-2026
+
+Current premium: £700
+
+Autoannie Quote Assistant said:
+
+Error talking to App
+I’m really sorry — something’s gone wrong while retrieving your quotes. 😔
+
+It looks like there’s a temporary issue with the quote system.
+
+Please try again in a moment, and I’ll be happy to search for the best deals for your 2014 Honda Jazz straight away. 🚗
+
+If the issue continues, let me know and we’ll take it from there.
+
+
+You said:
+Registration: VO14YYR
+
+Honda Jazz
+
+2014
+
+Petrol
+
+Age 40
+
+5 years NCB
+
+£250 voluntary excess
+
+Current insurer: PAXA
+
+Renewal: 23-Feb-2026
+
+Current premium: £700
+
+Autoannie Quote Assistant said:
+
+Error talking to App
+Tool call: autosage_replit_app__jit_plugin.searchQuotes
+The following was shared:
+Privacy policy
+
+{
+registration: 
+'VO14YYR'
+, 
+manufacturer: 
+'Honda'
+, 
+model: 
+'Jazz'
+, 
+year: 
+2014
+, 
+fuel_type: 
+'Petrol'
+, 
+driver_age: 
+40
+, 
+no_claims_bonus: 
+5
+, 
+voluntary_excess: 
+250
+, 
+current_insurer: 
+'PAXA'
+, 
+policy_end_date: 
+'2026-02-23'
+, 
+current_premium: 
+700
+}
+registration:
+'VO14YYR'
+manufacturer:
+'Honda'
+model:
+'Jazz'
+year:
+2014
+fuel_type:
+'Petrol'
+driver_age:
+40
+no_claims_bonus:
+5
+voluntary_excess:
+250
+current_insurer:
+'PAXA'
+policy_end_date:
+'2026-02-23'
+current_premium:
+700
+I’m really sorry — the quote system is still experiencing a technical issue and isn’t returning results right now. 😔
+
+I know that’s frustrating, especially with your renewal coming up on 23 February 2026.
+
+Please try again shortly and I’ll run your details straight away. If it continues to fail, it may be a temporary outage with the insurer search service.
+
+I’m ready whenever you are to try again. 🚗
+
+
+
+
