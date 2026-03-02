@@ -3106,6 +3106,7 @@ function LiveNegotiationVoice({
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [customerDecisionMade, setCustomerDecisionMade] = useState(false);
+  const pendingDecisionRef = useRef<{ decision: 'stay' | 'switch'; price?: number } | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -3158,8 +3159,17 @@ function LiveNegotiationVoice({
       onOutcome(data);
     });
 
+    socket.on("decision_received", () => {
+      setCustomerDecisionMade(true);
+    });
+
     socket.on("negotiation_closed", () => {
       setCustomerDecisionMade(true);
+      if (pendingDecisionRef.current?.decision === 'stay') {
+        onStay(pendingDecisionRef.current.price!);
+      } else if (pendingDecisionRef.current?.decision === 'switch') {
+        onSwitch();
+      }
     });
 
     return () => {
@@ -3169,13 +3179,15 @@ function LiveNegotiationVoice({
 
   const handleStay = () => {
     if (!outcome) return;
+    pendingDecisionRef.current = { decision: 'stay', price: outcome.finalOfferPrice };
+    setCustomerDecisionMade(true);
     socketRef.current?.emit("customer_decision", { roomId, decision: "stay" });
-    onStay(outcome.finalOfferPrice);
   };
 
   const handleSwitch = () => {
+    pendingDecisionRef.current = { decision: 'switch' };
+    setCustomerDecisionMade(true);
     socketRef.current?.emit("customer_decision", { roomId, decision: "switch" });
-    onSwitch();
   };
 
   return (
@@ -3381,6 +3393,14 @@ function LiveNegotiationVoice({
           </div>
         );
       })()}
+
+      {outcome && customerDecisionMade && (
+        <div className="mt-4 pt-4 border-t border-border shrink-0">
+          <p className="text-sm text-center text-muted-foreground" data-testid="text-voice-wrapping-up">
+            Decision submitted — AutoAnnie is wrapping up the call...
+          </p>
+        </div>
+      )}
     </div>
   );
 }

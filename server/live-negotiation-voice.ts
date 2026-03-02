@@ -79,11 +79,14 @@ export async function handleVoiceNegotiation(
     storage.updateLiveNegotiationStatus(negotiation.id, "completed");
 
     if (ioInstance) {
-      ioInstance.to(roomId).emit("negotiation_closed", { decision });
+      ioInstance.to(roomId).emit("decision_received", { decision });
     }
 
     setTimeout(() => {
       isClosing = true;
+      if (ioInstance) {
+        ioInstance.to(roomId).emit("negotiation_closed", { decision });
+      }
       session?.close();
     }, 60000);
   };
@@ -366,11 +369,14 @@ Once you have received the system decision message and announced it to the agent
         storage.updateLiveNegotiationStatus(negotiation.id, "completed");
 
         if (ioInstance) {
-          ioInstance.to(roomId).emit("negotiation_closed", { decision });
+          ioInstance.to(roomId).emit("decision_received", { decision });
         }
 
         setTimeout(() => {
           isClosing = true;
+          if (ioInstance) {
+            ioInstance.to(roomId).emit("negotiation_closed", { decision });
+          }
           session?.close();
         }, 60000);
       }
