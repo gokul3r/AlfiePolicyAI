@@ -25,6 +25,15 @@ const PROVIDER_COLORS: Record<string, { primary: string; bg: string; headerBg: s
 
 const DEFAULT_COLORS = { primary: "text-blue-700 dark:text-blue-300", bg: "bg-blue-50 dark:bg-blue-950/30", headerBg: "bg-blue-700 dark:bg-blue-900", accent: "border-blue-200 dark:border-blue-800" };
 
+function formatNegotiationTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  const day = d.toLocaleDateString("en-GB", { day: "2-digit", timeZone: "UTC" });
+  const mon = d.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
+  const year = d.toLocaleDateString("en-GB", { year: "numeric", timeZone: "UTC" });
+  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "UTC" }).toUpperCase();
+  return `${day}-${mon}-${year} ${time} GMT`;
+}
+
 function extractProviderFromEmail(email: string): string {
   const domain = email.split("@")[1] || "";
   const provider = domain.split(".")[0] || "";
@@ -1630,9 +1639,14 @@ function LiveChatView({ provider, onBack }: { provider: string; onBack: () => vo
                           ) : (
                             <MessageCircle className="w-4 h-4 text-muted-foreground" />
                           )}
-                          <span className="text-sm font-semibold text-foreground">
-                            {nego.mode === "voice" ? "Voice Negotiation" : "Live Negotiation"}
-                          </span>
+                          <div>
+                            <span className="text-sm font-semibold text-foreground">
+                              {nego.mode === "voice" ? "Voice Negotiation" : "Live Negotiation"}
+                            </span>
+                            <p className="text-xs text-muted-foreground" data-testid={`text-nego-time-${nego.id}`}>
+                              {formatNegotiationTime(nego.created_at)}
+                            </p>
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className={`text-xs ${
@@ -1648,6 +1662,22 @@ function LiveChatView({ provider, onBack }: { provider: string; onBack: () => vo
                               <><CheckCircle2 className="w-3 h-3 mr-1" /> {nego.status}</>
                             )}
                           </Badge>
+                          {isPending(nego) && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="text-green-600 dark:text-green-400"
+                              data-testid={`button-resolve-${nego.id}`}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await fetch(`/api/live-negotiations/${nego.id}/resolve`, { method: "PATCH" });
+                                fetchNegotiations();
+                              }}
+                              title="Resolve — move to completed"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -1824,6 +1824,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/live-negotiations/:id/resolve", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
+      const negotiation = await storage.getLiveNegotiationById(id);
+      if (!negotiation) return res.status(404).json({ error: "Not found" });
+      const updated = await storage.updateLiveNegotiationStatus(id, "completed");
+      res.json(updated);
+    } catch (error) {
+      console.error("Error resolving live negotiation:", error);
+      res.status(500).json({ error: "Failed to resolve live negotiation" });
+    }
+  });
+
   app.get("/api/live-negotiation-messages/:negotiationId", async (req, res) => {
     try {
       const negotiationId = parseInt(req.params.negotiationId);
