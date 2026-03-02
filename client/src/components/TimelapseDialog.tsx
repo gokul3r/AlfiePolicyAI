@@ -47,6 +47,8 @@ import {
   MessageSquare,
   UserRound,
   Mic,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { flushSync } from "react-dom";
@@ -3106,6 +3108,36 @@ function LiveNegotiationVoice({
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [customerDecisionMade, setCustomerDecisionMade] = useState(false);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
+  const isAudioEnabledRef = useRef(false);
+  const aaPlaybackCtxRef = useRef<AudioContext | null>(null);
+  const agentPlaybackCtxRef = useRef<AudioContext | null>(null);
+  const aaNextTimeRef = useRef(0);
+  const agentNextTimeRef = useRef(0);
+
+  const playCustomerAudio = (base64: string, sampleRate: number, ctxRef: { current: AudioContext | null }, nextTimeRef: { current: number }) => {
+    try {
+      if (!ctxRef.current || ctxRef.current.state === "closed") {
+        ctxRef.current = new AudioContext({ sampleRate });
+        nextTimeRef.current = 0;
+      }
+      const ctx = ctxRef.current;
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const pcm16 = new Int16Array(bytes.buffer);
+      const float32 = new Float32Array(pcm16.length);
+      for (let i = 0; i < pcm16.length; i++) float32[i] = pcm16[i] / 32768;
+      const buffer = ctx.createBuffer(1, float32.length, sampleRate);
+      buffer.getChannelData(0).set(float32);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      const startTime = Math.max(ctx.currentTime, nextTimeRef.current);
+      source.start(startTime);
+      nextTimeRef.current = startTime + buffer.duration;
+    } catch {}
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -3162,6 +3194,15 @@ function LiveNegotiationVoice({
       setCustomerDecisionMade(true);
     });
 
+    socket.on("customer_audio", (data: { audio: string; sampleRate: number }) => {
+      if (!isAudioEnabledRef.current) return;
+      if (data.sampleRate === 24000) {
+        playCustomerAudio(data.audio, 24000, aaPlaybackCtxRef, aaNextTimeRef);
+      } else {
+        playCustomerAudio(data.audio, 16000, agentPlaybackCtxRef, agentNextTimeRef);
+      }
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -3213,6 +3254,29 @@ function LiveNegotiationVoice({
               <span className="w-1 bg-primary rounded-full animate-pulse" style={{ height: "50%", animationDelay: "600ms" }} />
             </div>
           </div>
+        )}
+        {agentJoined && (
+          <Button
+            size="icon"
+            variant="ghost"
+            data-testid="button-customer-audio-toggle"
+            title={isAudioEnabled ? "Mute audio" : "Enable audio — listen to the live call"}
+            onClick={() => {
+              const next = !isAudioEnabled;
+              isAudioEnabledRef.current = next;
+              setIsAudioEnabled(next);
+              if (!next) {
+                if (aaPlaybackCtxRef.current && aaPlaybackCtxRef.current.state !== "closed") aaPlaybackCtxRef.current.close();
+                if (agentPlaybackCtxRef.current && agentPlaybackCtxRef.current.state !== "closed") agentPlaybackCtxRef.current.close();
+                aaPlaybackCtxRef.current = null;
+                agentPlaybackCtxRef.current = null;
+                aaNextTimeRef.current = 0;
+                agentNextTimeRef.current = 0;
+              }
+            }}
+          >
+            {isAudioEnabled ? <Volume2 className="w-4 h-4 text-primary" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
+          </Button>
         )}
         {outcome && (
           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${

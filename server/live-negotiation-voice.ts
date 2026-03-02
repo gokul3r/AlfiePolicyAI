@@ -143,6 +143,9 @@ Once you have received the system decision message and announced it to the agent
             if (clientWs.readyState === WebSocket.OPEN) {
               clientWs.send(JSON.stringify({ type: "audio", audio: audioData }));
             }
+            if (ioInstance) {
+              ioInstance.to(roomId).emit("customer_audio", { audio: audioData, sampleRate: 24000 });
+            }
           }
         }
       }
@@ -337,6 +340,9 @@ Once you have received the system decision message and announced it to the agent
             mimeType: "audio/pcm;rate=16000",
           }
         });
+        if (ioInstance) {
+          ioInstance.to(roomId).emit("customer_audio", { audio: msg.audio, sampleRate: 16000 });
+        }
       }
 
       if (msg.type === "customer_decision") {
