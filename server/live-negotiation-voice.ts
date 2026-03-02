@@ -79,14 +79,11 @@ export async function handleVoiceNegotiation(
     storage.updateLiveNegotiationStatus(negotiation.id, "completed");
 
     if (ioInstance) {
-      ioInstance.to(roomId).emit("decision_received", { decision });
+      ioInstance.to(roomId).emit("negotiation_closed", { decision });
     }
 
     setTimeout(() => {
       isClosing = true;
-      if (ioInstance) {
-        ioInstance.to(roomId).emit("negotiation_closed", { decision });
-      }
       session?.close();
     }, 60000);
   };
@@ -253,17 +250,6 @@ Once you have received the system decision message and announced it to the agent
           }
 
           fullAssistantTurn = "";
-
-          if (session) {
-            console.log("[VoiceNego] Injecting hold instruction — waiting for customer decision");
-            session.sendClientContent({
-              turns: [{
-                role: "user",
-                parts: [{ text: "SYSTEM: The customer is now reviewing the offer on their device and will click Stay or Switch. You are on hold. Do NOT say goodbye. Do NOT use any farewell language. Do NOT apply the CALL CLOSING PROTOCOL. If the agent speaks while you are on hold, respond only with a brief natural phrase such as 'Thank you, just one moment please.' or 'Bear with me, I'm just confirming with the customer.' Remain in this hold state until you receive the next SYSTEM instruction about the customer's decision." }]
-              }],
-              turnComplete: true
-            });
-          }
         }
 
         if (clientWs.readyState === WebSocket.OPEN) {
@@ -369,14 +355,11 @@ Once you have received the system decision message and announced it to the agent
         storage.updateLiveNegotiationStatus(negotiation.id, "completed");
 
         if (ioInstance) {
-          ioInstance.to(roomId).emit("decision_received", { decision });
+          ioInstance.to(roomId).emit("negotiation_closed", { decision });
         }
 
         setTimeout(() => {
           isClosing = true;
-          if (ioInstance) {
-            ioInstance.to(roomId).emit("negotiation_closed", { decision });
-          }
           session?.close();
         }, 60000);
       }
