@@ -62,15 +62,15 @@ export async function handleVoiceNegotiation(
     const { decision } = data;
     console.log(`[VoiceNego] Customer decision via Socket.IO: ${decision}`);
 
-    const responseText = decision === "stay"
-      ? `Thank you. ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name}. Please proceed with the renewal at the agreed price. We appreciate your time and the offer you've made.`
-      : `Thank you for your time. Unfortunately, ${negotiation.customer_name} has decided to proceed with ${negotiation.competitor_name}. We appreciate the discussion and the effort you've made.`;
+    const decisionInstruction = decision === "stay"
+      ? `The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} is happy to renew at the agreed price. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
+      : `The customer has decided to proceed with ${negotiation.competitor_name} and will not be renewing with ${negotiation.provider_name}. Announce this to the agent professionally and with courtesy. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`;
 
     session.sendClientContent({
       turns: [
         {
           role: "user",
-          parts: [{ text: `The customer has made their decision. Say the following to the agent: "${responseText}"` }]
+          parts: [{ text: decisionInstruction }]
         }
       ],
       turnComplete: true
@@ -85,7 +85,7 @@ export async function handleVoiceNegotiation(
     setTimeout(() => {
       isClosing = true;
       session?.close();
-    }, 10000);
+    }, 60000);
   };
 
   voiceDecisionEmitter.on("customer_decision", handleCustomerDecision);
@@ -98,7 +98,16 @@ export async function handleVoiceNegotiation(
   const voiceSystemPrompt = systemPrompt + `
 
 VOICE INTERACTION NOTE:
-You are speaking by voice with the insurance provider's human agent. Keep your responses natural and conversational as you are in a voice call. Speak clearly and at a moderate pace. Do not use markdown, bullet points, or formatting — you are speaking aloud.`;
+You are speaking by voice with the insurance provider's human agent. Keep your responses natural and conversational as you are in a voice call. Speak clearly and at a moderate pace. Do not use markdown, bullet points, or formatting — you are speaking aloud.
+
+CALL CLOSING PROTOCOL:
+When you have announced the customer's decision (to stay or to switch), do NOT end the call immediately. Follow these steps:
+- After announcing the decision, pause and genuinely listen for the agent's response. They may say "understood", "thank you", "no problem", "I'm sorry to hear that", "all the best", or something similar.
+- Respond warmly and professionally to whatever they say. Mirror their tone — if they are gracious, be gracious back. If they wish the customer well, reciprocate.
+- Only once the agent has had a chance to speak and you have acknowledged them should you bring the call to a close.
+- Your closing sign-off should feel natural, not scripted. Something like: "Thank you again for your time today — it's been a pleasure speaking with you. Take care, and I hope we can do business in the future. Goodbye." — but adapt it naturally to whatever was just said.
+- If after you announce the decision the agent goes quiet and does not respond, allow a brief pause, then wrap up gracefully yourself: "Well, thank you again for your time and the offer you made. It was a pleasure speaking with you. Take care, goodbye."
+- The system will close the call automatically after a short window — you do not need to worry about that. Simply focus on closing professionally and naturally.`;
 
   const config: LiveConnectConfig = {
     responseModalities: [Modality.AUDIO],
@@ -325,15 +334,15 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
         const { decision } = msg;
         console.log(`[VoiceNego] Customer decision received: ${decision}`);
 
-        const responseText = decision === "stay"
-          ? `Thank you. ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name}. Please proceed with the renewal at the agreed price. We appreciate your time and the offer you've made.`
-          : `Thank you for your time. Unfortunately, ${negotiation.customer_name} has decided to proceed with ${negotiation.competitor_name}. We appreciate the discussion and the effort you've made.`;
+        const decisionInstruction = decision === "stay"
+          ? `The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} is happy to renew at the agreed price. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
+          : `The customer has decided to proceed with ${negotiation.competitor_name} and will not be renewing with ${negotiation.provider_name}. Announce this to the agent professionally and with courtesy. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`;
 
         session.sendClientContent({
           turns: [
             {
               role: "user",
-              parts: [{ text: `The customer has made their decision. Say the following to the agent: "${responseText}"` }]
+              parts: [{ text: decisionInstruction }]
             }
           ],
           turnComplete: true
@@ -348,7 +357,7 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
         setTimeout(() => {
           isClosing = true;
           session?.close();
-        }, 10000);
+        }, 60000);
       }
     } catch (error) {
       console.error("[VoiceNego] Error processing client message:", error);
