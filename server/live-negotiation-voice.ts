@@ -63,8 +63,8 @@ export async function handleVoiceNegotiation(
     console.log(`[VoiceNego] Customer decision via Socket.IO: ${decision}`);
 
     const decisionInstruction = decision === "stay"
-      ? `The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} is happy to renew at the agreed price. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
-      : `The customer has decided to proceed with ${negotiation.competitor_name} and will not be renewing with ${negotiation.provider_name}. Announce this to the agent professionally and with courtesy. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`;
+      ? `The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name} and is happy to continue their policy at the agreed price. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
+      : `The customer has decided to proceed with ${negotiation.competitor_name} and will not be continuing with ${negotiation.provider_name}. Announce this to the agent professionally and with courtesy. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`;
 
     session.sendClientContent({
       turns: [
@@ -347,8 +347,8 @@ Once you have received the system decision message and announced it to the agent
         console.log(`[VoiceNego] Customer decision received: ${decision}`);
 
         const decisionInstruction = decision === "stay"
-          ? `The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} is happy to renew at the agreed price. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
-          : `The customer has decided to proceed with ${negotiation.competitor_name} and will not be renewing with ${negotiation.provider_name}. Announce this to the agent professionally and with courtesy. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`;
+          ? `The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name} and is happy to continue their policy at the agreed price. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
+          : `The customer has decided to proceed with ${negotiation.competitor_name} and will not be continuing with ${negotiation.provider_name}. Announce this to the agent professionally and with courtesy. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`;
 
         session.sendClientContent({
           turns: [
