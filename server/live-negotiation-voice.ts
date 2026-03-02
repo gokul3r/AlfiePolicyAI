@@ -78,12 +78,11 @@ export async function handleVoiceNegotiation(
 
     storage.updateLiveNegotiationStatus(negotiation.id, "completed");
 
-    if (ioInstance) {
-      ioInstance.to(roomId).emit("negotiation_closed", { decision });
-    }
-
     setTimeout(() => {
       isClosing = true;
+      if (ioInstance) {
+        ioInstance.to(roomId).emit("negotiation_closed", { decision });
+      }
       session?.close();
     }, 60000);
   };
@@ -252,6 +251,13 @@ Once you have received the system decision message and announced it to the agent
           }
 
           fullAssistantTurn = "";
+
+          if (session) {
+            session.sendClientContent({
+              turns: [{ role: "user", parts: [{ text: "SYSTEM: Hold. Customer is now deciding on their own screen. Await the SYSTEM DECISION message. No response required." }] }],
+              turnComplete: true
+            });
+          }
         }
 
         if (clientWs.readyState === WebSocket.OPEN) {
@@ -356,12 +362,11 @@ Once you have received the system decision message and announced it to the agent
 
         storage.updateLiveNegotiationStatus(negotiation.id, "completed");
 
-        if (ioInstance) {
-          ioInstance.to(roomId).emit("negotiation_closed", { decision });
-        }
-
         setTimeout(() => {
           isClosing = true;
+          if (ioInstance) {
+            ioInstance.to(roomId).emit("negotiation_closed", { decision });
+          }
           session?.close();
         }, 60000);
       }
