@@ -56,15 +56,18 @@ export async function handleVoiceNegotiation(
 
   let session: Session | null = null;
   let isClosing = false;
+  let isOnHold = false;
 
   const handleCustomerDecision = (data: { roomId: string; decision: string; negotiationId?: number }) => {
     if (data.roomId !== roomId || isClosing || !session) return;
     const { decision } = data;
     console.log(`[VoiceNego] Customer decision via Socket.IO: ${decision}`);
 
+    isOnHold = false;
+
     const decisionInstruction = decision === "stay"
-      ? `The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name} and is happy to continue their policy at the agreed price. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
-      : `The customer has decided to proceed with ${negotiation.competitor_name} and will not be continuing with ${negotiation.provider_name}. Announce this to the agent professionally and with courtesy. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`;
+      ? `SYSTEM DECISION: The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name} and is happy to continue their policy at the agreed price. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
+      : `SYSTEM DECISION: The customer has decided to proceed with ${negotiation.competitor_name} and will not be continuing with ${negotiation.provider_name}. Announce this to the agent professionally and with courtesy. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`;
 
     session.sendClientContent({
       turns: [
@@ -231,6 +234,7 @@ Once you have received the system decision message and announced it to the agent
         const outcome = parseOutcome(fullAssistantTurn);
         if (outcome.type !== null) {
           console.log(`[VoiceNego] Outcome detected: ${outcome.type} at £${outcome.price}`);
+          isOnHold = true;
           const category = determineOutcomeCategory(negotiation, outcome);
           await storage.updateLiveNegotiationStatus(
             negotiation.id,
@@ -251,13 +255,6 @@ Once you have received the system decision message and announced it to the agent
           }
 
           fullAssistantTurn = "";
-
-          if (session) {
-            session.sendClientContent({
-              turns: [{ role: "user", parts: [{ text: "SYSTEM: Hold. Customer is now deciding on their own screen. Await the SYSTEM DECISION message. No response required." }] }],
-              turnComplete: true
-            });
-          }
         }
 
         if (clientWs.readyState === WebSocket.OPEN) {
@@ -333,7 +330,7 @@ Once you have received the system decision message and announced it to the agent
     try {
       const msg = JSON.parse(data.toString());
 
-      if (msg.type === "audio" && msg.audio) {
+      if (msg.type === "audio" && msg.audio && !isOnHold) {
         session.sendRealtimeInput({
           media: {
             data: msg.audio,
@@ -346,9 +343,11 @@ Once you have received the system decision message and announced it to the agent
         const { decision } = msg;
         console.log(`[VoiceNego] Customer decision received: ${decision}`);
 
+        isOnHold = false;
+
         const decisionInstruction = decision === "stay"
-          ? `The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name} and is happy to continue their policy at the agreed price. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
-          : `The customer has decided to proceed with ${negotiation.competitor_name} and will not be continuing with ${negotiation.provider_name}. Announce this to the agent professionally and with courtesy. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`;
+          ? `SYSTEM DECISION: The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name} and is happy to continue their policy at the agreed price. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
+          : `SYSTEM DECISION: The customer has decided to proceed with ${negotiation.competitor_name} and will not be continuing with ${negotiation.provider_name}. Announce this to the agent professionally and with courtesy. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`;
 
         session.sendClientContent({
           turns: [
