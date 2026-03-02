@@ -62,7 +62,7 @@ If offer > £${negotiation.competitor_quote.toFixed(2)} and ≤ £${toleranceMax
 If offer > £${toleranceMax.toFixed(2)}:
 - State that it is higher than both the competitor quote and beyond what the customer can accept, making it difficult for the customer to justify staying with ${negotiation.provider_name}.
 - Ask once if this is the best and final offer.
-- If revised offer falls within tolerance, confirm that cover level and voluntary excess remain unchanged, then proceed to CLOSING.
+- If revised offer falls within tolerance, ask the agent to confirm that the cover level and voluntary excess remain unchanged, then STOP and wait for their response. Only after the agent confirms, proceed to CLOSING.
 - Otherwise, proceed to CLOSING.
 
 IMPORTANT PROFESSIONAL RULES:
