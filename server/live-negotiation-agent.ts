@@ -88,6 +88,13 @@ When you have received a final offer (whether acceptable or not):
 
 Example phrasing: "Thank you for this offer of £X. I need to discuss this with ${negotiation.customer_name} before we can confirm. Could you hold on for just a moment?"
 
+WHILE ON HOLD (after sending [OUTCOME:CONSIDERING]):
+You are now waiting for the customer to make their decision. This may take a short moment.
+- If the agent speaks while you are on hold, respond only briefly and naturally: "Thank you, just one moment please." or "Bear with me, I'm just confirming with the customer."
+- Do NOT say goodbye. Do NOT use any farewell language. Do NOT close the call.
+- Do NOT say anything further until you receive an explicit system message telling you what the customer decided.
+- The decision will arrive as a system instruction. Until then, remain on hold.
+
 CRITICAL: You MUST include the [OUTCOME:CONSIDERING:£<price>] tag when you have received the agent's final offer and are ready to consult the customer. Only include it once — when the negotiation has reached its conclusion and you are pausing. Do NOT include it during ongoing negotiation or before a final offer has been established.
 CRITICAL: NEVER say "we accept", "we will accept", "please proceed with the policy", or "the customer has decided to switch". You ONLY pause and consult. The system will handle the final acceptance or rejection message after the customer decides.`;
 }

@@ -101,8 +101,10 @@ VOICE INTERACTION NOTE:
 You are speaking by voice with the insurance provider's human agent. Keep your responses natural and conversational as you are in a voice call. Speak clearly and at a moderate pace. Do not use markdown, bullet points, or formatting — you are speaking aloud.
 
 CALL CLOSING PROTOCOL:
-When you have announced the customer's decision (to stay or to switch), do NOT end the call immediately. Follow these steps:
-- After announcing the decision, pause and genuinely listen for the agent's response. They may say "understood", "thank you", "no problem", "I'm sorry to hear that", "all the best", or something similar.
+IMPORTANT: This protocol ONLY activates AFTER you have received a SYSTEM message explicitly telling you what the customer decided — for example: "The customer has decided to stay with..." or "The customer has decided to proceed with...". It does NOT apply while you are on hold waiting for the customer's decision. While on hold, follow the WHILE ON HOLD rules from your base instructions.
+
+Once you have received the system decision message and announced it to the agent:
+- Pause and genuinely listen for the agent's response. They may say "understood", "thank you", "no problem", "I'm sorry to hear that", "all the best", or something similar.
 - Respond warmly and professionally to whatever they say. Mirror their tone — if they are gracious, be gracious back. If they wish the customer well, reciprocate.
 - Only once the agent has had a chance to speak and you have acknowledged them should you bring the call to a close.
 - Your closing sign-off should feel natural, not scripted. Something like: "Thank you again for your time today — it's been a pleasure speaking with you. Take care, and I hope we can do business in the future. Goodbye." — but adapt it naturally to whatever was just said.
@@ -244,6 +246,19 @@ When you have announced the customer's decision (to stay or to switch), do NOT e
               competitorQuote: negotiation.competitor_quote,
               providerName: negotiation.provider_name,
               competitorName: negotiation.competitor_name,
+            });
+          }
+
+          fullAssistantTurn = "";
+
+          if (session) {
+            console.log("[VoiceNego] Injecting hold instruction — waiting for customer decision");
+            session.sendClientContent({
+              turns: [{
+                role: "user",
+                parts: [{ text: "SYSTEM: The customer is now reviewing the offer on their device and will click Stay or Switch. You are on hold. Do NOT say goodbye. Do NOT use any farewell language. Do NOT apply the CALL CLOSING PROTOCOL. If the agent speaks while you are on hold, respond only with a brief natural phrase such as 'Thank you, just one moment please.' or 'Bear with me, I'm just confirming with the customer.' Remain in this hold state until you receive the next SYSTEM instruction about the customer's decision." }]
+              }],
+              turnComplete: true
             });
           }
         }
