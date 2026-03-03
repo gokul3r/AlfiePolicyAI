@@ -150,7 +150,7 @@ function generateFallbackResponse(
   isOpening: boolean
 ): string {
   if (isOpening) {
-    return `Hello, I'm calling on behalf of ${negotiation.customer_name} regarding policy number ${negotiation.policy_number}. Their current annual premium is £${negotiation.current_premium.toFixed(2)}. They have received a competitive quote from ${negotiation.competitor_name} for £${negotiation.competitor_quote.toFixed(2)} and are considering switching. Could you please review the policy and advise whether ${negotiation.provider_name} can offer a more competitive premium?`;
+    return `Hello, I'm AutoAnnie, calling on behalf of ${negotiation.customer_name} regarding policy number ${negotiation.policy_number}. Their current annual premium is £${negotiation.current_premium.toFixed(2)}. They have received a competitive quote from ${negotiation.competitor_name} for £${negotiation.competitor_quote.toFixed(2)} and are considering switching. Could you please review the policy and advise whether ${negotiation.provider_name} can offer a more competitive premium?`;
   }
   return `Thank you for your response. Could you confirm whether this is your best and final offer? ${negotiation.customer_name} is prepared to switch if we cannot reach a more competitive rate.`;
 }

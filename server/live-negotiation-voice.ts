@@ -65,8 +65,10 @@ export async function handleVoiceNegotiation(
 
     isOnHold = false;
 
+    const stayFinalOffer = negotiation.final_offer_price ?? negotiation.current_premium;
+    const staySaving = Math.round((negotiation.current_premium - stayFinalOffer) * 100) / 100;
     const decisionInstruction = decision === "stay"
-      ? `SYSTEM DECISION: The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name} and is happy to continue their policy at the agreed price. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
+      ? `SYSTEM DECISION: The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name} and is happy to continue their policy at the agreed price of £${stayFinalOffer.toFixed(2)}${staySaving > 0 ? `, saving £${staySaving.toFixed(2)} compared to their previous premium` : ""}. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
       : `SYSTEM DECISION: The customer has decided to proceed with ${negotiation.competitor_name} and will not be continuing with ${negotiation.provider_name}. Announce this to the agent professionally and with courtesy. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`;
 
     session.sendClientContent({
@@ -351,8 +353,10 @@ Once you have received the system decision message and announced it to the agent
 
         isOnHold = false;
 
+        const stayFinalOffer = negotiation.final_offer_price ?? negotiation.current_premium;
+        const staySaving = Math.round((negotiation.current_premium - stayFinalOffer) * 100) / 100;
         const decisionInstruction = decision === "stay"
-          ? `SYSTEM DECISION: The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name} and is happy to continue their policy at the agreed price. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
+          ? `SYSTEM DECISION: The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name} and is happy to continue their policy at the agreed price of £${stayFinalOffer.toFixed(2)}${staySaving > 0 ? `, saving £${staySaving.toFixed(2)} compared to their previous premium` : ""}. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
           : `SYSTEM DECISION: The customer has decided to proceed with ${negotiation.competitor_name} and will not be continuing with ${negotiation.provider_name}. Announce this to the agent professionally and with courtesy. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`;
 
         session.sendClientContent({

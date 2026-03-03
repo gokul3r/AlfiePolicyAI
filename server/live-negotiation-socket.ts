@@ -91,7 +91,9 @@ export function initializeLiveNegotiationSocket(httpServer: HTTPServer) {
       }
 
       if (decision === "stay") {
-        const stayMessage = `Thank you. ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name}. Please confirm the renewal at £${negotiation.final_offer_price?.toFixed(2) || negotiation.current_premium.toFixed(2)}. We appreciate your time.`;
+        const stayFinalOffer = negotiation.final_offer_price ?? negotiation.current_premium;
+        const staySaving = Math.round((negotiation.current_premium - stayFinalOffer) * 100) / 100;
+        const stayMessage = `Thank you. ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name}. Please confirm the renewal at £${stayFinalOffer.toFixed(2)}${staySaving > 0 ? `, saving £${staySaving.toFixed(2)} compared to their previous premium of £${negotiation.current_premium.toFixed(2)}` : ""}. We appreciate your time.`;
         const savedMsg = await storage.createLiveNegotiationMessage({
           negotiation_id: negotiation.id,
           sender: "autoannie",
