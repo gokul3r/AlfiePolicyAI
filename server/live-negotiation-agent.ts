@@ -179,6 +179,46 @@ export function parseOutcome(message: string): NegotiationOutcome {
   return { type: null, price: null };
 }
 
+export function detectOutcomeFromSpeech(transcript: string, negotiation: LiveNegotiation): NegotiationOutcome {
+  const lower = transcript.toLowerCase();
+
+  const holdPhrases = [
+    /hold on/i,
+    /hold for/i,
+    /hold while/i,
+    /please hold/i,
+    /just a moment/i,
+    /one moment/i,
+    /discuss this with/i,
+    /discuss with/i,
+    /consult with/i,
+    /before we can confirm/i,
+    /before i can confirm/i,
+    /need to discuss/i,
+    /need to consult/i,
+  ];
+
+  const isHoldDetected = holdPhrases.some(pattern => pattern.test(lower));
+
+  if (!isHoldDetected) {
+    return { type: null, price: null };
+  }
+
+  const priceMatches = [...transcript.matchAll(/£([\d,]+(?:\.[\d]+)?)/g)];
+  let detectedPrice: number | null = null;
+
+  if (priceMatches.length > 0) {
+    const lastMatch = priceMatches[priceMatches.length - 1];
+    const rawPrice = lastMatch[1].replace(/,/g, "");
+    const parsed = parseFloat(rawPrice);
+    if (!isNaN(parsed) && parsed > 0 && parsed < 10000) {
+      detectedPrice = parsed;
+    }
+  }
+
+  return { type: "considering", price: detectedPrice };
+}
+
 export function determineOutcomeCategory(
   negotiation: LiveNegotiation,
   outcome: NegotiationOutcome

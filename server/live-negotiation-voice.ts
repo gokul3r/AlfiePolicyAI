@@ -2,7 +2,7 @@ import WebSocket from "ws";
 import { GoogleGenAI, Modality, Session, LiveConnectConfig, LiveServerMessage } from "@google/genai";
 import { storage } from "./storage";
 import type { LiveNegotiation } from "@shared/schema";
-import { buildSystemPrompt, parseOutcome, determineOutcomeCategory } from "./live-negotiation-agent";
+import { buildSystemPrompt, parseOutcome, detectOutcomeFromSpeech, determineOutcomeCategory } from "./live-negotiation-agent";
 import type { Server as SocketIOServer } from "socket.io";
 import { EventEmitter } from "events";
 
@@ -57,6 +57,7 @@ export async function handleVoiceNegotiation(
   let session: Session | null = null;
   let isClosing = false;
   let isOnHold = false;
+  let detectedFinalOfferPrice: number | null = null;
 
   const handleCustomerDecision = (data: { roomId: string; decision: string; negotiationId?: number }) => {
     if (data.roomId !== roomId || isClosing || !session) return;
@@ -65,7 +66,7 @@ export async function handleVoiceNegotiation(
 
     isOnHold = false;
 
-    const stayFinalOffer = negotiation.final_offer_price ?? negotiation.current_premium;
+    const stayFinalOffer = detectedFinalOfferPrice ?? negotiation.final_offer_price ?? negotiation.current_premium;
     const staySaving = Math.round((negotiation.current_premium - stayFinalOffer) * 100) / 100;
     const decisionInstruction = decision === "stay"
       ? `SYSTEM DECISION: The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name} and is happy to continue their policy at the agreed price of £${stayFinalOffer.toFixed(2)}${staySaving > 0 ? `, saving £${staySaving.toFixed(2)} compared to their previous premium` : ""}. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
@@ -236,10 +237,18 @@ Once you have received the system decision message and announced it to the agent
           }
         }
 
-        const outcome = parseOutcome(fullAssistantTurn);
+        let outcome = parseOutcome(fullAssistantTurn);
+        if (outcome.type === null) {
+          const speechOutcome = detectOutcomeFromSpeech(fullAssistantTurn, negotiation);
+          if (speechOutcome.type !== null) {
+            console.log(`[VoiceNego] Outcome detected via speech pattern: ${speechOutcome.type} at £${speechOutcome.price}`);
+            outcome = speechOutcome;
+          }
+        }
         if (outcome.type !== null) {
           console.log(`[VoiceNego] Outcome detected: ${outcome.type} at £${outcome.price}`);
           isOnHold = true;
+          detectedFinalOfferPrice = outcome.price;
           const category = determineOutcomeCategory(negotiation, outcome);
           await storage.updateLiveNegotiationStatus(
             negotiation.id,
@@ -353,7 +362,7 @@ Once you have received the system decision message and announced it to the agent
 
         isOnHold = false;
 
-        const stayFinalOffer = negotiation.final_offer_price ?? negotiation.current_premium;
+        const stayFinalOffer = detectedFinalOfferPrice ?? negotiation.final_offer_price ?? negotiation.current_premium;
         const staySaving = Math.round((negotiation.current_premium - stayFinalOffer) * 100) / 100;
         const decisionInstruction = decision === "stay"
           ? `SYSTEM DECISION: The customer has decided to stay with ${negotiation.provider_name}. Announce this to the agent professionally — let them know ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name} and is happy to continue their policy at the agreed price of £${stayFinalOffer.toFixed(2)}${staySaving > 0 ? `, saving £${staySaving.toFixed(2)} compared to their previous premium` : ""}. Then listen for their response, acknowledge any closing remarks warmly, and bring the call to a natural, polite conclusion before saying goodbye.`
