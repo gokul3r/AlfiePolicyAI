@@ -2640,17 +2640,23 @@ function NegotiatePromptState({
   onYes: (tolerance: number, mode: "text" | "voice") => void;
   onNo: () => void;
 }) {
+  const CANCELLATION_FEE = 55;
   const sliderMin = competitorQuote;
   const sliderMax = currentPolicyPrice > competitorQuote ? currentPolicyPrice : competitorQuote + 100;
-  const defaultTolerance = Math.round(competitorQuote * 0.02 * 100) / 100;
-  const defaultSliderValue = Math.min(sliderMin + defaultTolerance, sliderMax);
+  const breakEvenPoint = Math.min(competitorQuote + CANCELLATION_FEE, sliderMax);
+  const defaultSliderValue = breakEvenPoint;
   const [sliderValue, setSliderValue] = useState<number>(defaultSliderValue);
   const [negotiationMode, setNegotiationMode] = useState<"text" | "voice">("text");
 
   const tolerance = Math.round((sliderValue - sliderMin) * 100) / 100;
-  const tolerancePct = sliderMax > sliderMin
-    ? Math.round(((sliderValue - sliderMin) / (sliderMax - sliderMin)) * 100)
+  const breakEvenPct = sliderMax > sliderMin
+    ? Math.min(((breakEvenPoint - sliderMin) / (sliderMax - sliderMin)) * 100, 100)
     : 0;
+
+  const savingsDiff = Math.round(Math.abs(sliderValue - breakEvenPoint) * 100) / 100;
+  const isAtBreakEven = savingsDiff < 0.5;
+  const stayingIsCheaper = sliderValue < breakEvenPoint - 0.49;
+  const switchingIsCheaper = sliderValue > breakEvenPoint + 0.49;
 
   const handleYes = () => {
     onYes(tolerance, negotiationMode);
@@ -2710,7 +2716,7 @@ function NegotiatePromptState({
             <span>Current rate</span>
           </div>
 
-          <div className="relative">
+          <div className="relative pb-5">
             <Slider
               min={sliderMin}
               max={sliderMax}
@@ -2719,6 +2725,15 @@ function NegotiatePromptState({
               onValueChange={([v]) => setSliderValue(v)}
               data-testid="slider-tolerance"
             />
+            <div
+              className="absolute top-0 flex flex-col items-center pointer-events-none"
+              style={{ left: `${breakEvenPct}%`, transform: "translateX(-50%)" }}
+            >
+              <div className="w-px h-3 bg-muted-foreground/50 mt-0.5" />
+              <span className="text-[9px] text-muted-foreground whitespace-nowrap mt-0.5 leading-tight">
+                {competitorName} +£{CANCELLATION_FEE}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center justify-between text-xs font-medium px-0.5">
@@ -2727,14 +2742,28 @@ function NegotiatePromptState({
           </div>
         </div>
 
-        <div className="rounded-md bg-muted/60 px-4 py-3 space-y-1 text-center">
+        <div
+          className={`rounded-md px-4 py-3 space-y-1 text-center border ${
+            isAtBreakEven
+              ? "bg-amber-50/60 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
+              : "bg-muted/60 border-transparent"
+          }`}
+        >
           <p className="text-base font-semibold text-foreground" data-testid="text-max-acceptable">
             Max acceptable: £{sliderValue.toFixed(2)}
           </p>
-          <p className="text-xs text-muted-foreground">
-            {tolerance === 0
-              ? "No tolerance — exact competitor price only"
-              : `+£${tolerance.toFixed(2)} above ${competitorName} quote (${tolerancePct}% of gap)`}
+          <p className={`text-xs font-medium ${
+            isAtBreakEven
+              ? "text-amber-600 dark:text-amber-400"
+              : stayingIsCheaper
+              ? "text-green-600 dark:text-green-400"
+              : "text-blue-600 dark:text-blue-400"
+          }`}>
+            {isAtBreakEven
+              ? "Break-even — same cost to stay or switch"
+              : stayingIsCheaper
+              ? `Staying saves you £${savingsDiff.toFixed(2)} vs switching`
+              : `Switching saves you £${savingsDiff.toFixed(2)} vs staying`}
           </p>
         </div>
       </div>
