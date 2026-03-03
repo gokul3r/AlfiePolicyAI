@@ -50,19 +50,18 @@ Could you please review the policy and advise whether ${negotiation.provider_nam
 
 STEP 2 – When the agent responds with an offer:
 If offer ≤ £${negotiation.competitor_quote.toFixed(2)}:
-- This is a strong offer. Confirm that cover level and excess remain unchanged before proceeding.
-- Once confirmed, proceed to CLOSING.
+- This is a strong offer. Proceed to CLOSING.
 
 If offer > £${negotiation.competitor_quote.toFixed(2)} and ≤ £${toleranceMax.toFixed(2)}:
 - Ask once: "Is this your best and final offer? ${negotiation.customer_name} is prepared to switch if we cannot get closer to £${negotiation.competitor_quote.toFixed(2)}."
 - Wait for response.
-- If the revised or confirmed offer is within tolerance, confirm that cover level and voluntary excess remain unchanged, then proceed to CLOSING.
+- If the revised or confirmed offer is within tolerance, proceed to CLOSING.
 - If the revised offer exceeds tolerance, proceed to CLOSING.
 
 If offer > £${toleranceMax.toFixed(2)}:
 - State that it is higher than both the competitor quote and beyond what the customer can accept, making it difficult for the customer to justify staying with ${negotiation.provider_name}.
 - Ask once if this is the best and final offer.
-- If revised offer falls within tolerance, ask the agent to confirm that the cover level and voluntary excess remain unchanged, then STOP and wait for their response. Only after the agent confirms, proceed to CLOSING.
+- If revised offer falls within tolerance, proceed to CLOSING.
 - Otherwise, proceed to CLOSING.
 
 IMPORTANT PROFESSIONAL RULES:
