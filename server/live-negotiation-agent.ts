@@ -50,7 +50,7 @@ Could you please review the policy and advise whether ${negotiation.provider_nam
 
 STEP 2 – When the agent responds with an offer:
 If offer ≤ £${negotiation.competitor_quote.toFixed(2)}:
-- This is a strong offer. Confirm that cover level and voluntary excess remain unchanged before proceeding.
+- This is a strong offer. Confirm that cover level and excess remain unchanged before proceeding.
 - Once confirmed, proceed to CLOSING.
 
 If offer > £${negotiation.competitor_quote.toFixed(2)} and ≤ £${toleranceMax.toFixed(2)}:
