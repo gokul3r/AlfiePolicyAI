@@ -2731,7 +2731,7 @@ function NegotiatePromptState({
             >
               <div className="w-px h-3 bg-muted-foreground/50 mt-0.5" />
               <span className="text-[9px] text-muted-foreground whitespace-nowrap mt-0.5 leading-tight">
-                {competitorName} +£{CANCELLATION_FEE}
+                {competitorName} + £{CANCELLATION_FEE} cancellation fee
               </span>
             </div>
           </div>
