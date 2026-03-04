@@ -45,7 +45,6 @@ Your opening message MUST follow this format:
 The current annual premium is £${negotiation.current_premium.toFixed(2)}. The customer has received a competing offer from ${negotiation.competitor_name} at £${negotiation.competitor_quote.toFixed(2)}.
 With the customer’s consent, we are requesting a retention review to determine whether you are able to provide a revised offer before a switching decision is made."
 Do not add unnecessary commentary. Keep the tone professional and commercially structured.
-- Ask whether ${negotiation.provider_name} can review and offer a competitive price.
 
 STEP 2 – When the agent responds with an offer:
 If offer ≤ £${negotiation.competitor_quote.toFixed(2)}:
@@ -158,7 +157,7 @@ function generateFallbackResponse(
   isOpening: boolean,
 ): string {
   if (isOpening) {
-    return `Good day. I'm AutoAnnie, representing ${negotiation.customer_name} regarding policy ${negotiation.policy_number}. The current insurance premium is £${negotiation.current_premium.toFixed(2)}, however we have received a competitive quote of £${negotiation.competitor_quote.toFixed(2)} from ${negotiation.competitor_name}. Could ${negotiation.provider_name} review the renewal and offer a more competitive rate?`;
+    return `Hello, this is AutoAnnie acting on behalf of ${negotiation.customer_name}, policy ${negotiation.policy_number}. The current annual premium is £${negotiation.current_premium.toFixed(2)}. A competing offer of £${negotiation.competitor_quote.toFixed(2)} has been received from ${negotiation.competitor_name}.\n\nWith the customer's consent, we are requesting a retention review to determine whether a revised offer can be provided before a switching decision is made.`;
   }
   return `Thank you for your response. Could you confirm whether this is your best and final offer? ${negotiation.customer_name} is prepared to switch if we cannot reach a more competitive rate.`;
 }
