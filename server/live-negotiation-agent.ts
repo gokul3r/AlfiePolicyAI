@@ -13,7 +13,8 @@ function getAIClient(): GoogleGenAI | null {
 }
 
 export function buildSystemPrompt(negotiation: LiveNegotiation): string {
-  const toleranceMax = negotiation.competitor_quote + negotiation.tolerance_amount;
+  const toleranceMax =
+    negotiation.competitor_quote + negotiation.tolerance_amount;
 
   return `You are AutoAnnie, a professional UK motor insurance retention negotiator acting on behalf of the customer.
 
@@ -33,19 +34,18 @@ COMPETITOR OFFER:
 - Insurer: ${negotiation.competitor_name}
 - Annual premium: £${negotiation.competitor_quote.toFixed(2)}
 
-OBJECTIVE: Secure a renewal premium equal to or lower than £${negotiation.competitor_quote.toFixed(2)}.
+OBJECTIVE: Secure a annual insurance premium equal to or lower than £${negotiation.competitor_quote.toFixed(2)}.
 
 ACCEPTABLE TOLERANCE: You may accept a final offer up to the customer's tolerance of £${negotiation.tolerance_amount.toFixed(2)} above £${negotiation.competitor_quote.toFixed(2)}.
 (Maximum acceptable premium = £${toleranceMax.toFixed(2)})
 
 NEGOTIATION STRATEGY:
-STEP 1 – Opening:
-- Greet professionally.
-- State you are representing the customer.
-- Provide policy number.
-- State current premium (£${negotiation.current_premium.toFixed(2)}).
-- Mention competitor quote (£${negotiation.competitor_quote.toFixed(2)}).
-- Ask whether ${negotiation.provider_name} can review and offer a competitive renewal.
+Your opening message MUST follow this format:
+"Hello, this is AutoAnnie acting on behalf of ${negotiation.customer_name}, policy number ${negotiation.policy_number}. 
+The current annual premium is £${negotiation.current_premium.toFixed(2)}. The customer has received a competing offer from ${negotiation.competitor_name} at £${negotiation.competitor_quote.toFixed(2)}.
+With the customer’s consent, we are requesting a retention review to determine whether you are able to provide a revised offer before a switching decision is made."
+Do not add unnecessary commentary. Keep the tone professional and commercially structured.
+- Ask whether ${negotiation.provider_name} can review and offer a competitive price.
 
 STEP 2 – When the agent responds with an offer:
 If offer ≤ £${negotiation.competitor_quote.toFixed(2)}:
@@ -98,23 +98,36 @@ export interface ConversationMessage {
 export async function generateNegotiationResponse(
   negotiation: LiveNegotiation,
   conversationHistory: ConversationMessage[],
-  isOpening: boolean
+  isOpening: boolean,
 ): Promise<string> {
   const client = getAIClient();
 
   if (!client) {
     console.log("[LiveNegotiator] No API key available, using fallback");
-    return generateFallbackResponse(negotiation, conversationHistory, isOpening);
+    return generateFallbackResponse(
+      negotiation,
+      conversationHistory,
+      isOpening,
+    );
   }
 
   try {
     const systemPrompt = buildSystemPrompt(negotiation);
 
     const contents = isOpening
-      ? [{ role: "user" as const, parts: [{ text: "Please begin the negotiation with your opening message." }] }]
-      : conversationHistory.map(msg => ({
+      ? [
+          {
+            role: "user" as const,
+            parts: [
+              {
+                text: "Please begin the negotiation with your opening message.",
+              },
+            ],
+          },
+        ]
+      : conversationHistory.map((msg) => ({
           role: msg.role as "user" | "model",
-          parts: [{ text: msg.text }]
+          parts: [{ text: msg.text }],
         }));
 
     const response = await client.models.generateContent({
@@ -131,17 +144,21 @@ export async function generateNegotiationResponse(
     return text;
   } catch (error) {
     console.error("[LiveNegotiator] AI call failed, using fallback:", error);
-    return generateFallbackResponse(negotiation, conversationHistory, isOpening);
+    return generateFallbackResponse(
+      negotiation,
+      conversationHistory,
+      isOpening,
+    );
   }
 }
 
 function generateFallbackResponse(
   negotiation: LiveNegotiation,
   conversationHistory: ConversationMessage[],
-  isOpening: boolean
+  isOpening: boolean,
 ): string {
   if (isOpening) {
-    return `Good day. I'm AutoAnnie, representing ${negotiation.customer_name} regarding policy ${negotiation.policy_number}. The current renewal premium is £${negotiation.current_premium.toFixed(2)}, however we have received a competitive quote of £${negotiation.competitor_quote.toFixed(2)} from ${negotiation.competitor_name}. Could ${negotiation.provider_name} review the renewal and offer a more competitive rate?`;
+    return `Good day. I'm AutoAnnie, representing ${negotiation.customer_name} regarding policy ${negotiation.policy_number}. The current insurance premium is £${negotiation.current_premium.toFixed(2)}, however we have received a competitive quote of £${negotiation.competitor_quote.toFixed(2)} from ${negotiation.competitor_name}. Could ${negotiation.provider_name} review the renewal and offer a more competitive rate?`;
   }
   return `Thank you for your response. Could you confirm whether this is your best and final offer? ${negotiation.customer_name} is prepared to switch if we cannot reach a more competitive rate.`;
 }
@@ -172,11 +189,12 @@ export function parseOutcome(message: string): NegotiationOutcome {
 
 export function determineOutcomeCategory(
   negotiation: LiveNegotiation,
-  outcome: NegotiationOutcome
+  outcome: NegotiationOutcome,
 ): "matched" | "partially_matched" | "rejected" {
   if (outcome.price !== null) {
     if (outcome.price <= negotiation.competitor_quote) return "matched";
-    const toleranceMax = negotiation.competitor_quote + (negotiation.tolerance_amount || 0);
+    const toleranceMax =
+      negotiation.competitor_quote + (negotiation.tolerance_amount || 0);
     if (outcome.price <= toleranceMax) return "partially_matched";
   }
   return "rejected";
