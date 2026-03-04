@@ -1137,6 +1137,7 @@ function VoiceAgentChatRoom({
   providerColors: ReturnType<typeof getProviderColors>;
 }) {
   const [isConnected, setIsConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [isMicActive, setIsMicActive] = useState(false);
   const [transcript, setTranscript] = useState<{ sender: string; text: string }[]>([]);
   const [isClosed, setIsClosed] = useState(negotiation.status === "completed");
@@ -1166,6 +1167,8 @@ function VoiceAgentChatRoom({
   }, [negotiation.socket_room_id]);
 
   const connectVoice = async () => {
+    if (isConnecting || isConnected) return;
+    setIsConnecting(true);
     try {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const ws = new WebSocket(
@@ -1181,6 +1184,7 @@ function VoiceAgentChatRoom({
         const msg = JSON.parse(event.data);
 
         if (msg.type === "session_ready") {
+          setIsConnecting(false);
           setIsConnected(true);
           startMicrophone();
         }
@@ -1214,18 +1218,26 @@ function VoiceAgentChatRoom({
         }
 
         if (msg.type === "session_closed" || msg.type === "error") {
+          setIsConnecting(false);
           setIsConnected(false);
           setIsMicActive(false);
         }
       };
 
       ws.onclose = () => {
+        setIsConnecting(false);
         setIsConnected(false);
         setIsMicActive(false);
         stopMicrophone();
       };
+
+      ws.onerror = () => {
+        setIsConnecting(false);
+        setIsConnected(false);
+      };
     } catch (error) {
       console.error("[VoiceNego] Connection error:", error);
+      setIsConnecting(false);
     }
   };
 
@@ -1355,7 +1367,7 @@ function VoiceAgentChatRoom({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {!isConnected && !isClosed && transcript.length === 0 && (
+        {!isConnected && !isConnecting && !isClosed && transcript.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full space-y-4">
             <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
               <Phone className="w-10 h-10 text-primary" />
@@ -1397,10 +1409,12 @@ function VoiceAgentChatRoom({
         <div ref={messagesEndRef} />
       </div>
 
-      {isConnected && !isClosed && (
+      {(isConnecting || isConnected) && !isClosed && (
         <div className="px-4 py-3 border-t border-border flex items-center justify-center gap-4 shrink-0">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            {isMicActive ? (
+            {isConnecting ? (
+              <><div className="w-3 h-3 rounded-full bg-yellow-500 animate-pulse" /> Connecting to AutoAnnie...</>
+            ) : isMicActive ? (
               <><Mic className="w-4 h-4 text-red-500 animate-pulse" /> Mic active — speak to AutoAnnie</>
             ) : (
               <><MicOff className="w-4 h-4" /> Mic off</>
