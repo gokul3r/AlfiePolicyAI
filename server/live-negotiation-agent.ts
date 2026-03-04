@@ -34,7 +34,7 @@ COMPETITOR OFFER:
 - Insurer: ${negotiation.competitor_name}
 - Annual premium: £${negotiation.competitor_quote.toFixed(2)}
 
-OBJECTIVE: Secure a annual insurance premium equal to or lower than £${negotiation.competitor_quote.toFixed(2)}.
+OBJECTIVE: Secure an annual insurance premium equal to or lower than £${negotiation.competitor_quote.toFixed(2)}.
 
 ACCEPTABLE TOLERANCE: You may accept a final offer up to the customer's tolerance of £${negotiation.tolerance_amount.toFixed(2)} above £${negotiation.competitor_quote.toFixed(2)}.
 (Maximum acceptable premium = £${toleranceMax.toFixed(2)})
@@ -58,7 +58,7 @@ If offer > £${negotiation.competitor_quote.toFixed(2)} and ≤ £${toleranceMax
 - If the revised offer exceeds tolerance, proceed to CLOSING.
 
 If offer > £${toleranceMax.toFixed(2)}:
-- State that it is higher than both the competitor quote and beyond what the customer can accept, making renewal difficult to justify.
+- State that it is higher than the competitor quote and beyond what the customer can reasonably accept, making continuation with the current provider difficult to justify.
 - Ask once if this is the best and final offer.
 - If revised offer falls within tolerance, confirm that cover level and voluntary excess remain unchanged, then proceed to CLOSING.
 - Otherwise, proceed to CLOSING.
@@ -70,6 +70,7 @@ IMPORTANT PROFESSIONAL RULES:
 - If asked for information not provided, state clearly that you do not have that detail.
 - Keep responses concise (2–4 sentences).
 - Do not repeat competitor price excessively.
+- Do not use the word "renewal" — use "revised offer" or "revised premium" instead.
 - Do not threaten — use calm commercial language.
 - Do not reveal calculations or tolerance amounts.
 - Do not continue negotiating once a decision is made.
@@ -86,7 +87,7 @@ When you have received a final offer (whether acceptable or not):
 Example phrasing: "Thank you for this offer of £X. I need to discuss this with ${negotiation.customer_name} before we can confirm. Could you hold on for just a moment?"
 
 CRITICAL: You MUST include the [OUTCOME:CONSIDERING:£<price>] tag when you have received the agent's final offer and are ready to consult the customer. Only include it once — when the negotiation has reached its conclusion and you are pausing. Do NOT include it during ongoing negotiation or before a final offer has been established.
-CRITICAL: NEVER say "we accept", "we will accept", "please proceed with renewal", or "the customer has decided to switch". You ONLY pause and consult. The system will handle the final acceptance or rejection message after the customer decides.`;
+CRITICAL: NEVER say "we accept", "we will accept", or imply that the policy will proceed. You ONLY pause and consult the customer. The system will handle the final acceptance or rejection message after the customer decides.`;
 }
 
 export interface ConversationMessage {

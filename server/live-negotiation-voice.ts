@@ -1,8 +1,18 @@
 import WebSocket from "ws";
-import { GoogleGenAI, Modality, Session, LiveConnectConfig, LiveServerMessage } from "@google/genai";
+import {
+  GoogleGenAI,
+  Modality,
+  Session,
+  LiveConnectConfig,
+  LiveServerMessage,
+} from "@google/genai";
 import { storage } from "./storage";
 import type { LiveNegotiation } from "@shared/schema";
-import { buildSystemPrompt, parseOutcome, determineOutcomeCategory } from "./live-negotiation-agent";
+import {
+  buildSystemPrompt,
+  parseOutcome,
+  determineOutcomeCategory,
+} from "./live-negotiation-agent";
 import type { Server as SocketIOServer } from "socket.io";
 import { EventEmitter } from "events";
 
@@ -28,14 +38,21 @@ export function setSocketIOInstance(io: SocketIOServer) {
 export async function handleVoiceNegotiation(
   clientWs: WebSocket,
   negotiationId: number,
-  roomId: string
+  roomId: string,
 ) {
-  console.log(`[VoiceNego] New connection for negotiation ${negotiationId}, room ${roomId}`);
+  console.log(
+    `[VoiceNego] New connection for negotiation ${negotiationId}, room ${roomId}`,
+  );
 
   const aiClient = getAIClient();
   if (!aiClient) {
     console.error("[VoiceNego] GOOGLE_API_KEY not configured");
-    clientWs.send(JSON.stringify({ type: "error", message: "Voice service not configured." }));
+    clientWs.send(
+      JSON.stringify({
+        type: "error",
+        message: "Voice service not configured.",
+      }),
+    );
     clientWs.close();
     return;
   }
@@ -43,7 +60,9 @@ export async function handleVoiceNegotiation(
   const negotiation = await storage.getLiveNegotiationById(negotiationId);
   if (!negotiation) {
     console.error(`[VoiceNego] Negotiation ${negotiationId} not found`);
-    clientWs.send(JSON.stringify({ type: "error", message: "Negotiation not found." }));
+    clientWs.send(
+      JSON.stringify({ type: "error", message: "Negotiation not found." }),
+    );
     clientWs.close();
     return;
   }
@@ -51,29 +70,40 @@ export async function handleVoiceNegotiation(
   await storage.updateLiveNegotiationStatus(negotiation.id, "active");
 
   if (ioInstance) {
-    ioInstance.to(roomId).emit("agent_joined", { negotiationId: negotiation.id });
+    ioInstance
+      .to(roomId)
+      .emit("agent_joined", { negotiationId: negotiation.id });
   }
 
   let session: Session | null = null;
   let isClosing = false;
 
-  const handleCustomerDecision = (data: { roomId: string; decision: string; negotiationId?: number }) => {
+  const handleCustomerDecision = (data: {
+    roomId: string;
+    decision: string;
+    negotiationId?: number;
+  }) => {
     if (data.roomId !== roomId || isClosing || !session) return;
     const { decision } = data;
     console.log(`[VoiceNego] Customer decision via Socket.IO: ${decision}`);
 
-    const responseText = decision === "stay"
-      ? `Thank you. ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name}. Please proceed with the renewal at the agreed price. We appreciate your time and the offer you've made.`
-      : `Thank you for your time. Unfortunately, ${negotiation.customer_name} has decided to proceed with ${negotiation.competitor_name}. We appreciate the discussion and the effort you've made.`;
+    const responseText =
+      decision === "stay"
+        ? `Thank you. ${negotiation.customer_name} has decided to continue with ${negotiation.provider_name} at the agreed premium. Please proceed accordingly. We appreciate your time and the revised offer provided.`
+        : `Thank you for your time. Unfortunately, ${negotiation.customer_name} has decided to proceed with ${negotiation.competitor_name}. We appreciate the discussion and the effort you've made.`;
 
     session.sendClientContent({
       turns: [
         {
           role: "user",
-          parts: [{ text: `The customer has made their decision. Say the following to the agent: "${responseText}"` }]
-        }
+          parts: [
+            {
+              text: `The customer has made their decision. Say the following to the agent: "${responseText}"`,
+            },
+          ],
+        },
       ],
-      turnComplete: true
+      turnComplete: true,
     });
 
     storage.updateLiveNegotiationStatus(negotiation.id, "completed");
@@ -95,7 +125,9 @@ export async function handleVoiceNegotiation(
 
   const systemPrompt = buildSystemPrompt(negotiation);
 
-  const voiceSystemPrompt = systemPrompt + `
+  const voiceSystemPrompt =
+    systemPrompt +
+    `
 
 VOICE INTERACTION NOTE:
 You are speaking by voice with the insurance provider's human agent. Keep your responses natural and conversational as you are in a voice call. Speak clearly and at a moderate pace. Do not use markdown, bullet points, or formatting — you are speaking aloud.`;
@@ -106,12 +138,12 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
     speechConfig: {
       voiceConfig: {
         prebuiltVoiceConfig: {
-          voiceName: "Aoede"
-        }
-      }
+          voiceName: "Aoede",
+        },
+      },
     },
     inputAudioTranscription: {},
-    outputAudioTranscription: {}
+    outputAudioTranscription: {},
   };
 
   const handleServerMessage = async (message: LiveServerMessage) => {
@@ -121,12 +153,15 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
       if (message.serverContent?.modelTurn?.parts) {
         for (const part of message.serverContent.modelTurn.parts) {
           if (part.inlineData?.data) {
-            const audioData = typeof part.inlineData.data === "string"
-              ? part.inlineData.data
-              : Buffer.from(part.inlineData.data).toString("base64");
+            const audioData =
+              typeof part.inlineData.data === "string"
+                ? part.inlineData.data
+                : Buffer.from(part.inlineData.data).toString("base64");
 
             if (clientWs.readyState === WebSocket.OPEN) {
-              clientWs.send(JSON.stringify({ type: "audio", audio: audioData }));
+              clientWs.send(
+                JSON.stringify({ type: "audio", audio: audioData }),
+              );
             }
           }
         }
@@ -146,7 +181,9 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
         }
 
         if (clientWs.readyState === WebSocket.OPEN) {
-          clientWs.send(JSON.stringify({ type: "user_transcript_delta", delta: userText }));
+          clientWs.send(
+            JSON.stringify({ type: "user_transcript_delta", delta: userText }),
+          );
         }
       }
 
@@ -165,7 +202,12 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
         }
 
         if (clientWs.readyState === WebSocket.OPEN) {
-          clientWs.send(JSON.stringify({ type: "assistant_transcript_delta", delta: assistantText }));
+          clientWs.send(
+            JSON.stringify({
+              type: "assistant_transcript_delta",
+              delta: assistantText,
+            }),
+          );
         }
       }
 
@@ -178,7 +220,9 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
         const userText = currentUserTranscript.trim();
         const assistantText = currentAssistantTranscript.trim();
 
-        console.log(`[VoiceNego] Turn complete. Agent: "${userText.substring(0, 80)}...", AA: "${assistantText.substring(0, 80)}..."`);
+        console.log(
+          `[VoiceNego] Turn complete. Agent: "${userText.substring(0, 80)}...", AA: "${assistantText.substring(0, 80)}..."`,
+        );
 
         if (userText) {
           await storage.createLiveNegotiationMessage({
@@ -218,13 +262,15 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
 
         const outcome = parseOutcome(fullAssistantTurn);
         if (outcome.type !== null) {
-          console.log(`[VoiceNego] Outcome detected: ${outcome.type} at £${outcome.price}`);
+          console.log(
+            `[VoiceNego] Outcome detected: ${outcome.type} at £${outcome.price}`,
+          );
           const category = determineOutcomeCategory(negotiation, outcome);
           await storage.updateLiveNegotiationStatus(
             negotiation.id,
             "awaiting_customer",
             category,
-            outcome.price ?? undefined
+            outcome.price ?? undefined,
           );
 
           if (ioInstance) {
@@ -240,11 +286,13 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
         }
 
         if (clientWs.readyState === WebSocket.OPEN) {
-          clientWs.send(JSON.stringify({
-            type: "turn_complete",
-            userTranscript: userText,
-            assistantTranscript: assistantText,
-          }));
+          clientWs.send(
+            JSON.stringify({
+              type: "turn_complete",
+              userTranscript: userText,
+              assistantTranscript: assistantText,
+            }),
+          );
         }
 
         currentUserTranscript = "";
@@ -273,10 +321,14 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
                 turns: [
                   {
                     role: "user",
-                    parts: [{ text: "You are now connected to the insurance provider's agent. Start the negotiation by introducing yourself and stating the customer's case. Begin speaking." }]
-                  }
+                    parts: [
+                      {
+                        text: "You are now connected to the insurance provider's agent. Start the negotiation by introducing yourself and stating the customer's case. Begin speaking.",
+                      },
+                    ],
+                  },
                 ],
-                turnComplete: true
+                turnComplete: true,
               });
             }
           }, 500);
@@ -287,7 +339,9 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
         onerror: (error: Error) => {
           console.error("[VoiceNego] Gemini Live error:", error);
           if (clientWs.readyState === WebSocket.OPEN) {
-            clientWs.send(JSON.stringify({ type: "error", message: "Voice session error" }));
+            clientWs.send(
+              JSON.stringify({ type: "error", message: "Voice session error" }),
+            );
           }
         },
         onclosed: () => {
@@ -296,12 +350,17 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
           if (clientWs.readyState === WebSocket.OPEN) {
             clientWs.send(JSON.stringify({ type: "session_closed" }));
           }
-        }
-      }
+        },
+      },
     });
   } catch (error) {
     console.error("[VoiceNego] Failed to connect to Gemini Live:", error);
-    clientWs.send(JSON.stringify({ type: "error", message: "Failed to start voice session" }));
+    clientWs.send(
+      JSON.stringify({
+        type: "error",
+        message: "Failed to start voice session",
+      }),
+    );
     clientWs.close();
     return;
   }
@@ -317,7 +376,7 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
           media: {
             data: msg.audio,
             mimeType: "audio/pcm;rate=16000",
-          }
+          },
         });
       }
 
@@ -325,18 +384,23 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
         const { decision } = msg;
         console.log(`[VoiceNego] Customer decision received: ${decision}`);
 
-        const responseText = decision === "stay"
-          ? `Thank you. ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name}. Please proceed with the renewal at the agreed price. We appreciate your time and the offer you've made.`
-          : `Thank you for your time. Unfortunately, ${negotiation.customer_name} has decided to proceed with ${negotiation.competitor_name}. We appreciate the discussion and the effort you've made.`;
+        const responseText =
+          decision === "stay"
+            ? `Thank you. ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name}. Please proceed with the renewal at the agreed price. We appreciate your time and the offer you've made.`
+            : `Thank you for your time. Unfortunately, ${negotiation.customer_name} has decided to proceed with ${negotiation.competitor_name}. We appreciate the discussion and the effort you've made.`;
 
         session.sendClientContent({
           turns: [
             {
               role: "user",
-              parts: [{ text: `The customer has made their decision. Say the following to the agent: "${responseText}"` }]
-            }
+              parts: [
+                {
+                  text: `The customer has made their decision. Say the following to the agent: "${responseText}"`,
+                },
+              ],
+            },
           ],
-          turnComplete: true
+          turnComplete: true,
         });
 
         storage.updateLiveNegotiationStatus(negotiation.id, "completed");
@@ -358,14 +422,20 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
   clientWs.on("close", () => {
     console.log("[VoiceNego] Agent WebSocket disconnected");
     isClosing = true;
-    voiceDecisionEmitter.removeListener("customer_decision", handleCustomerDecision);
+    voiceDecisionEmitter.removeListener(
+      "customer_decision",
+      handleCustomerDecision,
+    );
     session?.close();
   });
 
   clientWs.on("error", (error) => {
     console.error("[VoiceNego] WebSocket error:", error);
     isClosing = true;
-    voiceDecisionEmitter.removeListener("customer_decision", handleCustomerDecision);
+    voiceDecisionEmitter.removeListener(
+      "customer_decision",
+      handleCustomerDecision,
+    );
     session?.close();
   });
 }
