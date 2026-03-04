@@ -1,0 +1,105 @@
+We are refining the graceful session close logic in server/live-negotiation-voice.ts.
+
+⚠️ Important:
+
+Do NOT refactor the file.
+
+Do NOT modify negotiation outcome logic.
+
+Do NOT change storage logic except in the existing close block.
+
+Do NOT touch any other files.
+
+Only implement the minimal state refinement described below.
+
+Objective
+
+Ensure the session closes only AFTER:
+
+The AI has finished speaking the final decision message
+
+The human agent has replied once after that final decision
+
+We already have:
+
+let waitingForFinalAgentReply = false;
+
+We will now add a second flag to ensure the AI final decision speech has completed before allowing close.
+
+Required Changes
+1️⃣ Add New Flag
+
+In server/live-negotiation-voice.ts, locate the flag declarations:
+
+let session: Session | null = null;
+let isClosing = false;
+let waitingForFinalAgentReply = false;
+
+Add directly below:
+
+let finalDecisionSpoken = false;
+2️⃣ Reset finalDecisionSpoken When Decision Happens
+
+In BOTH customer decision handlers:
+
+handleCustomerDecision
+
+The clientWs.on("message") block handling msg.type === "customer_decision"
+
+After this line:
+
+waitingForFinalAgentReply = true;
+
+Add:
+
+finalDecisionSpoken = false;
+
+Do NOT modify anything else in those handlers.
+
+3️⃣ Detect When Final AI Speech Completes
+
+Inside the existing:
+
+if (message.serverContent?.turnComplete)
+
+After assistantText has been processed and stored (after the block that saves assistant messages to storage),
+
+Add:
+
+if (waitingForFinalAgentReply && assistantText) {
+  finalDecisionSpoken = true;
+}
+
+Do NOT move existing logic. Just insert this block before the close condition.
+
+4️⃣ Tighten the Close Condition
+
+Find the existing close condition:
+
+if (waitingForFinalAgentReply && userText) {
+
+Replace it with:
+
+if (waitingForFinalAgentReply && finalDecisionSpoken && userText) {
+
+Do NOT modify anything else inside that block.
+
+Expected Behaviour After Change
+
+Session should close only after:
+
+AI speaks final decision message
+
+Human agent replies once
+
+It must NOT:
+
+Close immediately after AI speech
+
+Close on earlier human messages (like "Yeah I can wait")
+
+Affect negotiation outcome detection
+
+Affect database state transitions
+
+Do NOT refactor. Only implement the minimal changes above.
