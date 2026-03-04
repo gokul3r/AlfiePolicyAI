@@ -386,7 +386,7 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
 
         const responseText =
           decision === "stay"
-            ? `Thank you. ${negotiation.customer_name} has decided to stay with ${negotiation.provider_name}. Please proceed with the renewal at the agreed price. We appreciate your time and the offer you've made.`
+            ? `Thank you. ${negotiation.customer_name} has decided to continue with ${negotiation.provider_name} at the agreed premium. Please proceed accordingly. We appreciate your time and the revised offer provided.`
             : `Thank you for your time. Unfortunately, ${negotiation.customer_name} has decided to proceed with ${negotiation.competitor_name}. We appreciate the discussion and the effort you've made.`;
 
         session.sendClientContent({
