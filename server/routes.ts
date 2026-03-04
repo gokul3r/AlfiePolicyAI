@@ -1824,6 +1824,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/live-negotiations/:id/status", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "Invalid ID" });
+      const { status } = req.body;
+      if (!status || typeof status !== "string") return res.status(400).json({ error: "status is required" });
+      const updated = await storage.updateLiveNegotiationStatus(id, status);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating live negotiation status:", error);
+      res.status(500).json({ error: "Failed to update status" });
+    }
+  });
+
   app.get("/api/live-negotiation-messages/:negotiationId", async (req, res) => {
     try {
       const negotiationId = parseInt(req.params.negotiationId);

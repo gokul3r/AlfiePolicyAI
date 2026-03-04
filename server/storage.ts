@@ -534,7 +534,7 @@ export class DbStorage implements IStorage {
       .where(
         and(
           ilike(liveNegotiations.provider_name, `%${providerName}%`),
-          inArray(liveNegotiations.status, ["pending", "active", "awaiting_customer"])
+          inArray(liveNegotiations.status, ["pending", "active", "awaiting_customer", "completed"])
         )
       )
       .orderBy(desc(liveNegotiations.created_at));

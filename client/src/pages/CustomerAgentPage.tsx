@@ -1444,6 +1444,7 @@ function LiveChatView({ provider, onBack }: { provider: string; onBack: () => vo
   const [isLoading, setIsLoading] = useState(true);
   const [selectedNegotiation, setSelectedNegotiation] = useState<LiveNegotiation | null>(null);
   const [activeFilter, setActiveFilter] = useState<"pending" | "completed" | null>(null);
+  const [resolvingId, setResolvingId] = useState<number | null>(null);
 
   const fetchNegotiations = useCallback(async () => {
     try {
@@ -1466,6 +1467,28 @@ function LiveChatView({ provider, onBack }: { provider: string; onBack: () => vo
 
   const isPending = (n: LiveNegotiation) => n.status === "pending" || n.status === "active";
   const isCompleted = (n: LiveNegotiation) => !isPending(n);
+
+  const handleResolve = async (e: React.MouseEvent, negoId: number) => {
+    e.stopPropagation();
+    setResolvingId(negoId);
+    try {
+      await fetch(`/api/live-negotiations/${negoId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
+      await fetchNegotiations();
+    } finally {
+      setResolvingId(null);
+    }
+  };
+
+  const formatRequestTime = (createdAt: string | Date) => {
+    const date = new Date(createdAt);
+    return date.toLocaleString("en-GB", {
+      day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: true
+    });
+  };
 
   const counts = {
     pending: negotiations.filter(isPending).length,
@@ -1647,6 +1670,9 @@ function LiveChatView({ provider, onBack }: { provider: string; onBack: () => vo
                           <span className="text-sm font-semibold text-foreground">
                             {nego.mode === "voice" ? "Voice Negotiation" : "Live Negotiation"}
                           </span>
+                          <span className="text-xs text-muted-foreground" data-testid={`text-nego-time-${nego.id}`}>
+                            {formatRequestTime(nego.created_at)}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className={`text-xs ${
@@ -1662,6 +1688,19 @@ function LiveChatView({ provider, onBack }: { provider: string; onBack: () => vo
                               <><CheckCircle2 className="w-3 h-3 mr-1" /> {nego.status}</>
                             )}
                           </Badge>
+                          {isPending(nego) && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="text-green-600 dark:text-green-400"
+                              onClick={(e) => handleResolve(e, nego.id)}
+                              disabled={resolvingId === nego.id}
+                              data-testid={`button-resolve-${nego.id}`}
+                              title="Mark as resolved"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
