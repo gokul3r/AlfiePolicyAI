@@ -77,6 +77,7 @@ export async function handleVoiceNegotiation(
 
   let session: Session | null = null;
   let isClosing = false;
+  let closingAfterDecision = false;
 
   const handleCustomerDecision = (data: {
     roomId: string;
@@ -106,16 +107,7 @@ export async function handleVoiceNegotiation(
       turnComplete: true,
     });
 
-    storage.updateLiveNegotiationStatus(negotiation.id, "completed");
-
-    if (ioInstance) {
-      ioInstance.to(roomId).emit("negotiation_closed", { decision });
-    }
-
-    setTimeout(() => {
-      isClosing = true;
-      session?.close();
-    }, 10000);
+    closingAfterDecision = true;
   };
 
   voiceDecisionEmitter.on("customer_decision", handleCustomerDecision);
@@ -295,6 +287,16 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
           );
         }
 
+        if (closingAfterDecision) {
+          isClosing = true;
+          await storage.updateLiveNegotiationStatus(negotiation.id, "completed");
+          if (ioInstance) {
+            ioInstance.to(roomId).emit("negotiation_closed", { decision: "finalized" });
+          }
+          session?.close();
+          return;
+        }
+
         currentUserTranscript = "";
         currentAssistantTranscript = "";
       }
@@ -403,16 +405,7 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
           turnComplete: true,
         });
 
-        storage.updateLiveNegotiationStatus(negotiation.id, "completed");
-
-        if (ioInstance) {
-          ioInstance.to(roomId).emit("negotiation_closed", { decision });
-        }
-
-        setTimeout(() => {
-          isClosing = true;
-          session?.close();
-        }, 10000);
+        closingAfterDecision = true;
       }
     } catch (error) {
       console.error("[VoiceNego] Error processing client message:", error);
