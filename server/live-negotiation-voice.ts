@@ -126,7 +126,7 @@ export async function handleVoiceNegotiation(
     `
 
 VOICE INTERACTION NOTE:
-You are speaking by voice with the insurance provider's human agent. Keep your responses natural and conversational as you are in a voice call. Speak clearly and at a moderate pace. Do not use markdown, bullet points, or formatting — you are speaking aloud.`;
+You are speaking by voice with the insurance provider's human agent. Keep your responses natural and conversational as you are in a voice call. Speak clearly and at a moderate pace. Do not use markdown, bullet points, or formatting — you are speaking aloud. If background speech, noise, or unclear input is detected, politely ask the agent to repeat or clarify before proceeding with the negotiation.`;
 
   const config: LiveConnectConfig = {
     responseModalities: [Modality.AUDIO],
