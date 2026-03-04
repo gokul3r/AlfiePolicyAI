@@ -47,8 +47,6 @@ import {
   MessageSquare,
   UserRound,
   Mic,
-  Volume2,
-  VolumeX,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { flushSync } from "react-dom";
@@ -2640,23 +2638,17 @@ function NegotiatePromptState({
   onYes: (tolerance: number, mode: "text" | "voice") => void;
   onNo: () => void;
 }) {
-  const CANCELLATION_FEE = 55;
   const sliderMin = competitorQuote;
   const sliderMax = currentPolicyPrice > competitorQuote ? currentPolicyPrice : competitorQuote + 100;
-  const breakEvenPoint = Math.min(competitorQuote + CANCELLATION_FEE, sliderMax);
-  const defaultSliderValue = breakEvenPoint;
+  const defaultTolerance = Math.round(competitorQuote * 0.02 * 100) / 100;
+  const defaultSliderValue = Math.min(sliderMin + defaultTolerance, sliderMax);
   const [sliderValue, setSliderValue] = useState<number>(defaultSliderValue);
   const [negotiationMode, setNegotiationMode] = useState<"text" | "voice">("text");
 
   const tolerance = Math.round((sliderValue - sliderMin) * 100) / 100;
-  const breakEvenPct = sliderMax > sliderMin
-    ? Math.min(((breakEvenPoint - sliderMin) / (sliderMax - sliderMin)) * 100, 100)
+  const tolerancePct = sliderMax > sliderMin
+    ? Math.round(((sliderValue - sliderMin) / (sliderMax - sliderMin)) * 100)
     : 0;
-
-  const savingsDiff = Math.round(Math.abs(sliderValue - breakEvenPoint) * 100) / 100;
-  const isAtBreakEven = savingsDiff < 0.5;
-  const stayingIsCheaper = sliderValue < breakEvenPoint - 0.49;
-  const switchingIsCheaper = sliderValue > breakEvenPoint + 0.49;
 
   const handleYes = () => {
     onYes(tolerance, negotiationMode);
@@ -2716,7 +2708,7 @@ function NegotiatePromptState({
             <span>Current rate</span>
           </div>
 
-          <div className="relative pb-5">
+          <div className="relative">
             <Slider
               min={sliderMin}
               max={sliderMax}
@@ -2725,15 +2717,6 @@ function NegotiatePromptState({
               onValueChange={([v]) => setSliderValue(v)}
               data-testid="slider-tolerance"
             />
-            <div
-              className="absolute top-0 flex flex-col items-center pointer-events-none"
-              style={{ left: `${breakEvenPct}%`, transform: "translateX(-50%)" }}
-            >
-              <div className="w-px h-3 bg-muted-foreground/50 mt-0.5" />
-              <span className="text-[9px] text-muted-foreground whitespace-nowrap mt-0.5 leading-tight">
-                {competitorName} + £{CANCELLATION_FEE} cancellation fee
-              </span>
-            </div>
           </div>
 
           <div className="flex items-center justify-between text-xs font-medium px-0.5">
@@ -2742,28 +2725,14 @@ function NegotiatePromptState({
           </div>
         </div>
 
-        <div
-          className={`rounded-md px-4 py-3 space-y-1 text-center border ${
-            isAtBreakEven
-              ? "bg-amber-50/60 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
-              : "bg-muted/60 border-transparent"
-          }`}
-        >
+        <div className="rounded-md bg-muted/60 px-4 py-3 space-y-1 text-center">
           <p className="text-base font-semibold text-foreground" data-testid="text-max-acceptable">
             Max acceptable: £{sliderValue.toFixed(2)}
           </p>
-          <p className={`text-xs font-medium ${
-            isAtBreakEven
-              ? "text-amber-600 dark:text-amber-400"
-              : stayingIsCheaper
-              ? "text-green-600 dark:text-green-400"
-              : "text-blue-600 dark:text-blue-400"
-          }`}>
-            {isAtBreakEven
-              ? "Break-even — same cost to stay or switch"
-              : stayingIsCheaper
-              ? `Staying saves you £${savingsDiff.toFixed(2)} vs switching`
-              : `Switching saves you £${savingsDiff.toFixed(2)} vs staying`}
+          <p className="text-xs text-muted-foreground">
+            {tolerance === 0
+              ? "No tolerance — exact competitor price only"
+              : `+£${tolerance.toFixed(2)} above ${competitorName} quote (${tolerancePct}% of gap)`}
           </p>
         </div>
       </div>
@@ -3137,36 +3106,6 @@ function LiveNegotiationVoice({
   const socketRef = useRef<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [customerDecisionMade, setCustomerDecisionMade] = useState(false);
-  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
-  const isAudioEnabledRef = useRef(false);
-  const aaPlaybackCtxRef = useRef<AudioContext | null>(null);
-  const agentPlaybackCtxRef = useRef<AudioContext | null>(null);
-  const aaNextTimeRef = useRef(0);
-  const agentNextTimeRef = useRef(0);
-
-  const playCustomerAudio = (base64: string, sampleRate: number, ctxRef: { current: AudioContext | null }, nextTimeRef: { current: number }) => {
-    try {
-      if (!ctxRef.current || ctxRef.current.state === "closed") {
-        ctxRef.current = new AudioContext({ sampleRate });
-        nextTimeRef.current = 0;
-      }
-      const ctx = ctxRef.current;
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const pcm16 = new Int16Array(bytes.buffer);
-      const float32 = new Float32Array(pcm16.length);
-      for (let i = 0; i < pcm16.length; i++) float32[i] = pcm16[i] / 32768;
-      const buffer = ctx.createBuffer(1, float32.length, sampleRate);
-      buffer.getChannelData(0).set(float32);
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(ctx.destination);
-      const startTime = Math.max(ctx.currentTime, nextTimeRef.current);
-      source.start(startTime);
-      nextTimeRef.current = startTime + buffer.duration;
-    } catch {}
-  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -3223,15 +3162,6 @@ function LiveNegotiationVoice({
       setCustomerDecisionMade(true);
     });
 
-    socket.on("customer_audio", (data: { audio: string; sampleRate: number }) => {
-      if (!isAudioEnabledRef.current) return;
-      if (data.sampleRate === 24000) {
-        playCustomerAudio(data.audio, 24000, aaPlaybackCtxRef, aaNextTimeRef);
-      } else {
-        playCustomerAudio(data.audio, 16000, agentPlaybackCtxRef, agentNextTimeRef);
-      }
-    });
-
     return () => {
       socket.disconnect();
     };
@@ -3283,29 +3213,6 @@ function LiveNegotiationVoice({
               <span className="w-1 bg-primary rounded-full animate-pulse" style={{ height: "50%", animationDelay: "600ms" }} />
             </div>
           </div>
-        )}
-        {agentJoined && (
-          <Button
-            size="icon"
-            variant="ghost"
-            data-testid="button-customer-audio-toggle"
-            title={isAudioEnabled ? "Mute audio" : "Enable audio — listen to the live call"}
-            onClick={() => {
-              const next = !isAudioEnabled;
-              isAudioEnabledRef.current = next;
-              setIsAudioEnabled(next);
-              if (!next) {
-                if (aaPlaybackCtxRef.current && aaPlaybackCtxRef.current.state !== "closed") aaPlaybackCtxRef.current.close();
-                if (agentPlaybackCtxRef.current && agentPlaybackCtxRef.current.state !== "closed") agentPlaybackCtxRef.current.close();
-                aaPlaybackCtxRef.current = null;
-                agentPlaybackCtxRef.current = null;
-                aaNextTimeRef.current = 0;
-                agentNextTimeRef.current = 0;
-              }
-            }}
-          >
-            {isAudioEnabled ? <Volume2 className="w-4 h-4 text-primary" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
-          </Button>
         )}
         {outcome && (
           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
@@ -3474,7 +3381,6 @@ function LiveNegotiationVoice({
           </div>
         );
       })()}
-
     </div>
   );
 }
