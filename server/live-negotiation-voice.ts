@@ -78,6 +78,7 @@ export async function handleVoiceNegotiation(
   let session: Session | null = null;
   let isClosing = false;
   let closingAfterDecision = false;
+  let waitingForFinalAgentReply = false;
 
   const handleCustomerDecision = (data: {
     roomId: string;
@@ -108,6 +109,7 @@ export async function handleVoiceNegotiation(
     });
 
     closingAfterDecision = true;
+    waitingForFinalAgentReply = true;
   };
 
   voiceDecisionEmitter.on("customer_decision", handleCustomerDecision);
@@ -287,7 +289,7 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
           );
         }
 
-        if (closingAfterDecision) {
+        if (waitingForFinalAgentReply && userText) {
           isClosing = true;
           await storage.updateLiveNegotiationStatus(negotiation.id, "completed");
           if (ioInstance) {
@@ -406,6 +408,7 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
         });
 
         closingAfterDecision = true;
+        waitingForFinalAgentReply = true;
       }
     } catch (error) {
       console.error("[VoiceNego] Error processing client message:", error);
