@@ -1,0 +1,86 @@
+We are applying a minimal bug fix in:
+
+server/live-negotiation-voice.ts
+🎯 Context
+
+Problem:
+
+After the final decision message ("Samy has decided to continue..."), the system is still re-parsing old [OUTCOME:CONSIDERING:£X] tags from fullAssistantTurn.
+
+This causes:
+
+Repeated Outcome detected: considering at £X
+
+Status flipping back to "awaiting_customer"
+
+Frontend polling continues indefinitely
+
+Voice lifecycle enters inconsistent state
+
+Final human input not processed correctly
+
+Root cause:
+
+parseOutcome(fullAssistantTurn) runs even during post-decision closing phase.
+
+Outcome parsing must only run during active negotiation phase — not after decision has begun.
+
+🛠 Required Change
+
+Inside handleServerMessage, locate this existing block inside:
+
+if (message.serverContent?.turnComplete) {
+
+Find the section that currently reads:
+
+const outcome = parseOutcome(fullAssistantTurn);
+if (outcome.type !== null) {
+   ...
+}
+✅ Replace That Block With This Guarded Version
+
+Wrap the outcome parsing inside a guard so it only runs when NOT in final decision phase.
+
+Replace the existing outcome block with:
+
+// Only parse negotiation outcome during active negotiation phase.
+// Do NOT re-parse old outcome tags after customer decision flow has started.
+if (!waitingForFinalAgentReply) {
+  const outcome = parseOutcome(fullAssistantTurn);
+  if (outcome.type !== null) {
+    console.log(
+      `[VoiceNego] Outcome detected: ${outcome.type} at £${outcome.price}`,
+    );
+    const category = determineOutcomeCategory(negotiation, outcome);
+    await storage.updateLiveNegotiationStatus(
+      negotiation.id,
+      "awaiting_customer",
+      category,
+      outcome.price ?? undefined,
+    );
+
+    if (ioInstance) {
+      ioInstance.to(roomId).emit("negotiation_outcome", {
+        negotiationId: negotiation.id,
+        outcome: category,
+        finalOfferPrice: outcome.price,
+        competitorQuote: negotiation.competitor_quote,
+        providerName: negotiation.provider_name,
+        competitorName: negotiation.competitor_name,
+      });
+    }
+  }
+}
+🚨 Important Constraints
+
+Do NOT move this block.
+
+Do NOT modify closing logic.
+
+Do NOT touch waitingForFinalAgentReply logic.
+
+Do NOT modify outcome tag parsing.
+
+Do NOT refactor fullAssistantTurn.
+
+Do NOT change anything else.
