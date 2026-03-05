@@ -1,0 +1,57 @@
+We are introducing a new negotiation capability in stages.
+
+Upcoming feature (do NOT implement yet):
+AutoAnnie will be allowed to negotiate using voluntary excess flexibility as a final structuring lever if price-based negotiation fails.
+
+This will be implemented in 3 controlled stages to avoid regression in the live voice negotiation flow.
+
+We are currently implementing Stage 1 ONLY.
+
+----------------------------------
+STAGE 1 – DATA PLUMBING ONLY
+----------------------------------
+
+Objective:
+Ensure voluntary_excess_flexibility is safely stored and passed through backend layers, without changing any negotiation logic or prompts yet.
+
+Do NOT modify negotiation behaviour.
+Do NOT modify buildSystemPrompt().
+Do NOT change voice logic.
+Do NOT change outcome parsing.
+Do NOT alter any existing working flow.
+
+Tasks:
+
+1) Schema update:
+In @shared/schema, extend the LiveNegotiation type/interface to include:
+
+  voluntary_excess_flexibility?: number;
+
+If the database layer requires migration handling, add it safely without altering existing fields.
+
+2) Storage layer:
+Ensure that when a negotiation is created, voluntary_excess_flexibility (if present in payload) is persisted.
+
+3) API handling:
+Ensure the POST negotiation endpoint safely accepts voluntary_excess_flexibility.
+If undefined, it should default to the existing voluntary_excess value.
+Do NOT override voluntary_excess.
+This is a separate field.
+
+4) Retrieval:
+Ensure storage.getLiveNegotiationById returns voluntary_excess_flexibility correctly.
+
+5) Add temporary console log (for verification only):
+When a voice negotiation starts in live-negotiation-voice.ts, log:
+
+  console.log("[VoiceNego] Voluntary excess flexibility:", negotiation.voluntary_excess_flexibility);
+
+No other changes.
+
+----------------------------------
+IMPORTANT:
+- This is Stage 1 only.
+- Do NOT implement any negotiation behaviour change.
+- Do NOT update prompts yet.
+- Keep current flow completely stable.
+----------------------------------
