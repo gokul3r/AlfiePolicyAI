@@ -79,8 +79,8 @@ export function ScheduleQuoteDialog({
   const [thresholdError, setThresholdError] = useState<string>("");
   const [negotiationMode, setNegotiationMode] = useState<"human" | "ai" | "live_agent">(() => {
     const stored = localStorage.getItem("negotiationMode");
-    if (stored === "human" || stored === "ai" || stored === "live_agent") return stored;
-    return "ai";
+    if (stored === "live_agent") return "live_agent";
+    return "live_agent";
   });
 
   // Reset and sync state when dialog opens or frequency changes
@@ -334,16 +334,16 @@ export function ScheduleQuoteDialog({
               className="flex flex-row gap-6"
               data-testid="radio-negotiation-mode"
             >
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="human" id="negotiation-human" data-testid="radio-negotiation-human" />
-                <Label htmlFor="negotiation-human" className="flex items-center gap-1.5 text-sm font-normal cursor-pointer">
+              <div className="flex items-center gap-2 opacity-40 cursor-not-allowed">
+                <RadioGroupItem value="human" id="negotiation-human" data-testid="radio-negotiation-human" disabled />
+                <Label htmlFor="negotiation-human" className="flex items-center gap-1.5 text-sm font-normal cursor-not-allowed">
                   <UserRound className="w-3.5 h-3.5 text-muted-foreground" />
                   Human Customer Agent
                 </Label>
               </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="ai" id="negotiation-ai" data-testid="radio-negotiation-ai" />
-                <Label htmlFor="negotiation-ai" className="flex items-center gap-1.5 text-sm font-normal cursor-pointer">
+              <div className="flex items-center gap-2 opacity-40 cursor-not-allowed">
+                <RadioGroupItem value="ai" id="negotiation-ai" data-testid="radio-negotiation-ai" disabled />
+                <Label htmlFor="negotiation-ai" className="flex items-center gap-1.5 text-sm font-normal cursor-not-allowed">
                   <Bot className="w-3.5 h-3.5 text-muted-foreground" />
                   AI Agent
                 </Label>
