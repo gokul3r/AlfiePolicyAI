@@ -1789,6 +1789,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/live-negotiations", async (req, res) => {
     try {
       const validated = insertLiveNegotiationSchema.parse(req.body);
+      if (validated.voluntary_excess_flexibility === undefined || validated.voluntary_excess_flexibility === null) {
+        (validated as any).voluntary_excess_flexibility = validated.voluntary_excess;
+      }
       const negotiation = await storage.createLiveNegotiation(validated);
       res.status(201).json(negotiation);
     } catch (error) {

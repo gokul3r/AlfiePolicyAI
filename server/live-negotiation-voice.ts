@@ -67,6 +67,8 @@ export async function handleVoiceNegotiation(
     return;
   }
 
+  console.log("[VoiceNego] Voluntary excess flexibility:", negotiation.voluntary_excess_flexibility);
+
   await storage.updateLiveNegotiationStatus(negotiation.id, "active");
 
   if (ioInstance) {
