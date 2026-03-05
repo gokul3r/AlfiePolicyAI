@@ -90,6 +90,9 @@ If the revised premium becomes acceptable under tolerance, proceed to CLOSING.
 
 If no improved premium is offered after this step, proceed to CLOSING.
 
+IMPORTANT – COMMERCIAL JUDGEMENT:
+If the agent clearly states that there is no further flexibility, no ability to revise the premium, or explicitly declines to provide a revised offer, do not continue pushing the voluntary excess lever. In such cases, acknowledge the position professionally and proceed directly to the CLOSING step.
+
 IMPORTANT PROFESSIONAL RULES:
 - Do NOT negotiate voluntary excess or cover structure.
 - Do NOT negotiate add-ons.
