@@ -1,0 +1,140 @@
+REPLIT PROMPT — Executive Anchor Slider Enhancement (Safe)
+
+Objective
+
+Enhance the negotiation slider to:
+
+Add anchor dot for competitor price
+
+Add anchor dot for current premium
+
+Keep break-even vertical line
+
+Show break-even calculation below the line (subtle)
+
+Do NOT modify any slider logic, calculations, or state
+
+File:
+client/src/components/TimelapseDialog.tsx
+
+Component:
+NegotiatePromptState
+
+🔧 T001 — Add Competitor & Current Anchor Markers
+
+Locate the slider wrapper block (the relative container that already contains):
+
+The gradient background
+
+The break-even vertical line
+
+The <Slider /> component
+
+Inside the same relative wrapper, add two absolute positioned anchor dots.
+
+Add below the break-even vertical line JSX, but above the <Slider /> so they layer correctly:
+
+{/* Competitor anchor dot */}
+<div
+  className="absolute -top-1 w-3 h-3 rounded-full bg-slate-400 -translate-x-1/2 pointer-events-none"
+  style={{ left: `${competitorPct}%` }}
+/>
+
+{/* Current premium anchor dot */}
+<div
+  className="absolute -top-1 w-3 h-3 rounded-full bg-slate-400 -translate-x-1/2 pointer-events-none"
+  style={{ left: `${currentPct}%` }}
+/>
+
+⚠️ Important:
+Reuse existing percentage calculations if already present.
+
+If competitorPct and currentPct do not exist, compute them exactly like markerPct is calculated, using the same min/max range logic.
+
+DO NOT change existing calculations — only reuse.
+
+🔧 T002 — Refine Break-even Label Layout
+
+Find the existing break-even label block.
+
+Replace it with this refined version:
+
+<div
+  className="absolute -top-6 text-xs text-slate-500 -translate-x-1/2 pointer-events-none text-center"
+  style={{ left: `${markerPct}%` }}
+>
+  Break-even
+</div>
+
+<div
+  className="absolute top-5 text-[11px] text-slate-400 -translate-x-1/2 pointer-events-none text-center whitespace-nowrap"
+  style={{ left: `${markerPct}%` }}
+>
+  £{competitorPrice.toFixed(2)} + £{cancellationFee.toFixed(2)} fee
+</div>
+
+This gives:
+
+Label above line
+
+Calculation below line
+
+Subtle grey tone
+
+Clear financial credibility
+
+🔧 T003 — Ensure No Visual Clutter
+
+Remove any large text labels like:
+
+Competitor name floating above line
+
+Current rate label overlapping scale
+
+Instead, keep those labels slightly above the scale but lighter:
+
+Use:
+
+className="text-sm text-slate-500"
+
+Avoid bold.
+
+🔧 T004 — Do NOT Modify:
+
+Slider value logic
+
+breakEvenDifference
+
+currentPremiumDifference
+
+Negotiation state
+
+Any API calls
+
+Any navigation
+
+Any event handlers
+
+This is strictly a visual enhancement.
+
+✅ Acceptance Criteria
+
+After change:
+
+Slider shows:
+
+Grey dot for competitor
+
+Grey dot for current rate
+
+Thin break-even line
+
+Break-even calculation below line
+
+User thumb remains the primary movable control
+
+No console errors
+
+No layout overflow
+
+Savings logic unaffected
