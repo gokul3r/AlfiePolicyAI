@@ -1,0 +1,81 @@
+Please update only the UI rendering in:
+
+client/src/components/TimelapseDialog.tsx
+
+Inside the Quote Match / Financial breakdown section (the card that currently shows):
+
+“Remaining coverage (~X days)”
+
+“Renewal (~X days)”
+
+multi-line breakdown under If you stay and If you switch
+
+🔧 Replace the existing “Annual Savings” breakdown UI with the following simplified comparison block.
+
+Use the existing values already available in financial_breakdown:
+
+current_cost → stay total
+
+switch_cost_12m → switch total
+
+cancellation_fee
+
+annual_savings
+
+✨ New UI Block
+<div className="rounded-lg border bg-white p-5 mt-4">
+  <div className="text-sm text-slate-500 mb-2">12-month cost comparison</div>
+
+  <div className="flex justify-between py-2 border-b">
+    <span className="text-slate-600">Stay with {currentProvider}</span>
+    <span className="font-semibold text-slate-900">
+      £{fb.current_cost.toFixed(2)}
+    </span>
+  </div>
+
+  <div className="flex justify-between py-2 border-b">
+    <span className="text-slate-600">
+      Switch to {fb.new_quote_insurer}
+      <div className="text-xs text-slate-400">
+        (£{fb.new_quote_price.toFixed(2)} new policy + £{fb.cancellation_fee.toFixed(2)} cancellation fee)
+      </div>
+    </span>
+    <span className="font-semibold text-slate-900">
+      £{fb.switch_cost_12m.toFixed(2)}
+    </span>
+  </div>
+
+  <div className="mt-4 text-center">
+    <span className="text-green-600 font-semibold text-lg">
+      Switching saves £{Math.abs(fb.annual_savings).toFixed(2)} over 12 months
+    </span>
+  </div>
+</div>
+🚫 Remove from UI (do NOT delete backend logic)
+
+Remove/hide only the following visual elements:
+
+Remaining coverage (~X days)
+
+Renewal (~X days)
+
+Pro-rata breakdown lines inside Annual Savings
+
+Multi-line stay/switch modelling table
+
+Do not remove the data from financial_breakdown, only stop rendering those rows.
+
+✅ Acceptance Criteria
+
+✔ Customer sees only:
+
+Stay total cost
+
+Switch total cost (with cancellation fee explanation)
+
+Bold green savings line
+
+✔ No backend/API changes
+✔ No calculation logic changes
+✔ No negotiation flow changes
+✔ No impact on other screens
