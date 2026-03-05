@@ -1,0 +1,112 @@
+🎯 Objective
+
+Enhance the existing slider section inside:
+
+client/src/components/TimelapseDialog.tsx
+
+Specifically inside:
+
+NegotiatePromptState
+
+Add a dynamic “Decision Impact” block under the slider that updates live as the slider moves.
+
+⚠️ Strict Constraints
+
+❌ Do NOT modify backend
+
+❌ Do NOT modify API calls
+
+❌ Do NOT modify financial-calculator.ts
+
+❌ Do NOT modify negotiation logic
+
+❌ Do NOT modify POST payload
+
+❌ Do NOT modify any business logic
+
+This is a pure UI enhancement using existing props/state only.
+
+📊 DATA AVAILABLE (Already Passed In)
+
+Inside NegotiatePromptState you already have:
+
+competitorQuote              ← number
+currentPolicyPrice           ← number
+sliderValue                  ← number (Max acceptable)
+currentWeekMatches[currentMatchIndex].financial_breakdown:
+  upfront_impact
+
+No new props needed.
+
+🧮 LOGIC TO ADD (Frontend Only)
+
+Add the following computed values inside the component (near existing slider calculations):
+
+const difference12m = sliderValue - competitorQuote;
+const monthlyDifference = difference12m / 12;
+
+const upfrontImpact =
+  currentWeekMatches[currentMatchIndex].financial_breakdown
+    ?.upfront_impact ?? 0;
+
+Then define:
+
+const showDecisionImpact = sliderValue > competitorQuote;
+🎨 UI BLOCK TO ADD
+
+Place this below the slider section (under the Max acceptable display).
+
+Render ONLY if:
+
+showDecisionImpact === true
+UI Layout (Clean + Minimal)
+{showDecisionImpact && (
+  <div className="mt-4 p-4 rounded-lg bg-slate-50 border border-slate-200">
+    <div className="text-sm font-semibold text-slate-700 mb-2">
+      Decision Impact at £{sliderValue.toFixed(2)}
+    </div>
+
+    {upfrontImpact > 0 && (
+      <div className="text-sm text-slate-600">
+        • Avoid £{Math.abs(upfrontImpact).toFixed(2)} upfront today
+      </div>
+    )}
+
+    <div className="text-sm text-slate-600">
+      • £{difference12m.toFixed(2)} difference over 12 months
+    </div>
+
+    <div className="text-sm font-medium text-slate-800">
+      • £{monthlyDifference.toFixed(2)} per month to stay
+    </div>
+  </div>
+)}
+🧠 Behaviour Requirements
+
+Must update live when slider moves.
+
+Must not trigger re-renders outside this component.
+
+Must not affect negotiation submission.
+
+Must not alter tolerance calculation.
+
+Must not affect POST payload.
+
+🎯 Expected Result
+
+When user moves slider:
+
+Example:
+
+If sliderValue = £683
+competitorQuote = £674.90
+
+Block shows:
+
+Decision Impact at £683
+• Avoid £100.17 upfront today
+• £8.10 difference over 12 months
+• £0.68 per month to stay
+
+All values update dynamically.
