@@ -2774,7 +2774,7 @@ function NegotiatePromptState({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {[100, 200, 300, 400, 500].map((v) => (
+                {Array.from(new Set([voluntaryExcess, ...[100, 200, 300, 400, 500].filter(v => v >= voluntaryExcess)])).sort((a, b) => a - b).map((v) => (
                   <SelectItem key={v} value={String(v)}>£{v}</SelectItem>
                 ))}
               </SelectContent>
