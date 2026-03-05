@@ -2738,7 +2738,7 @@ function NegotiatePromptState({
             <span className="font-semibold"> £{sliderValue.toFixed(2)}</span>
           </div>
 
-          {breakEvenDifference >= 0 ? (
+          {breakEvenDifference > 0 ? (
             <div className="space-y-1">
               <div className="text-5xl font-bold text-green-600">
                 £{breakEvenDifference.toFixed(2)}
@@ -2747,13 +2747,25 @@ function NegotiatePromptState({
                 Saved vs switching
               </div>
             </div>
-          ) : (
+          ) : breakEvenDifference < 0 ? (
             <div className="space-y-1">
               <div className="text-5xl font-bold text-red-600">
                 £{Math.abs(breakEvenDifference).toFixed(2)}
               </div>
               <div className="text-lg text-slate-600">
                 Switching would save this amount
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="text-5xl font-bold text-slate-700">
+                £0
+              </div>
+              <div className="text-lg text-slate-600">
+                Switching and staying cost the same
+              </div>
+              <div className="text-sm text-slate-400">
+                Consider service, coverage and convenience when deciding
               </div>
             </div>
           )}
