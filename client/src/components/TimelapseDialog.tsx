@@ -914,6 +914,7 @@ export function TimelapseDialog({
             currentPolicyPrice={currentPolicyPrice}
             voluntaryExcess={voluntaryExcess}
             upfrontImpact={currentWeekMatches[currentMatchIndex].financial_breakdown?.upfront_impact ?? 0}
+            switchCost12m={currentWeekMatches[currentMatchIndex].financial_breakdown?.switch_cost_12m ?? 0}
             onYes={async (tolerance: number, mode: "text" | "voice", voluntaryExcessFlexibility: number) => {
               if (!userEmail) {
                 toast({ title: "Error", description: "No email found. Please set up your profile first.", variant: "destructive" });
@@ -2640,6 +2641,7 @@ function NegotiatePromptState({
   currentPolicyPrice,
   voluntaryExcess,
   upfrontImpact,
+  switchCost12m,
   onYes,
   onNo,
 }: {
@@ -2649,6 +2651,7 @@ function NegotiatePromptState({
   currentPolicyPrice: number;
   voluntaryExcess: number;
   upfrontImpact: number;
+  switchCost12m: number;
   onYes: (tolerance: number, mode: "text" | "voice", voluntaryExcessFlexibility: number) => void;
   onNo: () => void;
 }) {
@@ -2666,9 +2669,17 @@ function NegotiatePromptState({
     ? Math.round(((sliderValue - sliderMin) / (sliderMax - sliderMin)) * 100)
     : 0;
 
-  const difference12m = sliderValue - competitorQuote;
-  const monthlyDifference = difference12m / 12;
-  const showDecisionImpact = sliderValue > competitorQuote;
+  const cancellationFee = switchCost12m - competitorQuote || 0;
+  const effectiveSwitchCost = competitorQuote + cancellationFee;
+  const breakEvenDifference = effectiveSwitchCost - sliderValue;
+  const currentPremiumDifference = currentPolicyPrice - sliderValue;
+  const monthlyDifference = (sliderValue - competitorQuote) / 12;
+  const isBelowBreakEven = sliderValue <= effectiveSwitchCost;
+  const markerPct = currentPolicyPrice > competitorQuote
+    ? Math.min(100, Math.max(0,
+        ((effectiveSwitchCost - competitorQuote) / (currentPolicyPrice - competitorQuote)) * 100
+      ))
+    : 0;
 
   const handleYes = () => {
     onYes(tolerance, negotiationMode, voluntaryExcessFlexibility);
@@ -2737,6 +2748,16 @@ function NegotiatePromptState({
               onValueChange={([v]) => setSliderValue(v)}
               data-testid="slider-tolerance"
             />
+            <div
+              className="absolute top-0 bottom-0 w-0.5 bg-slate-400 opacity-60 pointer-events-none"
+              style={{ left: `${markerPct}%` }}
+            />
+            <div
+              className="absolute -top-5 text-xs text-slate-500 -translate-x-1/2 pointer-events-none"
+              style={{ left: `${markerPct}%` }}
+            >
+              Break-even
+            </div>
           </div>
 
           <div className="flex items-center justify-between text-xs font-medium px-0.5">
@@ -2756,24 +2777,33 @@ function NegotiatePromptState({
           </p>
         </div>
 
-        {showDecisionImpact && (
-          <div className="mt-4 p-4 rounded-lg bg-slate-50 border border-slate-200" data-testid="decision-impact-block">
-            <div className="text-sm font-semibold text-slate-700 mb-2">
-              Decision Impact at £{sliderValue.toFixed(2)}
-            </div>
-            {upfrontImpact > 0 && (
-              <div className="text-sm text-slate-600">
-                • Avoid £{Math.abs(upfrontImpact).toFixed(2)} upfront today
-              </div>
-            )}
-            <div className="text-sm text-slate-600">
-              • £{difference12m.toFixed(2)} difference over 12 months
-            </div>
-            <div className="text-sm font-medium text-slate-800">
-              • £{monthlyDifference.toFixed(2)} per month to stay
-            </div>
+        <div className="mt-4 p-4 rounded-lg bg-slate-50 border border-slate-200" data-testid="decision-impact-block">
+          <div className="text-sm font-semibold text-slate-700 mb-2">
+            Decision Impact at £{sliderValue.toFixed(2)}
           </div>
-        )}
+          <div className="text-sm text-slate-600">
+            • £{Math.abs(breakEvenDifference).toFixed(2)}{" "}
+            {isBelowBreakEven
+              ? "better than switching (incl. cancellation fee)"
+              : "worse than switching (incl. cancellation fee)"}
+          </div>
+          <div className="text-sm text-slate-600">
+            • £{Math.abs(currentPremiumDifference).toFixed(2)}{" "}
+            {currentPremiumDifference >= 0
+              ? "lower than your current premium"
+              : "higher than your current premium"}
+          </div>
+          <div className="text-sm font-medium text-slate-800">
+            • £{Math.abs(monthlyDifference).toFixed(2)} per month to stay
+          </div>
+          <div className={`mt-3 text-sm font-semibold ${
+            isBelowBreakEven ? "text-green-600" : "text-amber-600"
+          }`}>
+            {isBelowBreakEven
+              ? "Staying is financially smarter than switching."
+              : `Switching becomes financially better above £${effectiveSwitchCost.toFixed(2)}.`}
+          </div>
+        </div>
       </div>
 
       <div className="w-full max-w-sm">
