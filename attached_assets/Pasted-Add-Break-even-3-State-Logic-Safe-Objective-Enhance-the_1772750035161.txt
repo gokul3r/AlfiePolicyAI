@@ -1,0 +1,111 @@
+Add Break-even 3-State Logic (Safe)
+
+Objective
+
+Enhance the savings section in NegotiatePromptState to properly handle:
+
+Staying cheaper
+
+Switching cheaper
+
+Break-even (equal cost)
+
+No calculation changes.
+No state changes.
+No API changes.
+UI-only conditional refinement.
+
+File:
+client/src/components/TimelapseDialog.tsx
+
+Component:
+NegotiatePromptState
+
+🔧 T001 — Replace 2-state condition with explicit 3-state logic
+
+Locate the current block:
+
+{breakEvenDifference >= 0 ? (
+  ...
+) : (
+  ...
+)}
+
+Replace the entire conditional block with the following:
+
+{breakEvenDifference > 0 ? (
+  /* Staying is cheaper */
+  <div className="space-y-1">
+    <div className="text-5xl font-bold text-green-600">
+      £{breakEvenDifference.toFixed(2)}
+    </div>
+    <div className="text-lg text-slate-600">
+      Saved vs switching
+    </div>
+  </div>
+) : breakEvenDifference < 0 ? (
+  /* Switching is cheaper */
+  <div className="space-y-1">
+    <div className="text-5xl font-bold text-red-600">
+      £{Math.abs(breakEvenDifference).toFixed(2)}
+    </div>
+    <div className="text-lg text-slate-600">
+      Switching would save this amount
+    </div>
+  </div>
+) : (
+  /* Break-even */
+  <div className="space-y-2">
+    <div className="text-5xl font-bold text-slate-700">
+      £0
+    </div>
+    <div className="text-lg text-slate-600">
+      Switching and staying cost the same
+    </div>
+    <div className="text-sm text-slate-400">
+      Consider service, coverage and convenience when deciding
+    </div>
+  </div>
+)}
+✅ Behaviour After Change
+🟢 If staying cheaper
+
+Large green number
+“Saved vs switching”
+
+🔴 If switching cheaper
+
+Large red number
+“Switching would save this amount”
+
+⚖ If break-even
+
+Large neutral £0
+“Switching and staying cost the same”
+Subtle guidance line below
+
+🛡 Why This Is Safe
+
+Uses existing breakEvenDifference
+
+No changes to calculations
+
+No change to slider
+
+No impact to negotiation flow
+
+No API interaction
+
+Pure JSX conditional rendering
+
+🧠 Important Note
+
+Do NOT use >= or <=.
+
+Use explicit:
+
+> 0
+< 0
+=== 0
+
+This prevents misleading “£0 saved” messaging.
