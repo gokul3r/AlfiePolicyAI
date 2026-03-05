@@ -1,0 +1,163 @@
+Objective
+
+Refactor the savings section in NegotiatePromptState to:
+
+Remove boxed number blocks
+
+Use clean typography hierarchy
+
+Make savings direction-aware
+
+Make break-even explanation subtle
+
+No state/calculation/API changes
+
+File:
+client/src/components/TimelapseDialog.tsx
+
+Component:
+NegotiatePromptState
+
+🔧 T001 — Improve Break-even Label Styling (Subtle & Credible)
+
+Locate the current Break-even label section above the slider.
+
+Keep:
+
+The vertical marker line
+
+The break-even position logic
+
+Replace the existing label block with this subtle version:
+
+<div
+  className="absolute -top-6 text-xs text-slate-500 -translate-x-1/2 pointer-events-none text-center leading-tight"
+  style={{ left: `${markerPct}%` }}
+>
+  <div className="font-medium">Break-even</div>
+  <div className="text-[11px] text-slate-400">
+    £{competitorPrice.toFixed(2)} + £{cancellationFee.toFixed(2)} fee
+  </div>
+</div>
+
+
+✔ Smaller
+✔ Greyed
+✔ Informational only
+✔ Does not compete visually
+
+🔧 T002 — Remove Any Remaining Boxed “Max acceptable” Blocks
+
+Ensure there are no background-filled summary boxes around savings.
+
+Delete any block resembling:
+
+<div className="bg-muted ...">
+  ...
+</div>
+
+
+We are moving to typography-only.
+
+🔧 T003 — Replace Savings Section with Clean Executive Layout
+
+Find the current savings block (the one containing scenario + savings numbers).
+
+Replace the entire block with this:
+
+<div className="mt-8 text-center space-y-4">
+
+  {/* Scenario */}
+  <div className="text-lg text-slate-600">
+    If <span className="font-semibold">{currentProvider.toUpperCase()}</span> agrees to 
+    <span className="font-semibold"> £{sliderValue.toFixed(2)}</span>
+  </div>
+
+  {/* Primary Decision Delta */}
+  {breakEvenDifference >= 0 ? (
+    <div className="space-y-1">
+      <div className="text-5xl font-bold text-green-600">
+        £{breakEvenDifference.toFixed(2)}
+      </div>
+      <div className="text-lg text-slate-600">
+        Saved vs switching
+      </div>
+    </div>
+  ) : (
+    <div className="space-y-1">
+      <div className="text-5xl font-bold text-red-600">
+        £{Math.abs(breakEvenDifference).toFixed(2)}
+      </div>
+      <div className="text-lg text-slate-600">
+        Switching would save this amount
+      </div>
+    </div>
+  )}
+
+  {/* Secondary Delta */}
+  <div className="pt-2">
+    <div className="text-3xl font-semibold text-slate-800">
+      £{Math.abs(currentPremiumDifference).toFixed(2)}
+    </div>
+    <div className="text-md text-slate-500">
+      Less than your current premium
+    </div>
+  </div>
+
+</div>
+
+🧠 What This Achieves
+Visual Hierarchy
+
+1️⃣ Scenario context
+2️⃣ BIG primary decision delta
+3️⃣ Secondary comparison
+
+No boxes. No clutter. Just numbers.
+
+🧠 Behaviour Logic (Unchanged)
+
+breakEvenDifference
+
+currentPremiumDifference
+
+sliderValue
+
+competitorPrice
+
+cancellationFee
+
+All reused.
+No recalculations.
+No new variables.
+No state changes.
+
+🎯 Final Visual Outcome
+
+The executive will see:
+
+If ADMIRAL agrees to £704.55
+
+£17
+
+Saved vs switching
+
+£55
+
+Less than your current premium
+
+Break-even shown subtly above slider.
+
+🚀 Why This Is Safe
+
+JSX-only changes
+
+Uses existing variables
+
+No mutation of logic
+
+No navigation changes
+
+No API interactions
+
+No impact on negotiation flow
