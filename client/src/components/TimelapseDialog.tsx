@@ -2072,104 +2072,34 @@ function MatchFoundState({
             )}
           </div>
 
-          {/* Annual Savings - Unified collapsible section */}
-          <div
-            className="bg-muted/30 rounded-lg overflow-hidden"
-            data-testid="section-annual-savings"
-          >
-            <button
-              onClick={() => setShowDeltaBreakdown(!showDeltaBreakdown)}
-              className="flex justify-between items-center w-full py-3 px-4 text-left"
-              data-testid="button-toggle-annual-savings"
-            >
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">Annual Savings</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`text-xl font-bold ${
-                    financial_breakdown.annual_savings > 0
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-red-600 dark:text-red-400"
-                  }`}
-                  data-testid="text-annual-savings"
-                >
-                  {financial_breakdown.annual_savings > 0 ? "Save " : "Extra "}£
-                  {Math.abs(financial_breakdown.annual_savings).toFixed(2)}
-                </span>
-                {showDeltaBreakdown ? (
-                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                )}
-              </div>
-            </button>
+          {/* 12-month cost comparison */}
+          <div className="rounded-lg border bg-white p-5 mt-4" data-testid="section-annual-savings">
+            <div className="text-sm text-slate-500 mb-2">12-month cost comparison</div>
 
-            {showDeltaBreakdown && (
-              <div className="px-4 pb-4 pt-1 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 text-xs text-muted-foreground">
-                <p className="text-xs text-muted-foreground">
-                  Cost over next 12 months from switch date
-                </p>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-slate-600">Stay with your current insurer</span>
+              <span className="font-semibold text-slate-900">
+                £{financial_breakdown.current_cost.toFixed(2)}
+              </span>
+            </div>
 
-                {/* If you stay */}
-                <div className="space-y-1">
-                  <div className="flex justify-between font-medium text-foreground">
-                    <span>If you stay</span>
-                    <span>£{financial_breakdown.stay_cost_12m.toFixed(2)}</span>
-                  </div>
-                  <div className="ml-2 pl-3 border-l-2 border-border space-y-1">
-                    <div className="flex justify-between">
-                      <span>
-                        Remaining coverage (~
-                        {financial_breakdown.days_remaining} days)
-                      </span>
-                      <span>
-                        £{financial_breakdown.stay_remaining_value.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>
-                        Renewal (~{financial_breakdown.stay_renewal_days} days
-                        at same rate)
-                      </span>
-                      <span>
-                        £{financial_breakdown.stay_renewal_cost.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
+            <div className="flex justify-between py-2 border-b">
+              <span className="text-slate-600">
+                Switch to {financial_breakdown.new_quote_insurer}
+                <div className="text-xs text-slate-400">
+                  (£{financial_breakdown.new_quote_price.toFixed(2)} new policy + £{financial_breakdown.cancellation_fee.toFixed(2)} cancellation fee)
                 </div>
+              </span>
+              <span className="font-semibold text-slate-900">
+                £{financial_breakdown.switch_cost_12m.toFixed(2)}
+              </span>
+            </div>
 
-                {/* If you switch */}
-                <div className="space-y-1">
-                  <div className="flex justify-between font-medium text-foreground">
-                    <span>If you switch</span>
-                    <span
-                      className={
-                        financial_breakdown.annual_savings > 0
-                          ? "text-green-600 dark:text-green-400"
-                          : ""
-                      }
-                    >
-                      £{financial_breakdown.switch_cost_12m.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="ml-2 pl-3 border-l-2 border-green-300 dark:border-green-700 space-y-1">
-                    <div className="flex justify-between">
-                      <span>New policy (12 months)</span>
-                      <span>
-                        £{financial_breakdown.new_quote_price.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Cancellation fee</span>
-                      <span>
-                        £{financial_breakdown.cancellation_fee.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            <div className="mt-4 text-center">
+              <span className="text-green-600 font-semibold text-lg" data-testid="text-annual-savings">
+                Switching saves £{Math.abs(financial_breakdown.annual_savings).toFixed(2)} over 12 months
+              </span>
+            </div>
           </div>
         </div>
 
