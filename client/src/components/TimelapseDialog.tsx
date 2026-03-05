@@ -913,6 +913,7 @@ export function TimelapseDialog({
             competitorQuote={currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_price}
             currentPolicyPrice={currentPolicyPrice}
             voluntaryExcess={voluntaryExcess}
+            upfrontImpact={currentWeekMatches[currentMatchIndex].financial_breakdown?.upfront_impact ?? 0}
             onYes={async (tolerance: number, mode: "text" | "voice", voluntaryExcessFlexibility: number) => {
               if (!userEmail) {
                 toast({ title: "Error", description: "No email found. Please set up your profile first.", variant: "destructive" });
@@ -2638,6 +2639,7 @@ function NegotiatePromptState({
   competitorQuote,
   currentPolicyPrice,
   voluntaryExcess,
+  upfrontImpact,
   onYes,
   onNo,
 }: {
@@ -2646,6 +2648,7 @@ function NegotiatePromptState({
   competitorQuote: number;
   currentPolicyPrice: number;
   voluntaryExcess: number;
+  upfrontImpact: number;
   onYes: (tolerance: number, mode: "text" | "voice", voluntaryExcessFlexibility: number) => void;
   onNo: () => void;
 }) {
@@ -2662,6 +2665,10 @@ function NegotiatePromptState({
   const tolerancePct = sliderMax > sliderMin
     ? Math.round(((sliderValue - sliderMin) / (sliderMax - sliderMin)) * 100)
     : 0;
+
+  const difference12m = sliderValue - competitorQuote;
+  const monthlyDifference = difference12m / 12;
+  const showDecisionImpact = sliderValue > competitorQuote;
 
   const handleYes = () => {
     onYes(tolerance, negotiationMode, voluntaryExcessFlexibility);
@@ -2748,6 +2755,25 @@ function NegotiatePromptState({
               : `+£${tolerance.toFixed(2)} above ${competitorName} quote (${tolerancePct}% of gap)`}
           </p>
         </div>
+
+        {showDecisionImpact && (
+          <div className="mt-4 p-4 rounded-lg bg-slate-50 border border-slate-200" data-testid="decision-impact-block">
+            <div className="text-sm font-semibold text-slate-700 mb-2">
+              Decision Impact at £{sliderValue.toFixed(2)}
+            </div>
+            {upfrontImpact > 0 && (
+              <div className="text-sm text-slate-600">
+                • Avoid £{Math.abs(upfrontImpact).toFixed(2)} upfront today
+              </div>
+            )}
+            <div className="text-sm text-slate-600">
+              • £{difference12m.toFixed(2)} difference over 12 months
+            </div>
+            <div className="text-sm font-medium text-slate-800">
+              • £{monthlyDifference.toFixed(2)} per month to stay
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="w-full max-w-sm">
