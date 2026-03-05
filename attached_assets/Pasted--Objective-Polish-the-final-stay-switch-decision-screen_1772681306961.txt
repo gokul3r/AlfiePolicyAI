@@ -1,0 +1,172 @@
+🎯 Objective
+
+Polish the final stay/switch decision screen shown in:
+
+LiveNegotiationChat
+
+LiveNegotiationVoice
+
+Both are inside:
+
+client/src/components/TimelapseDialog.tsx
+
+We will:
+
+Replace negative headline
+
+Add positive reviewed-offer framing
+
+Keep financial calculations unchanged
+
+Add a subtle reassurance line
+
+Not modify any logic or variables
+
+Keep both chat and voice modes visually identical
+
+🔧 STEP 1 — Update Header Text
+
+Locate the section rendered when:
+
+outcome && !customerDecisionMade
+
+Replace the existing header:
+
+ADMIRAL COULD NOT MATCH THE COMPETITOR QUOTE
+
+With:
+
+Admiral has offered £{stayCost.toFixed(2)} after review.
+
+Use existing stayCost variable (which equals outcome.finalOfferPrice).
+
+Do NOT hardcode.
+
+🔧 STEP 2 — Keep Cost Comparison Section (No Logic Change)
+
+Keep the following exactly as is:
+
+stayCost
+
+switchCost
+
+cancellation fee
+
+"£X to pay today"
+
+All calculations
+
+Do NOT modify how savings is calculated:
+
+const savings = Math.abs(stayCost - switchCost);
+🔧 STEP 3 — Replace Savings Line
+
+Find the current savings line:
+
+Staying saves £{savings.toFixed(2)} over 12 months
+
+Keep this — but ensure it is centered and styled as:
+
+<div className="text-green-700 font-semibold text-center mt-4">
+  Staying saves £{savings.toFixed(2)} over 12 months.
+</div>
+
+(Add period at end.)
+
+🔧 STEP 4 — Add Reassurance Line (Below Savings)
+
+Immediately below the savings line, add:
+
+<div className="text-sm text-slate-600 text-center mt-2">
+  ✔ No cancellation fee &nbsp;&nbsp; ✔ No policy change &nbsp;&nbsp; ✔ No payment disruption
+</div>
+
+Keep font smaller than savings line.
+
+Do NOT bold.
+
+Keep subtle.
+
+🔧 STEP 5 — Remove Negative Tone (If Present)
+
+If any line says:
+
+“could not match”
+
+“unable to match”
+
+“failed to match”
+
+Remove it.
+
+We are reframing positively as:
+
+“has offered £X after review.”
+
+🔧 STEP 6 — Ensure Both Components Updated
+
+Apply identical changes to:
+
+LiveNegotiationChat
+
+LiveNegotiationVoice
+
+Do NOT touch NegotiationScreen.
+
+🚫 DO NOT MODIFY
+
+financial_breakdown
+
+liveNegotiationOutcome
+
+Negotiation logic
+
+Any backend file
+
+Savings calculation logic
+
+Button handlers
+
+Navigation
+
+Pure content + UI polish only.
+
+✅ Acceptance Criteria
+
+Header reads: “Admiral has offered £720.00 after review.”
+
+Cost comparison unchanged
+
+Savings line visible and centered
+
+Reassurance line appears below savings
+
+No TypeScript errors
+
+No runtime errors
+
+No behavioural change
+
+🏆 Expected Result
+
+Screen now reads:
+
+Admiral has offered £720.00 after review.
+
+Cost comparison over the next 12 months
+
+If you stay with ADMIRAL
+£720.00
+Best reviewed offer
+
+If you switch to PAXA
+£732.18
+Includes £55.00 cancellation fee
+£0.13 to pay today
+
+Staying saves £12.18 over 12 months.
+
+✔ No cancellation fee ✔ No policy change ✔ No payment disruption
+
+[Stay with ADMIRAL]
+[Switch to PAXA]
