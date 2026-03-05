@@ -2688,7 +2688,7 @@ function NegotiatePromptState({
         <div className="space-y-1 text-center">
           <p className="text-sm font-medium text-foreground">Your tolerance threshold</p>
           <p className="text-xs text-muted-foreground">
-            Drag to set the max you'd pay to stay with {currentProvider}
+            At what price would you stay?
           </p>
         </div>
 
@@ -2699,10 +2699,10 @@ function NegotiatePromptState({
           </div>
 
           <div className="relative">
-            <div className="absolute inset-0 flex pointer-events-none">
-              <div className="bg-green-50" style={{ width: `${markerPct}%` }} />
-              <div className="flex-1 bg-amber-50" />
-            </div>
+            <div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              style={{ background: 'linear-gradient(to right, #3b82f6 0%, #e5e7eb 50%, #7c3aed 100%)' }}
+            />
             <Slider
               min={sliderMin}
               max={sliderMax}
@@ -2715,12 +2715,6 @@ function NegotiatePromptState({
               className="absolute top-0 bottom-0 w-0.5 bg-slate-400 opacity-60 pointer-events-none"
               style={{ left: `${markerPct}%` }}
             />
-            <div
-              className="absolute -top-5 text-xs text-slate-500 -translate-x-1/2 pointer-events-none"
-              style={{ left: `${markerPct}%` }}
-            >
-              Break-even
-            </div>
           </div>
 
           <div className="flex items-center justify-between text-xs font-medium px-0.5">
@@ -2729,39 +2723,23 @@ function NegotiatePromptState({
           </div>
         </div>
 
-        <div className="rounded-md bg-muted/60 px-4 py-3 space-y-1 text-center">
+        <div className="rounded-md bg-muted/60 px-4 py-3 text-center">
           <p className="text-base font-semibold text-foreground" data-testid="text-max-acceptable">
             Max acceptable: £{sliderValue.toFixed(2)}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {tolerance === 0
-              ? "No tolerance — exact competitor price only"
-              : `+£${tolerance.toFixed(2)} above ${competitorName} quote (${tolerancePct}% of gap)`}
           </p>
         </div>
 
         <div className="mt-4 p-4 rounded-lg bg-slate-50 border border-slate-200" data-testid="decision-impact-block">
-          <div className="text-sm font-semibold text-slate-700 mb-2">
-            Decision Impact at £{sliderValue.toFixed(2)}
-          </div>
-          <div className="text-sm text-slate-600">
-            • £{Math.abs(breakEvenDifference).toFixed(2)}{" "}
-            {isBelowBreakEven
-              ? "better than switching (incl. cancellation fee)"
-              : "worse than switching (incl. cancellation fee)"}
-          </div>
-          <div className="text-sm text-slate-600">
-            • £{Math.abs(currentPremiumDifference).toFixed(2)}{" "}
-            {currentPremiumDifference >= 0
-              ? "lower than your current premium"
-              : "higher than your current premium"}
-          </div>
-          <div className={`mt-3 text-sm font-semibold ${
-            isBelowBreakEven ? "text-green-600" : "text-amber-600"
-          }`}>
-            {isBelowBreakEven
-              ? "Staying is financially smarter than switching."
-              : `Switching becomes financially better above £${effectiveSwitchCost.toFixed(2)}.`}
+          <div className="mt-6 text-center space-y-2">
+            <div className="text-sm text-muted-foreground">
+              If {currentProvider} agrees to £{sliderValue.toFixed(2)}
+            </div>
+            <div className="text-3xl font-bold text-green-600">
+              £{Math.abs(breakEvenDifference).toFixed(2)} saved vs switching
+            </div>
+            <div className="text-lg font-medium text-slate-700">
+              £{Math.abs(currentPremiumDifference).toFixed(2)} less than your current premium
+            </div>
           </div>
         </div>
       </div>
