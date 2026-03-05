@@ -3097,20 +3097,14 @@ function LiveNegotiationChat({
           <div className="mt-4 pt-4 border-t border-border shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-500" data-testid="stay-switch-decision">
             <div className="rounded-md border border-border bg-card p-3 space-y-3">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                {outcome.outcome === "matched"
-                  ? `${currentProvider} matched the price!`
-                  : outcome.outcome === "partially_matched"
-                  ? `${currentProvider} partially matched — within your tolerance`
-                  : `${currentProvider} could not match the competitor quote`}
+                {currentProvider} has offered £{stayCost.toFixed(2)} after review.
               </p>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cost over next 12 months</p>
 
               <div className={`flex items-start justify-between gap-2 p-2 rounded-md ${stayIsCheaper ? "bg-green-50 dark:bg-green-900/20" : ""}`}>
                 <div className="space-y-0.5">
                   <p className="text-sm font-semibold" data-testid="text-stay-label">If you stay with {currentProvider}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {outcome.outcome === "matched" ? "Matched renewal rate" : "Best renewal offer"}
-                  </p>
+                  <p className="text-xs text-muted-foreground">Best reviewed offer</p>
                 </div>
                 <p className={`text-sm font-bold whitespace-nowrap ${stayIsCheaper ? "text-green-700 dark:text-green-400" : ""}`} data-testid="text-stay-price">
                   £{stayCost.toFixed(2)}
@@ -3139,10 +3133,14 @@ function LiveNegotiationChat({
               </div>
 
               {savings > 0.01 && (
-                <p className="text-xs text-center text-green-700 dark:text-green-400 font-medium" data-testid="text-savings-summary">
-                  {stayIsCheaper ? "Staying" : "Switching"} saves £{savings.toFixed(2)} over 12 months
-                </p>
+                <div className="text-green-700 font-semibold text-center mt-4" data-testid="text-savings-summary">
+                  {stayIsCheaper ? "Staying" : "Switching"} saves £{savings.toFixed(2)} over 12 months.
+                </div>
               )}
+
+              <div className="text-sm text-slate-600 text-center mt-2">
+                ✔ No cancellation fee &nbsp;&nbsp; ✔ No policy change &nbsp;&nbsp; ✔ No payment disruption
+              </div>
 
               <div className="flex flex-col gap-2 pt-1">
                 <Button
@@ -3412,20 +3410,14 @@ function LiveNegotiationVoice({
           <div className="mt-4 pt-4 border-t border-border shrink-0 animate-in fade-in slide-in-from-bottom-4 duration-500" data-testid="voice-stay-switch-decision">
             <div className="rounded-md border border-border bg-card p-3 space-y-3">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                {outcome.outcome === "matched"
-                  ? `${currentProvider} matched the price!`
-                  : outcome.outcome === "partially_matched"
-                  ? `${currentProvider} partially matched — within your tolerance`
-                  : `${currentProvider} could not match the competitor quote`}
+                {currentProvider} has offered £{stayCost.toFixed(2)} after review.
               </p>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cost over next 12 months</p>
 
               <div className={`flex items-start justify-between gap-2 p-2 rounded-md ${stayIsCheaper ? "bg-green-50 dark:bg-green-900/20" : ""}`}>
                 <div className="space-y-0.5">
                   <p className="text-sm font-semibold" data-testid="text-voice-stay-label">If you stay with {currentProvider}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {outcome.outcome === "matched" ? "Matched renewal rate" : "Best renewal offer"}
-                  </p>
+                  <p className="text-xs text-muted-foreground">Best reviewed offer</p>
                 </div>
                 <p className={`text-sm font-bold whitespace-nowrap ${stayIsCheaper ? "text-green-700 dark:text-green-400" : ""}`} data-testid="text-voice-stay-price">
                   £{stayCost.toFixed(2)}
@@ -3454,10 +3446,14 @@ function LiveNegotiationVoice({
               </div>
 
               {savings > 0.01 && (
-                <p className="text-xs text-center text-green-700 dark:text-green-400 font-medium" data-testid="text-voice-savings-summary">
-                  {stayIsCheaper ? "Staying" : "Switching"} saves £{savings.toFixed(2)} over 12 months
-                </p>
+                <div className="text-green-700 font-semibold text-center mt-4" data-testid="text-voice-savings-summary">
+                  {stayIsCheaper ? "Staying" : "Switching"} saves £{savings.toFixed(2)} over 12 months.
+                </div>
               )}
+
+              <div className="text-sm text-slate-600 text-center mt-2">
+                ✔ No cancellation fee &nbsp;&nbsp; ✔ No policy change &nbsp;&nbsp; ✔ No payment disruption
+              </div>
 
               <div className="flex flex-col gap-2 pt-1">
                 <Button
