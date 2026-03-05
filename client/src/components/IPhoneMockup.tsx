@@ -79,9 +79,13 @@ function buildLineSegments(
 function LivePriceChart({
   priceHistory,
   currentPolicyPrice,
+  width = 260,
+  height = 120,
 }: {
   priceHistory: PriceDataPoint[];
   currentPolicyPrice: number;
+  width?: number;
+  height?: number;
 }) {
   const [activeTooltip, setActiveTooltip] = useState<{
     x: number;
@@ -91,9 +95,6 @@ function LivePriceChart({
     features?: string[];
     type: "purchased" | "matched" | "market";
   } | null>(null);
-
-  const width = 260;
-  const height = 120;
   const paddingLeft = 35;
   const paddingRight = 10;
   const paddingTop = 18;
@@ -445,6 +446,7 @@ export function IPhoneMockup({
   whisperBudget = null,
 }: IPhoneMockupProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isTrendExpanded, setIsTrendExpanded] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -510,15 +512,48 @@ export function IPhoneMockup({
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-4 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-3 border border-gray-200 shadow-md w-full"
+                className="mt-4 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-3 border border-gray-200 shadow-md w-full relative"
                 data-testid="iphone-price-chart"
               >
                 <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5 text-center font-semibold">Market Price Trend</p>
+                <button
+                  onClick={() => setIsTrendExpanded(true)}
+                  className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 transition"
+                  aria-label="Expand trend chart"
+                  data-testid="button-expand-trend"
+                >
+                  <span className="text-lg font-semibold">+</span>
+                </button>
                 <LivePriceChart
                   priceHistory={priceHistory}
                   currentPolicyPrice={currentPolicyPrice}
                 />
               </motion.div>
+
+              {/* Fullscreen Trend Modal */}
+              {isTrendExpanded && (
+                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+                  <div className="bg-white w-[95vw] h-[90vh] rounded-xl shadow-xl relative p-6">
+                    <button
+                      onClick={() => setIsTrendExpanded(false)}
+                      className="absolute top-4 right-4 text-slate-500 hover:text-slate-800 text-xl"
+                      aria-label="Close trend chart"
+                      data-testid="button-close-trend-expanded"
+                    >
+                      ×
+                    </button>
+                    <div className="text-lg font-semibold mb-4">Market Price Trend</div>
+                    <div className="h-[80%] flex items-center justify-center">
+                      <LivePriceChart
+                        priceHistory={priceHistory}
+                        currentPolicyPrice={currentPolicyPrice}
+                        width={700}
+                        height={400}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {consecutiveNoMatchMonths >= 6 && (
                 <motion.div
