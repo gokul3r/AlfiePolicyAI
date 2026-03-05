@@ -14,6 +14,13 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   X,
   Sparkles,
   Search,
@@ -905,7 +912,8 @@ export function TimelapseDialog({
             competitorName={currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_insurer}
             competitorQuote={currentWeekMatches[currentMatchIndex].financial_breakdown.new_quote_price}
             currentPolicyPrice={currentPolicyPrice}
-            onYes={async (tolerance: number, mode: "text" | "voice") => {
+            voluntaryExcess={voluntaryExcess}
+            onYes={async (tolerance: number, mode: "text" | "voice", voluntaryExcessFlexibility: number) => {
               if (!userEmail) {
                 toast({ title: "Error", description: "No email found. Please set up your profile first.", variant: "destructive" });
                 return;
@@ -929,6 +937,7 @@ export function TimelapseDialog({
                   vehicle_year: vehicleYear,
                   no_claim_bonus_years: noClaimBonusYears,
                   voluntary_excess: voluntaryExcess,
+                  voluntary_excess_flexibility: voluntaryExcessFlexibility,
                   policy_start_date: policyStartDate?.toISOString().split("T")[0] || "",
                   policy_end_date: policyEndDate?.toISOString().split("T")[0] || "",
                   socket_room_id: roomId,
@@ -2628,6 +2637,7 @@ function NegotiatePromptState({
   competitorName,
   competitorQuote,
   currentPolicyPrice,
+  voluntaryExcess,
   onYes,
   onNo,
 }: {
@@ -2635,7 +2645,8 @@ function NegotiatePromptState({
   competitorName: string;
   competitorQuote: number;
   currentPolicyPrice: number;
-  onYes: (tolerance: number, mode: "text" | "voice") => void;
+  voluntaryExcess: number;
+  onYes: (tolerance: number, mode: "text" | "voice", voluntaryExcessFlexibility: number) => void;
   onNo: () => void;
 }) {
   const sliderMin = competitorQuote;
@@ -2643,7 +2654,9 @@ function NegotiatePromptState({
   const defaultTolerance = Math.round(competitorQuote * 0.02 * 100) / 100;
   const defaultSliderValue = Math.min(sliderMin + defaultTolerance, sliderMax);
   const [sliderValue, setSliderValue] = useState<number>(defaultSliderValue);
-  const [negotiationMode, setNegotiationMode] = useState<"text" | "voice">("text");
+  const [negotiationMode, setNegotiationMode] = useState<"text" | "voice">("voice");
+  const [voluntaryExcessFlexibility, setVoluntaryExcessFlexibility] = useState<number>(voluntaryExcess);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState<boolean>(false);
 
   const tolerance = Math.round((sliderValue - sliderMin) * 100) / 100;
   const tolerancePct = sliderMax > sliderMin
@@ -2651,7 +2664,7 @@ function NegotiatePromptState({
     : 0;
 
   const handleYes = () => {
-    onYes(tolerance, negotiationMode);
+    onYes(tolerance, negotiationMode, voluntaryExcessFlexibility);
   };
 
   return (
@@ -2673,16 +2686,6 @@ function NegotiatePromptState({
 
       <div className="flex gap-2 p-1 bg-muted rounded-lg" data-testid="mode-toggle">
         <Button
-          variant={negotiationMode === "text" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setNegotiationMode("text")}
-          className="gap-2"
-          data-testid="button-mode-text"
-        >
-          <MessageSquare className="w-4 h-4" />
-          Text
-        </Button>
-        <Button
           variant={negotiationMode === "voice" ? "default" : "ghost"}
           size="sm"
           onClick={() => setNegotiationMode("voice")}
@@ -2691,6 +2694,16 @@ function NegotiatePromptState({
         >
           <Mic className="w-4 h-4" />
           Voice
+        </Button>
+        <Button
+          variant={negotiationMode === "text" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setNegotiationMode("text")}
+          className="gap-2"
+          data-testid="button-mode-text"
+        >
+          <MessageSquare className="w-4 h-4" />
+          Text
         </Button>
       </div>
 
@@ -2734,6 +2747,39 @@ function NegotiatePromptState({
               ? "No tolerance — exact competitor price only"
               : `+£${tolerance.toFixed(2)} above ${competitorName} quote (${tolerancePct}% of gap)`}
           </p>
+        </div>
+      </div>
+
+      <div className="w-full max-w-sm">
+        <button
+          type="button"
+          className="flex items-center justify-between w-full text-sm font-medium text-foreground py-2"
+          onClick={() => setIsAdvancedOpen(prev => !prev)}
+          data-testid="button-advanced-preferences-toggle"
+        >
+          <span>Advanced negotiation preferences</span>
+          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isAdvancedOpen ? "rotate-180" : ""}`} />
+        </button>
+        <div style={{ visibility: isAdvancedOpen ? "visible" : "hidden", height: isAdvancedOpen ? "auto" : 0, overflow: "hidden" }}>
+          <p className="text-xs text-muted-foreground mb-3">
+            AutoAnnie may adjust voluntary excess within this limit if it improves your premium.
+          </p>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-foreground">Voluntary excess flexibility</label>
+            <Select
+              value={String(voluntaryExcessFlexibility)}
+              onValueChange={(v) => setVoluntaryExcessFlexibility(Number(v))}
+            >
+              <SelectTrigger data-testid="select-voluntary-excess-flexibility">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[100, 200, 300, 400, 500].map((v) => (
+                  <SelectItem key={v} value={String(v)}>£{v}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
