@@ -1,0 +1,170 @@
+Refine Decision Impact + Add Subtle Slider Zone Shading
+
+🎯 Objective
+
+Refine the existing “Decision Impact” block and enhance the slider visually:
+
+Remove the monthly line entirely.
+
+Keep only:
+
+Break-even comparison
+
+Current premium comparison
+
+Dynamic verdict line
+
+Add subtle background zone coloring on the slider:
+
+Light green for “Stay zone” (≤ break-even)
+
+Light amber for “Switch zone” (> break-even)
+
+Keep UI subtle and professional.
+
+Modify ONLY client/src/components/TimelapseDialog.tsx.
+
+No backend changes.
+No payload changes.
+No tolerance logic changes.
+
+🧮 STEP 1 — Remove Monthly Line
+
+Inside NegotiatePromptState, locate the Decision Impact block.
+
+Remove this line entirely:
+
+• £{Math.abs(monthlyDifference).toFixed(2)} per month to stay
+
+Also remove any unused monthlyDifference computation.
+
+Do NOT touch other computed values.
+
+🎨 STEP 2 — Keep Only These 2 Metrics + Verdict
+
+Final Decision Impact structure should be:
+
+<div className="mt-4 p-4 rounded-lg bg-slate-50 border border-slate-200">
+  <div className="text-sm font-semibold text-slate-700 mb-2">
+    Decision Impact at £{sliderValue.toFixed(2)}
+  </div>
+
+  <div className="text-sm text-slate-600">
+    • £{Math.abs(breakEvenDifference).toFixed(2)}{" "}
+    {isBelowBreakEven
+      ? "better than switching (incl. cancellation fee)"
+      : "worse than switching (incl. cancellation fee)"}
+  </div>
+
+  <div className="text-sm text-slate-600">
+    • £{Math.abs(currentPremiumDifference).toFixed(2)}{" "}
+    {currentPremiumDifference >= 0
+      ? "lower than your current premium"
+      : "higher than your current premium"}
+  </div>
+
+  <div
+    className={`mt-3 text-sm font-semibold ${
+      isBelowBreakEven ? "text-green-600" : "text-amber-600"
+    }`}
+  >
+    {isBelowBreakEven
+      ? "Staying is financially smarter than switching."
+      : `Switching becomes financially better above £${effectiveSwitchCost.toFixed(
+          2
+        )}.`}
+  </div>
+</div>
+
+Do not change logic variables — reuse existing ones.
+
+🎨 STEP 3 — Add Subtle Slider Zone Shading
+
+Inside the slider container (ensure wrapper has className="relative").
+
+Add two background segments behind the slider track:
+
+<div className="absolute inset-0 flex pointer-events-none">
+  {/* Stay zone (left of break-even) */}
+  <div
+    className="bg-green-50"
+    style={{
+      width: `${
+        ((effectiveSwitchCost - competitorQuote) /
+          (currentPolicyPrice - competitorQuote)) *
+        100
+      }%`,
+    }}
+  />
+
+  {/* Switch zone (right of break-even) */}
+  <div className="flex-1 bg-amber-50" />
+</div>
+
+Make sure:
+
+This is positioned behind the actual slider track.
+
+It uses very light Tailwind shades (green-50, amber-50).
+
+No animations.
+
+No gradients.
+
+No icons.
+
+Subtle only.
+
+🎯 STEP 4 — Keep Break-Even Marker
+
+Keep the vertical “Break-even” marker already implemented.
+
+Do NOT change its logic.
+
+🚫 Do NOT Modify
+
+Negotiation logic
+
+Tolerance calculations
+
+POST payload
+
+Backend
+
+Financial calculator
+
+Any other file
+
+✅ Acceptance Criteria
+
+Monthly line is gone.
+
+Only 2 bullets remain.
+
+Verdict line dynamically changes color/text.
+
+Slider shows subtle green left zone and amber right zone.
+
+No layout shift.
+
+No console errors.
+
+No TypeScript errors.
+
+Negotiation flow untouched.
+
+🏆 Expected Result
+
+When slider is left of break-even:
+
+Soft green background.
+Green verdict.
+Customer feels safe.
+
+When slider is right of break-even:
+
+Soft amber background.
+Amber verdict.
+Customer sees risk.
+
+Professional. Calm. Intelligent.
