@@ -2673,7 +2673,6 @@ function NegotiatePromptState({
   const effectiveSwitchCost = competitorQuote + cancellationFee;
   const breakEvenDifference = effectiveSwitchCost - sliderValue;
   const currentPremiumDifference = currentPolicyPrice - sliderValue;
-  const monthlyDifference = (sliderValue - competitorQuote) / 12;
   const isBelowBreakEven = sliderValue <= effectiveSwitchCost;
   const markerPct = currentPolicyPrice > competitorQuote
     ? Math.min(100, Math.max(0,
@@ -2740,6 +2739,10 @@ function NegotiatePromptState({
           </div>
 
           <div className="relative">
+            <div className="absolute inset-0 flex pointer-events-none">
+              <div className="bg-green-50" style={{ width: `${markerPct}%` }} />
+              <div className="flex-1 bg-amber-50" />
+            </div>
             <Slider
               min={sliderMin}
               max={sliderMax}
@@ -2792,9 +2795,6 @@ function NegotiatePromptState({
             {currentPremiumDifference >= 0
               ? "lower than your current premium"
               : "higher than your current premium"}
-          </div>
-          <div className="text-sm font-medium text-slate-800">
-            • £{Math.abs(monthlyDifference).toFixed(2)} per month to stay
           </div>
           <div className={`mt-3 text-sm font-semibold ${
             isBelowBreakEven ? "text-green-600" : "text-amber-600"
