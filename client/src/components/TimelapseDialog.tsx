@@ -956,6 +956,7 @@ export function TimelapseDialog({
             }}
             onNo={() => handleConfirmPurchase()}
             onBack={() => setState("match_found")}
+            onCancel={handleKeepSearching}
           />
         )}
 
@@ -2588,6 +2589,7 @@ function NegotiatePromptState({
   onYes,
   onNo,
   onBack,
+  onCancel,
 }: {
   currentProvider: string;
   competitorName: string;
@@ -2599,6 +2601,7 @@ function NegotiatePromptState({
   onYes: (tolerance: number, mode: "text" | "voice", voluntaryExcessFlexibility: number) => void;
   onNo: () => void;
   onBack: () => void;
+  onCancel: () => void;
 }) {
   const sliderMin = competitorQuote;
   const sliderMax = currentPolicyPrice > competitorQuote ? currentPolicyPrice : competitorQuote + 100;
@@ -2816,6 +2819,15 @@ function NegotiatePromptState({
             Switch Directly
           </Button>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onCancel}
+          className="text-muted-foreground"
+          data-testid="button-negotiate-cancel"
+        >
+          Cancel
+        </Button>
         <p className="text-xs text-muted-foreground text-center max-w-xs mx-auto">
           AutoAnnie will never accept a quote, purchase a policy, or make any changes without your explicit confirmation.
         </p>
