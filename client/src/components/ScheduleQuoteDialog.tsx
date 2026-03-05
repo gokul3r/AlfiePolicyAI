@@ -359,10 +359,6 @@ export function ScheduleQuoteDialog({
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground text-center">
-          Preferences stored locally (backend integration coming soon)
-        </p>
-
         {/* Timelapse Dialog */}
         <TimelapseDialog 
           open={timelapseOpen} 
