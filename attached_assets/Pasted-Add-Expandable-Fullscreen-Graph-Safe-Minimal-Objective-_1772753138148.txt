@@ -1,0 +1,133 @@
+Add Expandable Fullscreen Graph (Safe & Minimal)
+
+Objective
+
+Add a "+" expand icon to the Market Price Trend card that:
+
+Opens a fullscreen modal
+
+Reuses the existing graph component
+
+Does NOT modify any data logic
+
+Does NOT modify chart calculations
+
+Does NOT affect other screens
+
+File:
+client/src/components/TimelapseDialog.tsx
+(or wherever the Market Price Trend card is rendered)
+
+🔧 T001 — Add Local UI State (No Logic Changes)
+
+At the top of the component where the Market Price Trend is rendered, add:
+
+const [isTrendExpanded, setIsTrendExpanded] = useState(false);
+
+⚠️ Do NOT move existing state.
+⚠️ Do NOT touch data logic.
+
+🔧 T002 — Add Expand Icon in Top Right of Trend Card
+
+Locate the Market Price Trend card container.
+
+Inside its header section (top-right corner), add:
+
+<button
+  onClick={() => setIsTrendExpanded(true)}
+  className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 transition"
+  aria-label="Expand trend chart"
+>
+  <span className="text-lg font-semibold">+</span>
+</button>
+
+Ensure the parent container has:
+
+className="relative"
+
+So the button positions correctly.
+
+Do NOT modify chart itself.
+
+🔧 T003 — Add Fullscreen Modal Overlay (Reusing Same Graph Component)
+
+Below the main card JSX (in same component), add:
+
+{isTrendExpanded && (
+  <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+    <div className="bg-white w-[95vw] h-[90vh] rounded-xl shadow-xl relative p-6">
+
+      {/* Close Button */}
+      <button
+        onClick={() => setIsTrendExpanded(false)}
+        className="absolute top-4 right-4 text-slate-500 hover:text-slate-800 text-xl"
+        aria-label="Close trend chart"
+      >
+        ×
+      </button>
+
+      {/* Title */}
+      <div className="text-lg font-semibold mb-4">
+        Market Price Trend
+      </div>
+
+      {/* Reuse existing chart component */}
+      <div className="h-[80%]">
+        <MarketPriceTrendChart
+          {...existingPropsUsedInOriginalChart}
+        />
+      </div>
+
+    </div>
+  </div>
+)}
+
+⚠️ IMPORTANT:
+
+Reuse the exact same chart component
+
+Pass the exact same props
+
+Do NOT duplicate chart logic
+
+Do NOT recreate data arrays
+
+Simply reuse.
+
+🔧 T004 — Increase Chart Height in Modal Only
+
+If original chart uses fixed height like:
+
+height={250}
+
+Change it to:
+
+height={isTrendExpanded ? 500 : 250}
+
+OR wrap container with:
+
+className={isTrendExpanded ? "h-[80%]" : "h-[250px]"}
+
+Do NOT change data rendering.
+
+✅ What This Achieves
+
+Small Card View:
+
+Clean summary graph
+
+button visible
+
+Expanded View:
+
+Large strategic chart
+
+Dark backdrop
+
+Focused view
+
+Close (×) restores state
+
+No route change.
+No re-fetch.
+No data recalculation.
