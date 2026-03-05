@@ -262,28 +262,32 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
           finalDecisionSpoken = true;
         }
 
-        const outcome = parseOutcome(fullAssistantTurn);
-        if (outcome.type !== null) {
-          console.log(
-            `[VoiceNego] Outcome detected: ${outcome.type} at £${outcome.price}`,
-          );
-          const category = determineOutcomeCategory(negotiation, outcome);
-          await storage.updateLiveNegotiationStatus(
-            negotiation.id,
-            "awaiting_customer",
-            category,
-            outcome.price ?? undefined,
-          );
+        // Only parse negotiation outcome during active negotiation phase.
+        // Do NOT re-parse old outcome tags after customer decision flow has started.
+        if (!waitingForFinalAgentReply) {
+          const outcome = parseOutcome(fullAssistantTurn);
+          if (outcome.type !== null) {
+            console.log(
+              `[VoiceNego] Outcome detected: ${outcome.type} at £${outcome.price}`,
+            );
+            const category = determineOutcomeCategory(negotiation, outcome);
+            await storage.updateLiveNegotiationStatus(
+              negotiation.id,
+              "awaiting_customer",
+              category,
+              outcome.price ?? undefined,
+            );
 
-          if (ioInstance) {
-            ioInstance.to(roomId).emit("negotiation_outcome", {
-              negotiationId: negotiation.id,
-              outcome: category,
-              finalOfferPrice: outcome.price,
-              competitorQuote: negotiation.competitor_quote,
-              providerName: negotiation.provider_name,
-              competitorName: negotiation.competitor_name,
-            });
+            if (ioInstance) {
+              ioInstance.to(roomId).emit("negotiation_outcome", {
+                negotiationId: negotiation.id,
+                outcome: category,
+                finalOfferPrice: outcome.price,
+                competitorQuote: negotiation.competitor_quote,
+                providerName: negotiation.provider_name,
+                competitorName: negotiation.competitor_name,
+              });
+            }
           }
         }
 
