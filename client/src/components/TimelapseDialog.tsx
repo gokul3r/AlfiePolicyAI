@@ -2633,7 +2633,7 @@ function NegotiatePromptState({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full space-y-6 p-8 bg-gradient-to-br from-background via-background to-blue-500/5">
+    <div className="flex flex-col items-center justify-center h-full space-y-6 p-8 bg-gradient-to-br from-background via-background to-blue-500/5 overflow-y-auto">
       <div className="w-full flex items-center">
         <Button
           variant="ghost"
