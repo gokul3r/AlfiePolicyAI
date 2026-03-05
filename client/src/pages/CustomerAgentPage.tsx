@@ -702,7 +702,7 @@ function HomeScreen({ provider, onNavigate, liveChatCount }: { provider: string;
                       <h3 className="text-lg font-semibold text-foreground">{section.title}</h3>
                       {section.badge > 0 && (
                         <Badge variant="outline" className="text-xs bg-violet-50 dark:bg-violet-950/30 text-violet-700 dark:text-violet-300 border-violet-300 dark:border-violet-700" data-testid={`badge-${section.key}-count`}>
-                          {section.badge} active
+                          {section.badge} pending
                         </Badge>
                       )}
                     </div>
@@ -1752,7 +1752,7 @@ export default function CustomerAgentPage() {
         const res = await fetch(`/api/live-negotiations/provider/${encodeURIComponent(provider)}`);
         if (res.ok) {
           const data = await res.json();
-          setLiveChatCount(data.length);
+          setLiveChatCount(data.filter((n: any) => n.status === "pending" || n.status === "active").length);
         }
       } catch {}
     };
