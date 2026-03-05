@@ -1,0 +1,192 @@
+Touch only TimelapseDialog.tsx
+
+Not affect negotiation flow, payload, or backend
+
+Below is the clean, controlled Replit prompt.
+
+✅ REPLIT IMPLEMENTATION PROMPT
+
+(Refine Decision Impact + Add Break-Even Marker)
+
+🎯 Objective
+
+Upgrade the existing “Decision Impact” section under the tolerance slider to:
+
+Use break-even logic (competitor + cancellation fee)
+
+Compare vs current premium
+
+Show monthly framing
+
+Add a dynamic verdict line
+
+Add a subtle visual tick for “Switch break-even”
+
+Pure UI change.
+No backend changes.
+No API changes.
+No negotiation logic changes.
+
+Modify ONLY:
+
+client/src/components/TimelapseDialog.tsx
+
+Inside:
+
+NegotiatePromptState
+🧮 Available Data (Already in Scope)
+
+Inside component props/state:
+
+competitorQuote
+
+currentPolicyPrice
+
+sliderValue
+
+upfrontImpact
+
+financial_breakdown.switch_cost_12m
+
+financial_breakdown.stay_cost_12m
+
+From backend we know:
+
+switch_cost_12m = competitorQuote + cancellation fee
+
+We will compute cancellationFee dynamically instead of hardcoding 55.
+
+🔢 STEP 1 — Add New Computed Values
+
+Add immediately after existing slider calculations:
+
+const cancellationFee =
+  currentWeekMatches[currentMatchIndex]
+    .financial_breakdown?.switch_cost_12m -
+  competitorQuote || 0;
+
+const effectiveSwitchCost = competitorQuote + cancellationFee;
+
+const breakEvenDifference = effectiveSwitchCost - sliderValue;
+
+const currentPremiumDifference = currentPolicyPrice - sliderValue;
+
+const monthlyDifference = (sliderValue - competitorQuote) / 12;
+
+const isBelowBreakEven = sliderValue <= effectiveSwitchCost;
+
+Do NOT modify any existing calculations.
+
+🎨 STEP 2 — Replace Decision Impact Block
+
+Replace the current Decision Impact block entirely with:
+
+<div className="mt-4 p-4 rounded-lg bg-slate-50 border border-slate-200">
+  <div className="text-sm font-semibold text-slate-700 mb-2">
+    Decision Impact at £{sliderValue.toFixed(2)}
+  </div>
+
+  {/* Break-even comparison */}
+  <div className="text-sm text-slate-600">
+    • £{Math.abs(breakEvenDifference).toFixed(2)}{" "}
+    {isBelowBreakEven
+      ? "better than switching (incl. cancellation fee)"
+      : "worse than switching (incl. cancellation fee)"}
+  </div>
+
+  {/* Current premium comparison */}
+  <div className="text-sm text-slate-600">
+    • £{Math.abs(currentPremiumDifference).toFixed(2)}{" "}
+    {currentPremiumDifference >= 0
+      ? "lower than your current premium"
+      : "higher than your current premium"}
+  </div>
+
+  {/* Monthly framing */}
+  <div className="text-sm font-medium text-slate-800">
+    • £{Math.abs(monthlyDifference).toFixed(2)} per month to stay
+  </div>
+
+  {/* Verdict line */}
+  <div className={`mt-3 text-sm font-semibold ${
+    isBelowBreakEven ? "text-green-600" : "text-amber-600"
+  }`}>
+    {isBelowBreakEven
+      ? "Staying is financially smarter than switching."
+      : `Switching becomes financially better above £${effectiveSwitchCost.toFixed(2)}.`}
+  </div>
+</div>
+🎯 STEP 3 — Add Subtle Break-Even Slider Marker
+
+Inside the slider container, overlay a subtle vertical marker:
+
+After the slider track element, insert:
+
+<div
+  className="absolute top-0 bottom-0 w-0.5 bg-slate-400 opacity-60"
+  style={{
+    left: `${((effectiveSwitchCost - competitorQuote) /
+      (currentPolicyPrice - competitorQuote)) *
+      100}%`,
+  }}
+/>
+<div
+  className="absolute -top-5 text-xs text-slate-500"
+  style={{
+    left: `${((effectiveSwitchCost - competitorQuote) /
+      (currentPolicyPrice - competitorQuote)) *
+      100}%`,
+  }}
+>
+  Break-even
+</div>
+
+Ensure the slider wrapper has:
+
+className="relative"
+
+So positioning works.
+
+Keep marker subtle.
+No animations.
+No tooltips.
+
+🚫 Do NOT Change
+
+Negotiation logic
+
+Tolerance logic
+
+Payload submission
+
+API structure
+
+Backend calculations
+
+Any other files
+
+✅ Acceptance Criteria
+
+Slider still behaves exactly the same.
+
+Decision Impact updates live as slider moves.
+
+Break-even marker renders correctly.
+
+No console errors.
+
+No TypeScript errors.
+
+No behavioural changes in negotiation.
+
+🎯 Result
+
+Customer now sees:
+
+• £X better than switching (incl. cancellation fee)
+• £Y lower than your current premium
+• £Z per month to stay
+
+🟢 Staying is financially smarter than switching.
+
+With a visible break-even tick on the slider.
