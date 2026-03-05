@@ -2627,6 +2627,10 @@ function NegotiatePromptState({
         ((effectiveSwitchCost - competitorQuote) / (currentPolicyPrice - competitorQuote)) * 100
       ))
     : 0;
+  const competitorPct = 0;
+  const currentPct = sliderMax > sliderMin
+    ? Math.min(100, Math.max(0, ((currentPolicyPrice - sliderMin) / (sliderMax - sliderMin)) * 100))
+    : 100;
 
   const handleYes = () => {
     onYes(tolerance, negotiationMode, voluntaryExcessFlexibility);
@@ -2693,7 +2697,7 @@ function NegotiatePromptState({
         </div>
 
         <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs text-muted-foreground px-0.5">
+          <div className="flex items-center justify-between text-sm text-slate-500 px-0.5">
             <span>{competitorName}</span>
             <span>Current rate</span>
           </div>
@@ -2702,6 +2706,16 @@ function NegotiatePromptState({
             <div
               className="absolute inset-0 rounded-full pointer-events-none"
               style={{ background: 'linear-gradient(to right, #3b82f6 0%, #e5e7eb 50%, #7c3aed 100%)' }}
+            />
+            {/* Competitor anchor dot */}
+            <div
+              className="absolute -top-1 w-3 h-3 rounded-full bg-slate-400 -translate-x-1/2 pointer-events-none"
+              style={{ left: `${competitorPct}%` }}
+            />
+            {/* Current premium anchor dot */}
+            <div
+              className="absolute -top-1 w-3 h-3 rounded-full bg-slate-400 -translate-x-1/2 pointer-events-none"
+              style={{ left: `${currentPct}%` }}
             />
             <Slider
               min={sliderMin}
@@ -2716,13 +2730,16 @@ function NegotiatePromptState({
               style={{ left: `${markerPct}%` }}
             />
             <div
-              className="absolute -top-6 text-xs text-slate-500 -translate-x-1/2 pointer-events-none text-center leading-tight"
+              className="absolute -top-6 text-xs text-slate-500 -translate-x-1/2 pointer-events-none text-center"
               style={{ left: `${markerPct}%` }}
             >
-              <div className="font-medium">Break-even</div>
-              <div className="text-[11px] text-slate-400">
-                £{competitorQuote.toFixed(2)} + £{cancellationFee.toFixed(2)} fee
-              </div>
+              Break-even
+            </div>
+            <div
+              className="absolute top-5 text-[11px] text-slate-400 -translate-x-1/2 pointer-events-none text-center whitespace-nowrap"
+              style={{ left: `${markerPct}%` }}
+            >
+              £{competitorQuote.toFixed(2)} + £{cancellationFee.toFixed(2)} fee
             </div>
           </div>
 
