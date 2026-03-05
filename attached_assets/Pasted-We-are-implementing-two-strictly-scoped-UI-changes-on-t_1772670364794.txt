@@ -1,0 +1,113 @@
+We are implementing two strictly scoped UI changes on the negotiation start screen.
+
+This is a stable demo build.
+Do NOT refactor unrelated files.
+Do NOT change styling.
+Do NOT change negotiation engine logic.
+Only apply the scoped changes below.
+
+-----------------------------------------
+CHANGE 1 — Voice Mode Default + Position
+-----------------------------------------
+
+On the negotiation start screen:
+
+1. Position the "Voice" button on the LEFT.
+2. Position the "Text" button on the RIGHT.
+3. Make "Voice" selected by default.
+4. Do NOT change switching behaviour.
+5. Do NOT change styling.
+6. Do NOT modify other components.
+
+Only change:
+- Button order
+- Default selected state
+
+-----------------------------------------
+CHANGE 2 — Advanced Negotiation Preferences (Collapsible Section)
+-----------------------------------------
+
+Under the tolerance slider section (below “Max acceptable”), add a collapsible section.
+
+SECTION HEADER:
+"Advanced negotiation preferences"
+
+Sub-text (small font under header):
+"AutoAnnie may adjust voluntary excess within this limit if it improves your premium."
+
+Requirements:
+- Collapsed by default.
+- Expands on click.
+- Must match existing UI styling.
+- Must not affect layout when collapsed.
+
+-----------------------------------------
+Inside Expanded Section
+-----------------------------------------
+
+Add:
+
+Label:
+"Voluntary excess flexibility"
+
+Dropdown values:
+Use the following values:
+100, 200, 300, 400, 500
+
+IMPORTANT DEFAULT LOGIC:
+
+- Default selected value must equal the customer's current voluntary excess.
+- That value already exists as:
+  negotiation.voluntary_excess
+
+- If user does not change the dropdown,
+  voluntary_excess_flexibility must equal negotiation.voluntary_excess.
+
+-----------------------------------------
+STATE MANAGEMENT
+-----------------------------------------
+
+Create a state variable:
+
+voluntaryExcessFlexibility
+
+Initialise it to:
+negotiation.voluntary_excess
+
+When user selects a different value,
+update voluntaryExcessFlexibility accordingly.
+
+-----------------------------------------
+PAYLOAD REQUIREMENTS
+-----------------------------------------
+
+When user clicks "Authorise & Negotiate":
+
+Extend the existing payload to include:
+
+voluntary_excess_flexibility: voluntaryExcessFlexibility
+
+Do NOT remove or rename any existing fields.
+Do NOT change existing negotiation payload structure.
+Only append this new field.
+
+-----------------------------------------
+BACKWARD COMPATIBILITY
+-----------------------------------------
+
+If the advanced section is never expanded,
+the system must still send:
+voluntary_excess_flexibility = negotiation.voluntary_excess
+
+This ensures existing flows are unaffected.
+
+-----------------------------------------
+STRICT RULES
+-----------------------------------------
+
+- Do NOT modify negotiation engine logic.
+- Do NOT modify voice lifecycle logic.
+- Do NOT refactor unrelated code.
+- Do NOT change CSS.
+- Do NOT rename variables used elsewhere.
+- Only implement the UI + payload extension.
