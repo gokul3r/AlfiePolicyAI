@@ -1,0 +1,162 @@
+🎯 Objective
+
+Simplify the tolerance section UI in NegotiatePromptState to be executive-friendly:
+
+Remove gap percentage and explanatory text
+
+Remove verdict sentence
+
+Keep break-even marker (visual only, no label)
+
+Replace decision block with large numeric comparison
+
+Modify header text
+
+Keep all calculations and logic untouched
+
+File:
+client/src/components/TimelapseDialog.tsx
+
+Component:
+NegotiatePromptState
+
+🔒 Critical Rule
+
+⚠️ Do NOT modify:
+
+Any state variables
+
+Any calculations
+
+sliderValue logic
+
+break-even logic
+
+negotiation payload
+
+API calls
+
+handleConfirmPurchase
+
+handleKeepSearching
+
+any props
+
+This is UI-only refactor.
+
+T001 — Update Section Title
+
+Replace:
+
+Drag to set the max you'd pay to stay with Admiral
+
+With:
+
+At what price would you stay?
+
+Do not change container structure.
+
+T002 — Remove Gap Text
+
+Remove this line completely:
+
++£X above [competitor] quote (X% of gap)
+
+Keep the “Max acceptable: £X” line for now (we will visually downplay it later if needed).
+
+Do not remove sliderValue usage.
+
+T003 — Remove Verdict Line
+
+Remove:
+
+Staying is financially smarter than switching.
+
+No replacement text there.
+
+T004 — Remove "Decision Impact at £X" Label
+
+Remove the heading:
+
+Decision Impact at £X
+
+We will replace the entire block below.
+
+T005 — Replace Bullet Decision Block
+
+Remove existing bullet block:
+
+• £X better than switching
+• £X lower than your current premium
+
+Replace with:
+
+<div className="mt-6 text-center space-y-2">
+  <div className="text-sm text-muted-foreground">
+    If Admiral agrees to £{sliderValue.toFixed(2)}
+  </div>
+
+  <div className="text-3xl font-bold text-green-600">
+    £{Math.abs(difference12m).toFixed(2)} saved vs switching
+  </div>
+
+  <div className="text-lg font-medium text-slate-700">
+    £{Math.abs(currentPolicyPrice - sliderValue).toFixed(2)} less than your current premium
+  </div>
+</div>
+
+⚠️ Use existing computed variables.
+⚠️ Do NOT introduce new calculations.
+⚠️ If variable names differ, reuse existing ones.
+
+T006 — Break-even Marker Adjustment
+
+Keep the vertical break-even line.
+
+Remove the text label “Break-even”.
+
+Do NOT remove the break-even calculation logic.
+
+Only remove the text rendering.
+
+T007 — Slider Styling (Visual Only)
+
+Modify the slider track background to use subtle gradient:
+
+background: linear-gradient(
+  to right,
+  #3b82f6 0%,
+  #e5e7eb 50%,
+  #7c3aed 100%
+);
+
+Do NOT change slider value behaviour.
+Do NOT change min/max logic.
+
+Only modify visual track styling.
+
+Acceptance Criteria
+
+Slider behaviour unchanged
+
+Negotiation works exactly as before
+
+Threshold sent to backend unchanged
+
+No console errors
+
+No new state variables
+
+UI now shows:
+
+Clear question header
+
+Big savings number
+
+Clean numeric comparison
+
+No gap %
+
+No verbose verdict sentence
+
+Subtle break-even marker
