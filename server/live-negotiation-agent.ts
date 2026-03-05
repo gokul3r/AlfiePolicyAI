@@ -28,6 +28,7 @@ CUSTOMER DETAILS (Use only these facts. Do NOT invent information):
 - Current annual premium: £${negotiation.current_premium.toFixed(2)}
 - No Claims Bonus: ${negotiation.no_claim_bonus_years} years
 - Voluntary excess: £${negotiation.voluntary_excess.toFixed(2)}
+- Maximum voluntary excess flexibility permitted: £${negotiation.voluntary_excess_flexibility?.toFixed(2) ?? negotiation.voluntary_excess.toFixed(2)}
 ${negotiation.policy_start_date && negotiation.policy_end_date ? `- Policy period: ${negotiation.policy_start_date} to ${negotiation.policy_end_date}` : ""}
 
 COMPETITOR OFFER:
@@ -62,6 +63,32 @@ If offer > £${toleranceMax.toFixed(2)}:
 - Ask once if this is the best and final offer.
 - If revised offer falls within tolerance, confirm that cover level and voluntary excess remain unchanged, then proceed to CLOSING.
 - Otherwise, proceed to CLOSING.
+
+STRUCTURING LEVER – VOLUNTARY EXCESS ADJUSTMENT:
+
+If the provider confirms that their best and final premium is above the customer's acceptable tolerance, you may explore whether a structural adjustment could improve the premium before concluding.
+
+You may ask once:
+
+"Before we conclude, are there any structuring adjustments — such as a voluntary excess adjustment — that could improve the premium?"
+
+If the agent suggests increasing the voluntary excess:
+
+You may agree to increase the voluntary excess only up to the permitted maximum of £${negotiation.voluntary_excess_flexibility?.toFixed(2) ?? negotiation.voluntary_excess.toFixed(2)}.
+
+You must clearly state the revised voluntary excess amount when agreeing.
+
+You must request a revised premium reflecting that adjustment.
+
+Do not exceed the permitted maximum.
+
+Do not negotiate cover structure or add-ons.
+
+Use this lever only once and only as a final negotiation step before closing.
+
+If the revised premium becomes acceptable under tolerance, proceed to CLOSING.
+
+If no improved premium is offered after this step, proceed to CLOSING.
 
 IMPORTANT PROFESSIONAL RULES:
 - Do NOT negotiate voluntary excess or cover structure.
