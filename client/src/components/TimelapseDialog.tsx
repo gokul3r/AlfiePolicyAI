@@ -955,6 +955,7 @@ export function TimelapseDialog({
               }
             }}
             onNo={() => handleConfirmPurchase()}
+            onBack={() => setState("match_found")}
           />
         )}
 
@@ -2586,6 +2587,7 @@ function NegotiatePromptState({
   switchCost12m,
   onYes,
   onNo,
+  onBack,
 }: {
   currentProvider: string;
   competitorName: string;
@@ -2596,6 +2598,7 @@ function NegotiatePromptState({
   switchCost12m: number;
   onYes: (tolerance: number, mode: "text" | "voice", voluntaryExcessFlexibility: number) => void;
   onNo: () => void;
+  onBack: () => void;
 }) {
   const sliderMin = competitorQuote;
   const sliderMax = currentPolicyPrice > competitorQuote ? currentPolicyPrice : competitorQuote + 100;
@@ -2628,6 +2631,18 @@ function NegotiatePromptState({
 
   return (
     <div className="flex flex-col items-center justify-center h-full space-y-6 p-8 bg-gradient-to-br from-background via-background to-blue-500/5">
+      <div className="w-full flex items-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          className="gap-1 text-muted-foreground"
+          data-testid="button-negotiate-back"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Back
+        </Button>
+      </div>
       <div className="text-center space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
         <Scale className="h-16 w-16 text-blue-500 mx-auto" />
         <h2 className="text-2xl md:text-3xl font-bold text-foreground" data-testid="text-negotiate-heading">
