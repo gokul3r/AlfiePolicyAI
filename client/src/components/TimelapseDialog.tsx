@@ -882,6 +882,7 @@ export function TimelapseDialog({
                 setState("negotiating");
               }
             }}
+            onDirectSwitch={handleConfirmPurchase}
             onKeepSearching={handleKeepSearching}
             onPreviousMatch={() =>
               setCurrentMatchIndex((prev) => Math.max(0, prev - 1))
@@ -1821,6 +1822,7 @@ function MatchFoundState({
   matchNumber,
   totalMatches,
   onConfirmPurchase,
+  onDirectSwitch,
   onKeepSearching,
   onPreviousMatch,
   onNextMatch,
@@ -1835,6 +1837,7 @@ function MatchFoundState({
   matchNumber: number;
   totalMatches: number;
   onConfirmPurchase: () => void;
+  onDirectSwitch: () => void;
   onKeepSearching: () => void;
   onPreviousMatch: () => void;
   onNextMatch: () => void;
@@ -2326,11 +2329,20 @@ function MatchFoundState({
         <div className="flex flex-col sm:flex-row gap-4 pt-6">
           <Button
             size="lg"
-            onClick={onConfirmPurchase}
+            onClick={onDirectSwitch}
             className="flex-1 text-lg py-6"
             data-testid="button-confirm-purchase"
           >
             Switch Policy
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={onConfirmPurchase}
+            className="flex-1 text-lg py-6"
+            data-testid="button-negotiate"
+          >
+            Negotiate
           </Button>
           <Button
             size="lg"
