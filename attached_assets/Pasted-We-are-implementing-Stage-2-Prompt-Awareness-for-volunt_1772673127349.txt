@@ -1,0 +1,87 @@
+We are implementing Stage 2 – Prompt Awareness for voluntary excess flexibility in live negotiation.
+
+⚠️ IMPORTANT:
+
+Modify ONLY server/live-negotiation-agent.ts
+
+Modify ONLY the buildSystemPrompt() function
+
+Do NOT modify any other files
+
+Do NOT change outcome parsing
+
+Do NOT change voice.ts
+
+Do NOT change closing logic
+
+Do NOT change fallback logic
+
+This is a controlled prompt extension only.
+
+1️⃣ Add Voluntary Excess Flexibility Context
+
+Inside buildSystemPrompt() in the CUSTOMER DETAILS section, after:
+
+- Voluntary excess: £${negotiation.voluntary_excess.toFixed(2)}
+
+Add this block immediately below it:
+
+- Maximum voluntary excess flexibility permitted: £${negotiation.voluntary_excess_flexibility?.toFixed(2) ?? negotiation.voluntary_excess.toFixed(2)}
+
+This ensures backward compatibility if the value is null.
+
+2️⃣ Add New Section: STRUCTURING LEVER – VOLUNTARY EXCESS
+
+After the NEGOTIATION STRATEGY section (before IMPORTANT PROFESSIONAL RULES), insert this new section:
+
+STRUCTURING LEVER – VOLUNTARY EXCESS ADJUSTMENT:
+
+If the provider confirms that their best and final premium is above the customer’s acceptable tolerance, you may explore whether a structural adjustment could improve the premium before concluding.
+
+You may ask once:
+
+"Before we conclude, are there any structuring adjustments — such as a voluntary excess adjustment — that could improve the premium?"
+
+If the agent suggests increasing the voluntary excess:
+
+You may agree to increase the voluntary excess only up to the permitted maximum of £${negotiation.voluntary_excess_flexibility?.toFixed(2) ?? negotiation.voluntary_excess.toFixed(2)}.
+
+You must clearly state the revised voluntary excess amount when agreeing.
+
+You must request a revised premium reflecting that adjustment.
+
+Do not exceed the permitted maximum.
+
+Do not negotiate cover structure or add-ons.
+
+Use this lever only once and only as a final negotiation step before closing.
+
+If the revised premium becomes acceptable under tolerance, proceed to CLOSING.
+
+If no improved premium is offered after this step, proceed to CLOSING.
+
+3️⃣ Do NOT Modify:
+
+Outcome tag format
+
+Closing instructions
+
+CRITICAL rules
+
+Tolerance logic
+
+Fallback response function
+
+Any TypeScript logic
+
+4️⃣ After Implementation
+
+Do not refactor or optimise anything else.
+
+Only confirm that:
+
+buildSystemPrompt compiles
+
+No TypeScript errors
+
+No other files changed
