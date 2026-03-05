@@ -2715,6 +2715,15 @@ function NegotiatePromptState({
               className="absolute top-0 bottom-0 w-0.5 bg-slate-400 opacity-60 pointer-events-none"
               style={{ left: `${markerPct}%` }}
             />
+            <div
+              className="absolute -top-6 text-xs text-slate-500 -translate-x-1/2 pointer-events-none text-center leading-tight"
+              style={{ left: `${markerPct}%` }}
+            >
+              <div className="font-medium">Break-even</div>
+              <div className="text-[11px] text-slate-400">
+                £{competitorQuote.toFixed(2)} + £{cancellationFee.toFixed(2)} fee
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center justify-between text-xs font-medium px-0.5">
@@ -2723,22 +2732,38 @@ function NegotiatePromptState({
           </div>
         </div>
 
-        <div className="rounded-md bg-muted/60 px-4 py-3 text-center">
-          <p className="text-base font-semibold text-foreground" data-testid="text-max-acceptable">
-            Max acceptable: £{sliderValue.toFixed(2)}
-          </p>
-        </div>
+        <div className="mt-8 text-center space-y-4" data-testid="decision-impact-block">
+          <div className="text-lg text-slate-600">
+            If <span className="font-semibold">{currentProvider.toUpperCase()}</span> agrees to
+            <span className="font-semibold"> £{sliderValue.toFixed(2)}</span>
+          </div>
 
-        <div className="mt-4 p-4 rounded-lg bg-slate-50 border border-slate-200" data-testid="decision-impact-block">
-          <div className="mt-6 text-center space-y-2">
-            <div className="text-sm text-muted-foreground">
-              If {currentProvider} agrees to £{sliderValue.toFixed(2)}
+          {breakEvenDifference >= 0 ? (
+            <div className="space-y-1">
+              <div className="text-5xl font-bold text-green-600">
+                £{breakEvenDifference.toFixed(2)}
+              </div>
+              <div className="text-lg text-slate-600">
+                Saved vs switching
+              </div>
             </div>
-            <div className="text-3xl font-bold text-green-600">
-              £{Math.abs(breakEvenDifference).toFixed(2)} saved vs switching
+          ) : (
+            <div className="space-y-1">
+              <div className="text-5xl font-bold text-red-600">
+                £{Math.abs(breakEvenDifference).toFixed(2)}
+              </div>
+              <div className="text-lg text-slate-600">
+                Switching would save this amount
+              </div>
             </div>
-            <div className="text-lg font-medium text-slate-700">
-              £{Math.abs(currentPremiumDifference).toFixed(2)} less than your current premium
+          )}
+
+          <div className="pt-2">
+            <div className="text-3xl font-semibold text-slate-800">
+              £{Math.abs(currentPremiumDifference).toFixed(2)}
+            </div>
+            <div className="text-md text-slate-500">
+              Less than your current premium
             </div>
           </div>
         </div>
