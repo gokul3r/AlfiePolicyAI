@@ -95,10 +95,11 @@ function LivePriceChart({
     features?: string[];
     type: "purchased" | "matched" | "market";
   } | null>(null);
-  const paddingLeft = 35;
-  const paddingRight = 10;
-  const paddingTop = 18;
-  const paddingBottom = 20;
+  const scale = width / 260;
+  const paddingLeft = Math.round(35 * scale);
+  const paddingRight = Math.round(10 * scale);
+  const paddingTop = Math.round(18 * scale);
+  const paddingBottom = Math.round(20 * scale);
   const chartWidth = width - paddingLeft - paddingRight;
   const chartHeight = height - paddingTop - paddingBottom;
 
@@ -182,29 +183,29 @@ function LivePriceChart({
         }}
       >
         {/* Legend */}
-        <circle cx={paddingLeft + 2} cy={6} r={3} fill="#9ca3af" />
-        <text x={paddingLeft + 8} y={9} fontSize="6" className="fill-gray-500">Market Avg</text>
+        <circle cx={paddingLeft + 2 * scale} cy={6 * scale} r={3 * scale} fill="#9ca3af" />
+        <text x={paddingLeft + 8 * scale} y={9 * scale} fontSize={6 * scale} className="fill-gray-500">Market Avg</text>
         {hasPurchased ? (
           <>
-            <circle cx={paddingLeft + 52} cy={6} r={3} fill="#16a34a" />
-            <text x={paddingLeft + 58} y={9} fontSize="6" fill="#16a34a">Switched</text>
-            <circle cx={paddingLeft + 98} cy={6} r={3} fill="#3b82f6" />
-            <text x={paddingLeft + 104} y={9} fontSize="6" className="fill-blue-600">Matched</text>
+            <circle cx={paddingLeft + 52 * scale} cy={6 * scale} r={3 * scale} fill="#16a34a" />
+            <text x={paddingLeft + 58 * scale} y={9 * scale} fontSize={6 * scale} fill="#16a34a">Switched</text>
+            <circle cx={paddingLeft + 98 * scale} cy={6 * scale} r={3 * scale} fill="#3b82f6" />
+            <text x={paddingLeft + 104 * scale} y={9 * scale} fontSize={6 * scale} className="fill-blue-600">Matched</text>
             {currentPolicyPrice > 0 && (
               <>
-                <line x1={paddingLeft + 140} y1={6} x2={paddingLeft + 150} y2={6} stroke="#f97316" strokeWidth={1} strokeDasharray="2 1" />
-                <text x={paddingLeft + 153} y={9} fontSize="5.5" className="fill-orange-500">Your price</text>
+                <line x1={paddingLeft + 140 * scale} y1={6 * scale} x2={paddingLeft + 150 * scale} y2={6 * scale} stroke="#f97316" strokeWidth={scale} strokeDasharray="2 1" />
+                <text x={paddingLeft + 153 * scale} y={9 * scale} fontSize={5.5 * scale} className="fill-orange-500">Your price</text>
               </>
             )}
           </>
         ) : (
           <>
-            <circle cx={paddingLeft + 52} cy={6} r={3} fill="#3b82f6" />
-            <text x={paddingLeft + 58} y={9} fontSize="6" className="fill-blue-600">Matched</text>
+            <circle cx={paddingLeft + 52 * scale} cy={6 * scale} r={3 * scale} fill="#3b82f6" />
+            <text x={paddingLeft + 58 * scale} y={9 * scale} fontSize={6 * scale} className="fill-blue-600">Matched</text>
             {currentPolicyPrice > 0 && (
               <>
-                <line x1={paddingLeft + 98} y1={6} x2={paddingLeft + 108} y2={6} stroke="#f97316" strokeWidth={1} strokeDasharray="2 1" />
-                <text x={paddingLeft + 111} y={9} fontSize="6" className="fill-orange-500">Your price</text>
+                <line x1={paddingLeft + 98 * scale} y1={6 * scale} x2={paddingLeft + 108 * scale} y2={6 * scale} stroke="#f97316" strokeWidth={scale} strokeDasharray="2 1" />
+                <text x={paddingLeft + 111 * scale} y={9 * scale} fontSize={6 * scale} className="fill-orange-500">Your price</text>
               </>
             )}
           </>
@@ -212,7 +213,7 @@ function LivePriceChart({
 
         {/* Y-axis tick labels */}
         {tickValues.map((val) => (
-          <text key={val} x={paddingLeft - 4} y={getY(val) + 3} textAnchor="end" className="fill-gray-400" fontSize="8">
+          <text key={val} x={paddingLeft - 4 * scale} y={getY(val) + 3 * scale} textAnchor="end" className="fill-gray-400" fontSize={8 * scale}>
             £{val}
           </text>
         ))}
@@ -226,7 +227,7 @@ function LivePriceChart({
             x2={width - paddingRight}
             y2={getY(val)}
             stroke="#e5e7eb"
-            strokeWidth={0.5}
+            strokeWidth={0.5 * scale}
           />
         ))}
 
@@ -238,15 +239,15 @@ function LivePriceChart({
             x2={width - paddingRight}
             y2={refLineY}
             stroke="#f97316"
-            strokeWidth={1}
-            strokeDasharray="4 3"
+            strokeWidth={scale}
+            strokeDasharray={`${4 * scale} ${3 * scale}`}
             opacity={0.8}
           />
         )}
 
         {/* Grey market line segments */}
         {marketSegments.map((segment, i) => (
-          <path key={`market-${i}`} d={segment} fill="none" stroke="#9ca3af" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />
+          <path key={`market-${i}`} d={segment} fill="none" stroke="#9ca3af" strokeWidth={1.5 * scale} strokeLinecap="round" strokeLinejoin="round" opacity={0.7} />
         ))}
 
         {/* Grey market dots - clickable */}
@@ -255,7 +256,7 @@ function LivePriceChart({
             <circle
               cx={point.x}
               cy={point.y}
-              r={6}
+              r={6 * scale}
               fill="transparent"
               style={{ cursor: "pointer" }}
               onClick={(e) => {
@@ -266,10 +267,10 @@ function LivePriceChart({
             <circle
               cx={point.x}
               cy={point.y}
-              r={2.5}
+              r={2.5 * scale}
               fill="#9ca3af"
               stroke="white"
-              strokeWidth={1}
+              strokeWidth={scale}
               opacity={0.8}
               style={{ pointerEvents: "none" }}
             />
@@ -278,7 +279,7 @@ function LivePriceChart({
 
         {/* Matched line segments */}
         {matchedSegments.map((segment, i) => (
-          <path key={`matched-${i}`} d={segment} fill="none" stroke={getMatchedLineColor(hasPurchased)} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          <path key={`matched-${i}`} d={segment} fill="none" stroke={getMatchedLineColor(hasPurchased)} strokeWidth={2 * scale} strokeLinecap="round" strokeLinejoin="round" />
         ))}
 
         {/* Matched/Purchased dots - clickable with color coding */}
@@ -286,14 +287,14 @@ function LivePriceChart({
           const isPurchased = point.status === "purchased";
           const isLast = i === matchedDots.length - 1;
           const dotColor = getMatchedDotColor(point.status, isLast);
-          const dotRadius = isPurchased ? 4.5 : (isLast ? 4 : 3);
+          const dotRadius = (isPurchased ? 4.5 : (isLast ? 4 : 3)) * scale;
 
           return (
             <g key={`matched-dot-${i}`}>
               <circle
                 cx={point.x}
                 cy={point.y}
-                r={8}
+                r={8 * scale}
                 fill="transparent"
                 style={{ cursor: "pointer" }}
                 onClick={(e) => {
@@ -307,19 +308,19 @@ function LivePriceChart({
                 r={dotRadius}
                 fill={dotColor}
                 stroke="white"
-                strokeWidth={1.5}
+                strokeWidth={1.5 * scale}
                 style={{ pointerEvents: "none" }}
               >
                 {isLast && !isPurchased && (
-                  <animate attributeName="r" values="4;6;4" dur="1.5s" repeatCount="indefinite" />
+                  <animate attributeName="r" values={`${4 * scale};${6 * scale};${4 * scale}`} dur="1.5s" repeatCount="indefinite" />
                 )}
               </circle>
               {isPurchased && (
-                <text x={point.x} y={point.y + 0.5} textAnchor="middle" fontSize="5" fill="white" fontWeight="700" style={{ pointerEvents: "none" }}>
+                <text x={point.x} y={point.y + 0.5 * scale} textAnchor="middle" fontSize={5 * scale} fill="white" fontWeight="700" style={{ pointerEvents: "none" }}>
                   &#10003;
                 </text>
               )}
-              <text x={point.x} y={point.y - 7} textAnchor="middle" fontSize="7" fill={dotColor} fontWeight="600" style={{ pointerEvents: "none" }}>
+              <text x={point.x} y={point.y - 7 * scale} textAnchor="middle" fontSize={7 * scale} fill={dotColor} fontWeight="600" style={{ pointerEvents: "none" }}>
                 £{Math.round(point.price)}
               </text>
             </g>
@@ -335,9 +336,9 @@ function LivePriceChart({
             <g key={i}>
               <text
                 x={getX(i)}
-                y={height - 8}
+                y={height - 8 * scale}
                 textAnchor="middle"
-                fontSize="7"
+                fontSize={7 * scale}
                 className="fill-gray-500"
               >
                 {monthAbbr}
@@ -345,9 +346,9 @@ function LivePriceChart({
               {yearAbbr && (
                 <text
                   x={getX(i)}
-                  y={height - 1}
+                  y={height - 1 * scale}
                   textAnchor="middle"
-                  fontSize="5.5"
+                  fontSize={5.5 * scale}
                   className="fill-gray-400"
                 >
                   {yearAbbr}
