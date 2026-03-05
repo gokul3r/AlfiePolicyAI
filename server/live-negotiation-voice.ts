@@ -301,7 +301,11 @@ You are speaking by voice with the insurance provider's human agent. Keep your r
           );
         }
 
-        if (waitingForFinalAgentReply && finalDecisionSpoken && userText) {
+        if (
+          waitingForFinalAgentReply &&
+          assistantText &&
+          assistantText.includes("has decided to")
+        ) {
           isClosing = true;
           await storage.updateLiveNegotiationStatus(negotiation.id, "completed");
           if (ioInstance) {
