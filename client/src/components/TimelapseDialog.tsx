@@ -2354,7 +2354,7 @@ function MatchFoundState({
             className="flex-1 text-lg py-6"
             data-testid="button-keep-searching"
           >
-            {canSearchMoreMonths ? "Continue Demo" : "End of policy period"}
+            {canSearchMoreMonths ? "Don't Switch" : "End of policy period"}
           </Button>
         </div>
       </div>
